@@ -2606,6 +2606,7 @@
   </div>
 </div>
 
+<script src="config.local.js"></script>
 <script>
   /* ===================================================
    * 설정 및 상수
@@ -2617,7 +2618,7 @@
    * OpenRouter API 설정 및 함수
    * =================================================== */
   const OPENROUTER_CONFIG = {
-    API_KEY: 'REDACTED_ROTATE_THIS_KEY',
+    API_KEY: window.OPENROUTER_API_KEY || '',
     BASE_URL: 'https://openrouter.ai/api/v1',
     FREE_MODELS: [
       // OpenRouter API 실제 확인 목록 (2026-03 기준, 26개)
