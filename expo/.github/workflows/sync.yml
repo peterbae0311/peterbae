@@ -1,0 +1,45 @@
+name: Data Sync
+
+on:
+  schedule:
+    # 매일 05:00 KST(UTC 20:00, 전날) 1회 — exh_sources.call_interval_minutes(1440=1일)와 동일 주기
+    - cron: "0 20 * * *"
+  workflow_dispatch:
+    inputs:
+      source:
+        description: "동기화할 소스 코드 (기본값 all)"
+        required: false
+        default: "all"
+
+concurrency:
+  group: exh-data-sync
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: "npm"
+
+      - run: npm ci
+
+      - name: Run sync
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+          KOPIS_SERVICE_KEY: ${{ secrets.KOPIS_SERVICE_KEY }}
+          CULTURE_PORTAL_SERVICE_KEY: ${{ secrets.CULTURE_PORTAL_SERVICE_KEY }}
+          CULTURE_DATA_PLAZA_EXPO_SERVICE_KEY: ${{ secrets.CULTURE_DATA_PLAZA_EXPO_SERVICE_KEY }}
+          CULTURE_DATA_PLAZA_PERF_SERVICE_KEY: ${{ secrets.CULTURE_DATA_PLAZA_PERF_SERVICE_KEY }}
+          SEOUL_CULTURE_EVENT_SERVICE_KEY: ${{ secrets.SEOUL_CULTURE_EVENT_SERVICE_KEY }}
+          WORKNET_JOB_FAIR_SERVICE_KEY: ${{ secrets.WORKNET_JOB_FAIR_SERVICE_KEY }}
+          KOTRA_OVERSEAS_FAIR_SERVICE_KEY: ${{ secrets.KOTRA_OVERSEAS_FAIR_SERVICE_KEY }}
+        run: npm run sync -- ${{ github.event.inputs.source || 'all' }}

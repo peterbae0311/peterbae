@@ -1,0 +1,17 @@
+{
+  "name": "앨범 - 가족 포토 슬라이드쇼",
+  "short_name": "앨범",
+  "description": "사진을 업로드하고 슬라이드쇼로 감상하는 가족 앨범",
+  "start_url": "./index.html",
+  "display": "standalone",
+  "background_color": "#f5f3ff",
+  "theme_color": "#7c3aed",
+  "orientation": "portrait-primary",
+  "icons": [
+    { "src": "icons/icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
+    { "src": "icons/icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any" },
+    { "src": "icons/icon-maskable.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
+  ],
+  "categories": ["photo", "lifestyle"],
+  "lang": "ko"
+}

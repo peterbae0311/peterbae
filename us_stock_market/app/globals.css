@@ -1,0 +1,223 @@
+@import "tailwindcss";
+
+/* ===== Theme Variables ===== */
+:root,
+[data-theme="dark"] {
+  /* bg-root: #030712(순수검정) → #0f172a(slate-900)
+     이유: 극단적 검정 배경은 LCD에서 밝은 텍스트 주변에 bloom 현상을 유발.
+     #0f172a는 충분히 어둡되 배경 자체에 약간의 채도가 있어 눈의 피로를 줄임. */
+  --bg-root:        #0f172a;
+  /* bg-panel: #111827 → #1a2438
+     root와 panel 사이에 시각적 레이어 구분을 명확히 유지 */
+  --bg-panel:       #1a2438;
+  /* bg-card: #1f2937 → #243044
+     카드가 panel보다 확실히 밝아서 계층 구조가 읽힘 */
+  --bg-card:        #243044;
+  --bg-header:      #182030;
+  --bg-subrow:      rgba(26,36,56,0.85);
+  --bg-hover:       rgba(36,48,68,0.4);
+  --bg-modal:       #1a2438;
+  --bg-modal-card:  #243044;
+
+  --text-primary:   #ffffff;
+  --text-secondary: #cccccc;
+  --text-muted:     #888888;
+  --text-accent:    #fbbf24;
+  --text-on-card:   #ffffff;
+
+  --border:         #243044;
+  --border-strong:  #334155;
+
+  /* 한국 증시 관례: 상승=빨강, 하락=파랑 */
+  --clr-up:         #f87171;
+  --clr-up-border:  #991b1b;
+  --clr-down:       #60a5fa;
+  --clr-down-border:#1e40af;
+
+  --bg-date-panel:  #1a2438;
+  --border-date-panel: #243044;
+
+  --scrollbar-track: #1a2438;
+  --scrollbar-thumb: #334155;
+  --scrollbar-hover: #475569;
+}
+
+[data-theme="white"] {
+  /* bg-root 순수 흰색 유지. 단 텍스트를 순수 검정 대신 약간 완화 */
+  --bg-root:        #ffffff;
+  --bg-panel:       #f8fafc;
+  --bg-card:        #f1f5f9;
+  --bg-header:      #c8d3e0;
+  --bg-subrow:      rgba(241,245,249,0.9);
+  --bg-hover:       rgba(226,232,240,0.6);
+  --bg-modal:       #f8fafc;
+  --bg-modal-card:  #f1f5f9;
+  /* 날짜 사이드패널: 화이트 테마에서 패널 배경으로 통일 */
+  --bg-date-panel:  #f1f5f9;
+  --border-date-panel: #e2e8f0;
+
+  --text-primary:   #111827;
+  /* secondary: #374151 → 흰 배경 대비 약 9.5:1, WCAG AA 충족 */
+  --text-secondary: #374151;
+  /* muted: #4b5563 → 흰 배경 대비 약 7.0:1, 소형 텍스트에서도 AA 충족 */
+  --text-muted:     #4b5563;
+  --text-accent:    #92400e;
+  --text-on-card:   #111827;
+
+  --border:         #e2e8f0;
+  --border-strong:  #cbd5e1;
+
+  --clr-up:         #dc2626;
+  --clr-up-border:  #dc2626;
+  --clr-down:       #2563eb;
+  --clr-down-border:#2563eb;
+
+  --scrollbar-track: #f1f5f9;
+  --scrollbar-thumb: #cbd5e1;
+  --scrollbar-hover: #94a3b8;
+}
+
+[data-theme="light-grey"] {
+  /* bg-root → bg-panel → bg-card 순서로 밝아지는 계층 유지 */
+  --bg-root:        #eef2f7;
+  --bg-panel:       #e2e8f0;
+  --bg-card:        #ffffff;
+  --bg-header:      #c4cdd9;
+  --bg-subrow:      rgba(226,232,240,0.9);
+  --bg-hover:       rgba(203,213,225,0.6);
+  --bg-modal:       #e2e8f0;
+  --bg-modal-card:  #ffffff;
+  --bg-date-panel:  #dde3ec;
+  --border-date-panel: #cbd5e1;
+
+  --text-primary:   #111827;
+  --text-secondary: #374151;
+  --text-muted:     #4b5563;
+  --text-accent:    #92400e;
+  --text-on-card:   #111827;
+
+  /* border를 bg-panel보다 명확히 어둡게 설정해 카드 구분선 강화 */
+  --border:         #cbd5e1;
+  --border-strong:  #94a3b8;
+
+  --clr-up:         #dc2626;
+  --clr-up-border:  #dc2626;
+  --clr-down:       #2563eb;
+  --clr-down-border:#2563eb;
+
+  --scrollbar-track: #e2e8f0;
+  --scrollbar-thumb: #94a3b8;
+  --scrollbar-hover: #64748b;
+}
+
+body {
+  background-color: var(--bg-root);
+  color: var(--text-primary);
+  font-family: var(--font-noto-sans-kr), 'Noto Sans KR', Arial, Helvetica, sans-serif;
+  /* 폰트 렌더링 최적화:
+     macOS에서 기본값(auto)은 서브픽셀 안티앨리어싱을 사용해 소형 폰트가 번져 보임.
+     antialiased는 그레이스케일 안티앨리어싱을 사용해 특히 다크 배경에서 선명도 향상. */
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  /* 소형 폰트(10-11px)의 kern/ligature 렌더링 최적화 */
+  text-rendering: optimizeLegibility;
+  font-feature-settings: "kern" 1;
+}
+
+/* 숫자 데이터 영역: 고정폭 폰트로 열 정렬 보장.
+   'ui-monospace'는 macOS/iOS 시스템 모노폰트(SF Mono),
+   'Cascadia Code' / 'Consolas'는 Windows 시스템 폰트,
+   Noto Sans KR는 최종 한글 폴백으로만 유지. */
+.font-mono {
+  font-family: ui-monospace, 'Cascadia Code', 'Consolas', 'Menlo', 'Monaco',
+               'Liberation Mono', monospace,
+               var(--font-noto-sans-kr), 'Noto Sans KR', sans-serif;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: 0.01em;
+}
+
+::-webkit-scrollbar { width: 6px; height: 6px; }
+::-webkit-scrollbar-track  { background: var(--scrollbar-track); }
+::-webkit-scrollbar-thumb  { background: var(--scrollbar-thumb); border-radius: 3px; }
+::-webkit-scrollbar-thumb:hover { background: var(--scrollbar-hover); }
+
+/* ===== Light-theme overrides for Tailwind classes ===== */
+
+/* Backgrounds */
+[data-theme="white"] .bg-gray-950,
+[data-theme="light-grey"] .bg-gray-950 { background-color: var(--bg-root); }
+[data-theme="white"] .bg-gray-900,
+[data-theme="light-grey"] .bg-gray-900 { background-color: var(--bg-panel); }
+[data-theme="white"] .bg-gray-900\/60,
+[data-theme="light-grey"] .bg-gray-900\/60 { background-color: var(--bg-panel); }
+[data-theme="white"] .bg-gray-900\/80,
+[data-theme="light-grey"] .bg-gray-900\/80 { background-color: var(--bg-panel); }
+[data-theme="white"] .bg-gray-800,
+[data-theme="light-grey"] .bg-gray-800 { background-color: var(--bg-card); }
+[data-theme="white"] .bg-gray-700\/60,
+[data-theme="light-grey"] .bg-gray-700\/60 { background-color: var(--bg-card); }
+[data-theme="white"] .bg-gray-800\/30,
+[data-theme="light-grey"] .bg-gray-800\/30 { background-color: var(--bg-hover); }
+[data-theme="white"] .bg-gray-800\/40,
+[data-theme="light-grey"] .bg-gray-800\/40 { background-color: var(--bg-hover); }
+
+/* Hover backgrounds */
+[data-theme="white"] .hover\:bg-gray-800:hover,
+[data-theme="light-grey"] .hover\:bg-gray-800:hover { background-color: var(--bg-hover); }
+[data-theme="white"] .hover\:bg-gray-700\/50:hover,
+[data-theme="light-grey"] .hover\:bg-gray-700\/50:hover { background-color: var(--bg-hover); }
+[data-theme="white"] .hover\:bg-gray-800\/30:hover,
+[data-theme="light-grey"] .hover\:bg-gray-800\/30:hover { background-color: var(--bg-hover); }
+
+/* Text — 3단계 위계 유지:
+   text-white / text-gray-200  → primary   (#111827, 대비 ~18:1)
+   text-gray-300 / text-gray-400 → secondary (#374151, 대비 ~9.5:1)
+   text-gray-500 / text-gray-600 / text-gray-700 → muted (#4b5563, 대비 ~7:1) */
+[data-theme="white"] .text-white,
+[data-theme="light-grey"] .text-white { color: var(--text-primary); }
+[data-theme="white"] .text-gray-200,
+[data-theme="light-grey"] .text-gray-200 { color: var(--text-primary); }
+[data-theme="white"] .text-gray-300,
+[data-theme="light-grey"] .text-gray-300 { color: var(--text-secondary); }
+[data-theme="white"] .text-gray-400,
+[data-theme="light-grey"] .text-gray-400 { color: var(--text-secondary); }
+[data-theme="white"] .text-gray-500,
+[data-theme="light-grey"] .text-gray-500 { color: var(--text-muted); }
+[data-theme="white"] .text-gray-600,
+[data-theme="light-grey"] .text-gray-600 { color: var(--text-muted); }
+[data-theme="white"] .text-gray-700,
+[data-theme="light-grey"] .text-gray-700 { color: var(--text-muted); }
+
+/* Borders */
+[data-theme="white"] .border-gray-700,
+[data-theme="light-grey"] .border-gray-700 { border-color: var(--border-strong); }
+[data-theme="white"] .border-gray-800,
+[data-theme="light-grey"] .border-gray-800 { border-color: var(--border); }
+[data-theme="white"] .border-gray-800\/40,
+[data-theme="light-grey"] .border-gray-800\/40 { border-color: var(--border); }
+[data-theme="white"] .divide-gray-800 > :not([hidden]) ~ :not([hidden]),
+[data-theme="light-grey"] .divide-gray-800 > :not([hidden]) ~ :not([hidden]) { border-color: var(--border); }
+
+/* Session header backgrounds (US dashboard) */
+[data-theme="white"] .bg-amber-950\/70,
+[data-theme="light-grey"] .bg-amber-950\/70 { background-color: #fffbeb; }
+[data-theme="white"] .bg-sky-950\/70,
+[data-theme="light-grey"] .bg-sky-950\/70 { background-color: #f0f9ff; }
+[data-theme="white"] .bg-emerald-950\/70,
+[data-theme="light-grey"] .bg-emerald-950\/70 { background-color: #f0fdf4; }
+[data-theme="white"] .bg-violet-950\/70,
+[data-theme="light-grey"] .bg-violet-950\/70 { background-color: #faf5ff; }
+
+/* Outlook badge colors in light themes */
+[data-theme="white"] .text-red-300,
+[data-theme="light-grey"] .text-red-300 { color: var(--clr-up); }
+[data-theme="white"] .text-blue-300,
+[data-theme="light-grey"] .text-blue-300 { color: var(--clr-down); }
+[data-theme="white"] .border-red-700,
+[data-theme="light-grey"] .border-red-700 { border-color: var(--clr-up-border); }
+[data-theme="white"] .border-blue-700,
+[data-theme="light-grey"] .border-blue-700 { border-color: var(--clr-down-border); }
+[data-theme="white"] .bg-red-900\/40,
+[data-theme="light-grey"] .bg-red-900\/40 { background-color: rgba(220, 38, 38, 0.1); }
+[data-theme="white"] .bg-blue-900\/40,
+[data-theme="light-grey"] .bg-blue-900\/40 { background-color: rgba(37, 99, 235, 0.1); }

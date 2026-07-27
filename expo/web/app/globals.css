@@ -1,0 +1,103 @@
+@import "tailwindcss";
+
+:root {
+  --paper: #fcfcfb;
+  --surface: #ffffff;
+  --ink: #0b0b0b;
+  --ink-muted: #52514e;
+  --line: #e3e1da;
+  --line-strong: #cfccc2;
+  --culture: #2a78d6;
+  --industry: #eda100;
+  --status-done-bg: #e5f3e5;
+  --status-done-fg: #1f6b1f;
+  --status-hold-bg: #fdf1da;
+  --status-hold-fg: #92620a;
+}
+
+:root[data-theme="dark"] {
+  --paper: #1a1a19;
+  --surface: #232322;
+  --ink: #ededea;
+  --ink-muted: #c3c2b7;
+  --line: #38372f;
+  --line-strong: #47453a;
+  --culture: #3987e5;
+  --industry: #c98500;
+  --status-done-bg: #16321a;
+  --status-done-fg: #7ed17e;
+  --status-hold-bg: #3a2c10;
+  --status-hold-fg: #f0c274;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --paper: #1a1a19;
+    --surface: #232322;
+    --ink: #ededea;
+    --ink-muted: #c3c2b7;
+    --line: #38372f;
+    --line-strong: #47453a;
+    --culture: #3987e5;
+    --industry: #c98500;
+    --status-done-bg: #16321a;
+    --status-done-fg: #7ed17e;
+    --status-hold-bg: #3a2c10;
+    --status-hold-fg: #f0c274;
+  }
+}
+
+@theme inline {
+  --color-paper: var(--paper);
+  --color-surface: var(--surface);
+  --color-ink: var(--ink);
+  --color-ink-muted: var(--ink-muted);
+  --color-line: var(--line);
+  --color-line-strong: var(--line-strong);
+  --color-culture: var(--culture);
+  --color-industry: var(--industry);
+  --font-sans: var(--font-noto-sans-kr);
+}
+
+/* 콘텐츠 표시 폭 통일 — 목록/상세/관리자 전 화면 공통 */
+:root {
+  --content-width: 1816px;
+}
+
+body {
+  font-variant-numeric: tabular-nums;
+}
+
+.content-shell {
+  max-width: var(--content-width);
+  margin-inline: auto;
+  padding-inline: 2rem;
+}
+
+@media (min-width: 1024px) {
+  .content-shell {
+    padding-inline: 4rem;
+  }
+}
+
+/* Awwwards류 에디토리얼 톤: 하드 언더라인 호버, 이미지 줌 */
+.underline-grow {
+  background-image: linear-gradient(currentColor, currentColor);
+  background-size: 0% 1px;
+  background-position: 0 100%;
+  background-repeat: no-repeat;
+  transition: background-size 0.3s ease;
+}
+.underline-grow:hover {
+  background-size: 100% 1px;
+}
+
+.img-zoom {
+  overflow: hidden;
+}
+.img-zoom img {
+  transition: transform 0.6s cubic-bezier(0.16, 1, 0.3, 1);
+}
+.img-zoom:hover img {
+  transform: scale(1.06);
+}

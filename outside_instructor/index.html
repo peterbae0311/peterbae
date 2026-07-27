@@ -1,0 +1,4182 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>사외 강사 정보 관리</title>
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
+  <link rel="stylesheet" href="auth/auth.css">
+  <style>
+    /* ─── Reset & Base ─────────────────────────────────────────── */
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: 'Noto Sans KR', 'Malgun Gothic', 'Apple SD Gothic Neo', sans-serif;
+      font-size: 14px;
+      background: #f0f4ff;
+      color: #222;
+      height: 100vh;
+      display: flex;
+      overflow: hidden;
+    }
+
+    /* ─── Layout ────────────────────────────────────────────────── */
+    #app { display: grid; grid-template-columns: 20% 80%; width: 100%; height: 100vh; }
+
+    /* ─── Left Panel ─────────────────────────────────────────────  */
+    #left-panel {
+      background: linear-gradient(175deg, #2563eb 0%, #4f46e5 50%, #7c3aed 100%);
+      color: #fff;
+      display: flex;
+      flex-direction: column;
+      overflow-y: auto;
+      min-height: 100vh;
+      box-shadow: 4px 0 24px rgba(37,99,235,0.35);
+    }
+    .left-header {
+      padding: 30px 22px 22px;
+      border-bottom: 1px solid rgba(255,255,255,0.2);
+      background: rgba(0,0,0,0.12);
+    }
+    .left-header .app-logo-area { display: flex; align-items: center; gap: 12px; margin-bottom: 6px; }
+    .left-header .app-logo-area i { font-size: 26px; color: #fff; opacity: 1; filter: drop-shadow(0 2px 4px rgba(0,0,0,0.25)); }
+    .left-header .app-title { font-size: 18px; font-weight: 700; letter-spacing: -0.4px; color: #fff; line-height: 1.25; text-shadow: 0 1px 3px rgba(0,0,0,0.2); }
+    .left-header .app-subtitle {
+      font-size: 12px; color: rgba(255,255,255,0.9);
+      margin-top: 5px; padding-left: 2px;
+      letter-spacing: 0.1px; line-height: 1.5;
+      text-shadow: 0 1px 2px rgba(0,0,0,0.15);
+    }
+
+    .nav-group-header {
+      display: flex; align-items: center; justify-content: space-between;
+      padding: 14px 22px 13px; cursor: pointer; user-select: none;
+      font-size: 14px; font-weight: 700; color: #fff;
+      letter-spacing: -0.2px; text-transform: none;
+      transition: background 0.15s; gap: 8px;
+      text-shadow: 0 1px 3px rgba(0,0,0,0.2);
+    }
+    .nav-group-header .nav-group-label { display: flex; align-items: center; gap: 8px; }
+    .nav-group-header .nav-group-label i { font-size: 13px; color: #fff; opacity: 0.9; }
+    .nav-group-header:hover { background: rgba(255,255,255,0.08); }
+    .nav-group-header .chevron { font-size: 11px; transition: transform 0.2s; color: #fff; opacity: 0.85; flex-shrink: 0; }
+    .nav-group-header.collapsed .chevron { transform: rotate(180deg); }
+    .nav-group-body { overflow: hidden; max-height: 500px; transition: max-height 0.25s ease; }
+    .nav-group-body.collapsed { max-height: 0; }
+
+    .nav-item {
+      display: flex; align-items: center; gap: 11px;
+      padding: 11px 20px 11px 26px; cursor: pointer;
+      font-size: 14px; color: #fff; letter-spacing: -0.2px;
+      border-left: 4px solid transparent;
+      transition: background 0.15s, border-color 0.15s;
+      text-shadow: 0 1px 2px rgba(0,0,0,0.18);
+    }
+    .nav-item:hover {
+      background: rgba(255,255,255,0.12);
+      border-left-color: rgba(255,255,255,0.6);
+    }
+    .nav-item.active {
+      background: rgba(255,255,255,0.22);
+      color: #fff;
+      border-left-color: #fff;
+      font-weight: 700;
+    }
+    .nav-item i { font-size: 14px; opacity: 1; flex-shrink: 0; width: 16px; text-align: center; }
+    .nav-item.active i { opacity: 1; }
+
+    /* ─── Right Panel ─────────────────────────────────────────── */
+    #right-panel { background: #f0f4ff; overflow-y: auto; padding: 28px 32px; }
+
+    /* ─── Content Card ────────────────────────────────────────── */
+    .content-card { background: #fff; border-radius: 16px; box-shadow: 0 6px 28px rgba(102,126,234,0.11); overflow: hidden; }
+    .content-card-header {
+      display: flex; align-items: center; justify-content: space-between;
+      padding: 18px 24px;
+      background: linear-gradient(90deg, #667eea 0%, #764ba2 100%);
+    }
+    .content-card-header h2 { font-size: 17px; font-weight: 700; color: #fff; letter-spacing: -0.4px; }
+
+    /* ─── Section Header ──────────────────────────────────────── */
+    .sec-hdr {
+      font-size: 14px; font-weight: 700; color: #222;
+      padding: 14px 0 6px 0; margin: 0 24px;
+      border-bottom: 2px solid #333;
+    }
+    .sec-hdr:not(:first-child) { margin-top: 24px; }
+
+    /* ─── Registration Table (4-col form) ─────────────────────── */
+    .reg-table { width: 100%; border-collapse: collapse; margin: 0 0 4px 0; }
+    .reg-table td { padding: 7px 10px; vertical-align: middle; }
+    .reg-table .rl {
+      width: 110px; min-width: 110px;
+      text-align: right; font-size: 13px; font-weight: 600;
+      color: #333; white-space: nowrap; padding-right: 12px;
+    }
+    .reg-table .rl .req { color: #e53e3e; margin-left: 2px; font-weight: 700; }
+
+    /* ─── Form Inputs ─────────────────────────────────────────── */
+    .form-input, .form-select, .form-textarea {
+      width: 100%; padding: 7px 10px;
+      border: 1px solid #ccc; border-radius: 5px;
+      font-family: inherit; font-size: 13px; color: #333;
+      background: #fff; transition: border-color 0.15s, box-shadow 0.15s; outline: none;
+    }
+    .form-input:focus, .form-select:focus, .form-textarea:focus {
+      border-color: #667eea; box-shadow: 0 0 0 3px rgba(102,126,234,0.15);
+    }
+    .form-textarea { resize: vertical; line-height: 1.6; }
+
+    /* ─── Sub Table (dynamic rows) ────────────────────────────── */
+    .sub-table { width: 100%; border-collapse: collapse; font-size: 13px; }
+    .sub-table th {
+      background: #f5f5f5; padding: 7px 10px;
+      text-align: left; font-weight: 600; color: #444;
+      border: 1px solid #ddd; font-size: 12.5px; white-space: nowrap;
+    }
+    .sub-table td { padding: 5px 6px; border: 1px solid #e5e5e5; vertical-align: middle; }
+    .sub-table td .form-input,
+    .sub-table td .form-select { border-color: #ddd; font-size: 12.5px; padding: 5px 8px; height: 30px; box-sizing: border-box; }
+
+    /* ─── Row +/- Buttons ─────────────────────────────────────── */
+    .btn-row-op {
+      display: inline-flex; align-items: center; justify-content: center;
+      width: 26px; height: 26px; border: 1px solid; border-radius: 50%;
+      font-size: 15px; font-weight: 700; cursor: pointer;
+      line-height: 1; padding: 0; font-family: inherit;
+      transition: background 0.15s, color 0.15s;
+    }
+    .btn-row-add { background: #fff; color: #667eea; border-color: #667eea; }
+    .btn-row-add:hover { background: #667eea; color: #fff; }
+    .btn-row-del { background: #fff; color: #e53e3e; border-color: #e53e3e; margin-left: 4px; }
+    .btn-row-del:hover { background: #e53e3e; color: #fff; }
+
+    /* ─── Attachment ──────────────────────────────────────────── */
+    .attach-list { display: flex; flex-direction: column; gap: 4px; margin-top: 8px; }
+    .attach-item {
+      display: flex; align-items: center; gap: 10px;
+      background: #f7f7f7; border: 1px solid #e0e0e0;
+      border-radius: 5px; padding: 5px 10px; font-size: 12.5px;
+      max-width: 420px;
+    }
+    .attach-item .attach-name { flex: 1; color: #333; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .attach-item .attach-size { color: #888; white-space: nowrap; }
+    .attach-item .attach-del {
+      background: none; border: none; color: #aaa; cursor: pointer;
+      font-size: 14px; padding: 0 2px; line-height: 1;
+      transition: color 0.12s;
+    }
+    .attach-item .attach-del:hover { color: #e53e3e; }
+
+    /* ─── Profile Image ───────────────────────────────────────── */
+    .profile-preview {
+      width: 80px; height: 80px; object-fit: cover;
+      border-radius: 8px; border: 1px solid #ddd; display: none;
+    }
+    .profile-preview.visible { display: block; }
+
+    /* ─── Buttons ─────────────────────────────────────────────── */
+    .btn {
+      display: inline-flex; align-items: center; gap: 7px;
+      padding: 8px 20px; border: none; border-radius: 8px;
+      font-family: inherit; font-size: 14px; font-weight: 600;
+      cursor: pointer; transition: filter 0.15s, transform 0.15s;
+      letter-spacing: -0.2px;
+    }
+    .btn:hover { transform: translateY(-1px); filter: brightness(1.06); }
+    .btn:active { transform: scale(0.98); }
+    .btn-primary { background: linear-gradient(90deg,#667eea,#764ba2); color:#fff; box-shadow:0 3px 10px rgba(102,126,234,0.3); }
+    .btn-success { background: linear-gradient(90deg,#10b981,#059669); color:#fff; font-size:14px; padding:10px 36px; border-radius:10px; box-shadow:0 3px 10px rgba(16,185,129,0.3); }
+    .btn-secondary { background: #f1f3f5; color: #555; border-radius: 8px; }
+    .btn-secondary:hover { background: #e9ecef; }
+    .btn-edit   { background:#e8f4fd; color:#1a6fb3; padding:4px 10px; font-size:12px; border-radius:5px; border:none; cursor:pointer; font-family:inherit; font-weight:600; }
+    .btn-delete { background:#fde8e8; color:#b31a1a; padding:4px 10px; font-size:12px; border-radius:5px; border:none; cursor:pointer; font-family:inherit; font-weight:600; }
+    .btn-edit:hover   { filter: brightness(1.08); }
+    .btn-delete:hover { filter: brightness(1.08); }
+    .btn-sm { padding:5px 12px; font-size:12px; border-radius:6px; border:none; cursor:pointer; font-family:inherit; font-weight:600; }
+
+    /* ─── Form Footer ──────────────────────────────────────────── */
+    .form-footer {
+      padding: 20px 24px; display: flex; justify-content: center; gap: 12px;
+      border-top: 1px solid #eeebff; background: #faf8ff; margin-top: 8px;
+    }
+
+    /* ─── View Mode ───────────────────────────────────────────── */
+    .view-table { width: 100%; border-collapse: collapse; }
+    .view-table td { padding: 8px 10px; vertical-align: top; border: none; }
+    .view-label { width: 110px; min-width: 110px; text-align: right; font-weight: 600; color: #444; font-size: 13px; white-space: nowrap; padding-right: 12px; }
+    .view-value { font-size: 13px; color: #222; line-height: 1.6; }
+    .view-sub-table { width: 100%; border-collapse: collapse; font-size: 13px; margin-top: 4px; }
+    .view-sub-table th { background: #f5f5f5; padding: 6px 10px; text-align: left; font-weight: 600; color: #444; border: 1px solid #ddd; font-size: 12.5px; }
+    .view-sub-table td { padding: 6px 10px; border: 1px solid #e8e8e8; color: #333; }
+
+    /* ─── Data Table (Tax Company List) ──────────────────────── */
+    .list-toolbar { display: flex; justify-content: flex-end; padding: 14px 20px 10px; }
+    .data-table { width: 100%; border-collapse: collapse; font-size: 13.5px; }
+    .data-table thead tr { background: linear-gradient(90deg,#f0edff,#f8f6ff); }
+    .data-table th { padding: 10px 14px; text-align: left; font-weight: 700; color: #5a4fcf; font-size: 13px; border-bottom: 2px solid #ede8ff; white-space: nowrap; }
+    .data-table td { padding: 10px 14px; border-bottom: 1px solid #f0eeff; color: #333; font-size: 13px; }
+    .data-table tbody tr:hover td { background: #faf8ff; }
+    .data-table .action-cell { white-space: nowrap; text-align: center; width: 100px; }
+    .empty-table { text-align: center; padding: 36px; color: #aaa; font-size: 13px; }
+
+    /* ─── Modal ───────────────────────────────────────────────── */
+    .modal-overlay { display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.45); z-index: 10000; align-items: center; justify-content: center; }
+    .modal-overlay.active { display: flex; }
+    .modal { background: #fff; border-radius: 14px; box-shadow: 0 16px 48px rgba(102,126,234,0.22); width: 520px; max-width: 94vw; overflow: hidden; animation: modalIn 0.18s ease; }
+    @keyframes modalIn { from{opacity:0;transform:translateY(-14px) scale(0.97)} to{opacity:1;transform:translateY(0) scale(1)} }
+    .modal-header { display: flex; align-items: center; justify-content: space-between; padding: 16px 22px; background: linear-gradient(90deg,#667eea 0%,#764ba2 100%); }
+    .modal-header h3 { font-size: 15px; font-weight: 700; color: #fff; }
+    .modal-close { background: none; border: none; color: rgba(255,255,255,0.8); font-size: 20px; cursor: pointer; padding: 2px 6px; border-radius: 4px; transition: background 0.15s; }
+    .modal-close:hover { background: rgba(255,255,255,0.15); color: #fff; }
+    .modal-body { padding: 22px; display: flex; flex-direction: column; gap: 13px; }
+    .modal-field { display: flex; flex-direction: column; gap: 5px; }
+    .modal-field label { font-size: 13px; font-weight: 600; color: #5a4fcf; }
+    .modal-field .req { color: #e53e3e; margin-left: 2px; }
+    .modal-footer { display: flex; justify-content: flex-end; gap: 10px; padding: 14px 22px; border-top: 1px solid #ede8ff; background: #f8f6ff; }
+
+    /* ─── Spinner ─────────────────────────────────────────────── */
+    #spinner-overlay { display: none; position: fixed; inset: 0; background: rgba(255,255,255,0.70); z-index: 9999; align-items: center; justify-content: center; }
+    #spinner-overlay.active { display: flex; }
+    .spinner { width: 46px; height: 46px; border: 5px solid #e8e0ff; border-top-color: #667eea; border-radius: 50%; animation: spin 0.7s linear infinite; }
+    @keyframes spin { to { transform: rotate(360deg); } }
+
+    /* ─── Toast ───────────────────────────────────────────────── */
+    #toast-container { position: fixed; top: 20px; right: 22px; z-index: 99999; display: flex; flex-direction: column; gap: 10px; pointer-events: none; }
+    .toast { padding: 13px 18px; border-radius: 10px; font-size: 13px; font-weight: 600; box-shadow: 0 6px 20px rgba(0,0,0,0.12); opacity: 0; transform: translateX(28px); transition: opacity 0.22s, transform 0.22s; pointer-events: auto; max-width: 320px; background: #fff; border-left: 4px solid #667eea; color: #222; }
+    .toast.show { opacity: 1; transform: translateX(0); }
+    .toast.success { border-left-color: #10b981; }
+    .toast.error   { border-left-color: #ef4444; }
+    .toast.warning { border-left-color: #f59e0b; }
+
+    /* ─── Misc ────────────────────────────────────────────────── */
+    .empty-state { padding: 56px 24px; text-align: center; color: #a78bfa; }
+    .empty-state .empty-icon { font-size: 46px; margin-bottom: 12px; }
+    .empty-state p { font-size: 14px; color: #9ca3af; }
+    .consent-badge { display:inline-block; padding:2px 10px; border-radius:10px; font-size:12px; font-weight:600; }
+    .consent-badge.yes { background:#d1fae5; color:#065f46; }
+    .consent-badge.no  { background:#fee2e2; color:#991b1b; }
+
+    /* ─── Tag Input ──────────────────────────────────────────── */
+    .tag-input-wrap {
+      display: flex; flex-wrap: wrap; align-items: center; gap: 6px;
+      border: 1.5px solid #cbd5e1; border-radius: 8px;
+      padding: 7px 10px; min-height: 42px; cursor: text; background: #fff;
+    }
+    .tag-input-wrap:focus-within { border-color: #2563eb; }
+    .tag-item {
+      display: inline-flex; align-items: center; gap: 4px;
+      background: #eff6ff; color: #1d4ed8;
+      border: 1px solid #bfdbfe; border-radius: 20px;
+      padding: 3px 8px 3px 12px; font-size: 13px; font-weight: 500; white-space: nowrap;
+    }
+    .tag-del {
+      cursor: pointer; color: #93c5fd; font-size: 13px; line-height: 1;
+      border: none; background: none; font-family: inherit; padding: 0 2px;
+    }
+    .tag-del:hover { color: #1d4ed8; }
+    .tag-text-input {
+      border: none; outline: none; font-size: 13.5px; font-family: inherit;
+      min-width: 160px; flex: 1; padding: 2px 0; background: transparent;
+    }
+
+    /* ─── Privacy Box ─────────────────────────────────────────── */
+    .privacy-box { margin: 0; border: 1.5px solid #d6ccff; border-radius: 10px; background: #fdfcff; overflow: hidden; }
+    .privacy-box-header { background: linear-gradient(90deg,#f0edff,#ede8ff); padding: 10px 14px; font-weight: 700; font-size: 13px; border-bottom: 1px solid #e0d8ff; color: #5a4fcf; }
+    .privacy-box-body { padding: 12px 14px; font-size: 12px; line-height: 1.7; color: #444; max-height: 200px; overflow-y: auto; }
+    .privacy-box-body ol { padding-left: 16px; margin: 5px 0; }
+    .privacy-box-body li { margin-bottom: 3px; }
+    .privacy-check-row { padding: 10px 14px; border-top: 1px solid #e0d8ff; display: flex; align-items: center; gap: 8px; background: #f5f2ff; }
+    .privacy-check-row label { font-size: 13px; font-weight: 600; color: #222; cursor: pointer; }
+    .privacy-check-row input[type="checkbox"] { width: 15px; height: 15px; cursor: pointer; accent-color: #667eea; }
+
+    @media (max-width: 900px) {
+      #app { grid-template-columns: 1fr; grid-template-rows: auto 1fr; }
+      #left-panel { min-height: auto; max-height: 200px; }
+      body { overflow: auto; height: auto; }
+    }
+
+    /* ─── Review Page ─────────────────────────────────────────── */
+    .review-guide-box {
+      margin: 20px 24px 0;
+      padding: 13px 16px;
+      background: #f0f7ff;
+      border: 1px solid #bfdbfe;
+      border-radius: 8px;
+      font-size: 13px;
+      color: #1e3a5f;
+      line-height: 1.7;
+    }
+    .review-guide-box i { color: #2563eb; margin-right: 6px; }
+
+    .review-instr-table { width: 100%; border-collapse: collapse; font-size: 13.5px; }
+    .review-instr-table thead tr { background: #f1f5f9; }
+    .review-instr-table th {
+      padding: 10px 14px; text-align: left; font-weight: 700; color: #334155;
+      font-size: 12.5px; border-bottom: 2px solid #e2e8f0; white-space: nowrap;
+    }
+    .review-instr-table td { padding: 10px 14px; border-bottom: 1px solid #f1f5f9; color: #374151; font-size: 13px; }
+    .review-instr-table tbody tr { cursor: pointer; transition: background 0.12s; }
+    .review-instr-table tbody tr:hover td { background: #f8fafc; }
+    .review-instr-table tbody tr.row-review-selected td {
+      background: #fffbeb !important;
+    }
+    .review-instr-table tbody tr.row-review-selected td:first-child {
+      border-left: 4px solid #f59e0b;
+      padding-left: 10px;
+    }
+    .review-instr-table tbody tr:not(.row-review-selected) td:first-child {
+      border-left: 4px solid transparent;
+    }
+    .review-sel-check { color: #f59e0b; font-size: 13px; }
+
+    /* 폼 등장 애니메이션 */
+    @keyframes reviewFormIn {
+      from { opacity: 0; transform: translateY(12px); }
+      to   { opacity: 1; transform: translateY(0); }
+    }
+    .review-form-wrap {
+      animation: reviewFormIn 0.22s ease;
+    }
+
+    /* 선택 강사 뱃지 */
+    .review-ctx-badge {
+      display: inline-flex; align-items: center; gap: 8px;
+      background: #fffbeb; border: 1.5px solid #fcd34d;
+      border-radius: 20px; padding: 5px 14px;
+      font-size: 13px; font-weight: 600; color: #92400e;
+    }
+    .review-ctx-badge i { color: #f59e0b; }
+
+    /* 별점 */
+    .star-row { display: flex; align-items: center; gap: 2px; }
+    .star-wrap {
+      position: relative; display: inline-block;
+      width: 36px; height: 36px; cursor: pointer;
+    }
+    .star-wrap i {
+      font-size: 30px; line-height: 36px; pointer-events: none;
+      color: #d1d5db; transition: color 0.08s, transform 0.08s;
+      display: block; text-align: center;
+    }
+    .star-wrap.lit i     { color: #f59e0b; }
+    .star-wrap.half i    { color: #f59e0b; }
+    .star-wrap.hovered i { color: #fbbf24; transform: scale(1.15); }
+    .star-half {
+      position: absolute; top: 0; height: 100%; width: 50%; z-index: 1;
+    }
+    .star-half.left-half  { left: 0; }
+    .star-half.right-half { right: 0; }
+    .star-score-display {
+      margin-left: 14px; font-size: 20px; font-weight: 700;
+      color: #f59e0b; min-width: 56px; letter-spacing: -0.5px;
+    }
+
+    /* 글자수 카운터 */
+    .char-counter { font-size: 11.5px; color: #9ca3af; text-align: right; margin-top: 3px; }
+    .char-counter.warn { color: #ef4444; }
+
+    /* 저장 버튼 비활성 */
+    .btn-success:disabled {
+      background: #d1d5db; color: #9ca3af;
+      box-shadow: none; cursor: not-allowed; filter: none; transform: none;
+    }
+    .btn-success:disabled:hover { transform: none; filter: none; }
+
+    /* ─── Badge ─────────────────────────────────────────────────── */
+    .badge-requested { display:inline-block; padding:2px 10px; font-size:11px; font-weight:700; border-radius:20px; background:#d1fae5; color:#065f46; white-space:nowrap; }
+    .badge-pending   { display:inline-block; padding:2px 10px; font-size:11px; font-weight:700; border-radius:20px; background:#f1f5f9; color:#64748b; white-space:nowrap; }
+    tr.row-selected td { background:#eef2ff !important; }
+
+    /* ─── Email Preview ──────────────────────────────────────────── */
+    .email-preview { background:#f8fafc; border:1px solid #e2e8f0; border-radius:8px; padding:18px 20px; font-size:13px; line-height:1.8; color:#334155; white-space:pre-wrap; font-family:inherit; margin-bottom:4px; }
+    .email-preview strong { color:#1e293b; }
+    .email-preview p { margin-bottom:12px; color:#334155; }
+    .email-info-table { width:100%; border-collapse:separate; border-spacing:0 6px; margin:14px 0; }
+    .email-info-table td.lbl { font-weight:700; color:#4f46e5; font-size:15px; white-space:nowrap; padding:10px 16px 10px 0; width:110px; vertical-align:middle; }
+    .email-info-table td.sep { color:#94a3b8; padding:0 8px; vertical-align:middle; font-size:16px; }
+    .email-info-table td.val { color:#1e293b; font-size:15px; font-weight:500; word-break:break-all; background:#eef2ff; border-radius:7px; padding:10px 14px; vertical-align:middle; }
+
+    .auth-user-info {
+      display: flex; align-items: center; gap: 10px;
+      padding: 14px 18px 16px;
+      border-top: 1px solid rgba(255,255,255,0.18);
+      margin-top: auto;
+      background: rgba(0,0,0,0.12);
+    }
+    .auth-user-info .user-email {
+      font-size: 12px; color: rgba(255,255,255,0.8);
+      flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+      letter-spacing: -0.1px;
+    }
+    .auth-logout-btn {
+      padding: 5px 12px; font-size: 11.5px; font-weight: 600;
+      border: 1.5px solid rgba(255,255,255,0.45); border-radius: 20px;
+      background: transparent; color: rgba(255,255,255,0.9);
+      cursor: pointer; font-family: inherit; white-space: nowrap;
+      transition: background 0.15s, border-color 0.15s, color 0.15s;
+      letter-spacing: -0.1px;
+    }
+    .auth-logout-btn:hover {
+      background: rgba(255,255,255,0.18);
+      border-color: rgba(255,255,255,0.7);
+      color: #fff;
+    }
+  </style>
+</head>
+<body>
+
+<div id="spinner-overlay" role="status"><div class="spinner"></div></div>
+<div id="toast-container" aria-live="assertive" aria-atomic="true"></div>
+
+<div id="app" style="display:none;">
+
+  <!-- ═══ LEFT PANEL ═══════════════════════════════════════════ -->
+  <nav id="left-panel">
+    <div class="left-header">
+      <div class="app-logo-area">
+        <i class="fa-solid fa-chalkboard-user"></i>
+        <div class="app-title">강사 관리 시스템</div>
+      </div>
+      <div class="app-subtitle">사외 강사 정보 관리 포털</div>
+    </div>
+    <div class="nav-group">
+      <div class="nav-group-header" id="nav-group-toggle" role="button" tabindex="0">
+        <span class="nav-group-label"><i class="fa-solid fa-users-gear"></i> 사외 강사 관리</span>
+        <span class="chevron">&#9650;</span>
+      </div>
+      <div class="nav-group-body" id="nav-group-body">
+        <div class="nav-item" id="nav-instr-request" role="button" tabindex="0" onclick="handleNavInstrRequest()">
+          <i class="fa-solid fa-paper-plane"></i> 강사정보 등록요청
+        </div>
+        <div class="nav-item active" id="nav-register" role="button" tabindex="0" onclick="handleNavRegister()">
+          <i class="fa-solid fa-id-card"></i> 강사 등록
+        </div>
+        <div class="nav-item" id="nav-personal-vendor" role="button" tabindex="0" onclick="handleNavPersonalVendor()">
+          <i class="fa-solid fa-user-tag"></i> 개인 벤더
+        </div>
+        <div class="nav-item" id="nav-tax-company" role="button" tabindex="0" onclick="handleNavTaxCompany()">
+          <i class="fa-solid fa-file-invoice"></i> 업체 벤더
+        </div>
+        <div class="nav-item" id="nav-copy-test" role="button" tabindex="0" onclick="handleNavCopyTest()">
+          <i class="fa-solid fa-paste"></i> Copy Test
+        </div>
+        <div class="nav-item" id="nav-review" role="button" tabindex="0" onclick="handleNavReview()">
+          <i class="fa-solid fa-star"></i> 담당자 후기
+        </div>
+        <div style="margin:8px 20px;border-top:1px solid rgba(255,255,255,0.15);"></div>
+        <div class="nav-item" id="nav-withdraw" role="button" tabindex="0" onclick="handleNavWithdraw()"
+             style="color:#fca5a5;">
+          <i class="fa-solid fa-user-slash"></i> 영구 탈퇴
+        </div>
+      </div>
+    </div>
+    <div class="auth-user-info">
+      <i class="fa-solid fa-circle-user" style="color:rgba(255,255,255,0.7);font-size:16px;"></i>
+      <span class="user-email" id="current-user-email"></span>
+      <button class="auth-logout-btn" onclick="doLogout()">로그아웃</button>
+    </div>
+  </nav>
+
+  <!-- ═══ RIGHT PANEL ══════════════════════════════════════════ -->
+  <main id="right-panel">
+    <div id="content-area">
+      <div class="empty-state">
+        <div class="empty-icon">📋</div>
+        <p>왼쪽 메뉴에서 항목을 선택하세요.</p>
+      </div>
+    </div>
+  </main>
+</div>
+
+<script>
+'use strict';
+
+/* ══════════════════════════════════════════════════════════════
+   Supabase Init
+══════════════════════════════════════════════════════════════ */
+const SUPABASE_URL = 'https://mcshhvttsvfurrkpcbdf.supabase.co';
+const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im1jc2hodnR0c3ZmdXJya3BjYmRmIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzM5ODI5MDgsImV4cCI6MjA4OTU1ODkwOH0.FRlSXHknfnYoZ4i4-_up8QvppoKHGo50koK9yDkXPUQ';
+const { createClient } = supabase;
+const db = createClient(SUPABASE_URL, SUPABASE_KEY);
+
+/* ══════════════════════════════════════════════════════════════
+   State
+══════════════════════════════════════════════════════════════ */
+let currentUser          = null;
+let currentInstructorId  = null;
+let selectedRequestId    = null;
+let profileImageBase64 = null;
+let attachmentState = []; // {file_name, file_size, is_new}
+let orgFromList = false;  // true = 업체 목록에서 선택한 경우
+let _mousedownTarget = null; // drag 이탈로 팝업 닫힘 방지용
+
+/* ══════════════════════════════════════════════════════════════
+   Constants
+══════════════════════════════════════════════════════════════ */
+const INSTRUCTOR_TYPES = [
+  '학계 (교수, 겸임교수, 연구원)',
+  '공공 (정부기관, 공공기관, 협회)',
+  '기업 (CEO, 임원, 실무자)',
+  '전문서비스 (전문강사, 컨설턴트, 코치)',
+  '전문자격 (변호사, 노무사, 회계사, 의사)',
+  '미디어 (작가, 기자, 방송인, 유튜버)',
+  '기타',
+];
+const GENDERS = ['남','여'];
+const EDU_TYPES = ['대학교','대학원'];
+const CAREER_TYPES = ['강의','컨설팅','프로젝트'];
+
+/* ══════════════════════════════════════════════════════════════
+   Utilities
+══════════════════════════════════════════════════════════════ */
+function showSpinner() { document.getElementById('spinner-overlay').classList.add('active'); }
+function hideSpinner() { document.getElementById('spinner-overlay').classList.remove('active'); }
+
+function showToast(message, type = 'success', duration = 3500) {
+  const c = document.getElementById('toast-container');
+  const t = document.createElement('div');
+  t.className = `toast ${type}`;
+  t.textContent = message;
+  c.appendChild(t);
+  requestAnimationFrame(() => requestAnimationFrame(() => t.classList.add('show')));
+  setTimeout(() => { t.classList.remove('show'); setTimeout(() => t.remove(), 280); }, duration);
+}
+
+function esc(str) {
+  if (str == null) return '';
+  return String(str).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+
+function fmtSize(bytes) {
+  if (!bytes) return '';
+  if (bytes < 1024) return bytes + 'B';
+  if (bytes < 1048576) return (bytes/1024).toFixed(0) + 'KB';
+  return (bytes/1048576).toFixed(1) + 'MB';
+}
+
+/* ══════════════════════════════════════════════════════════════
+   Dropdown Helpers
+══════════════════════════════════════════════════════════════ */
+function onIRTypeChange() {
+  const sel = document.getElementById('ir-type');
+  const etc = document.getElementById('ir-type-etc');
+  if (!sel || !etc) return;
+  if (sel.value === '기타') { etc.style.display = 'block'; etc.focus(); }
+  else { etc.style.display = 'none'; }
+}
+
+function onTypeChange() {
+  const sel = document.getElementById('f_type');
+  const etc = document.getElementById('f_type_etc');
+  if (!sel || !etc) return;
+  if (sel.value === '기타') {
+    etc.style.display = 'block';
+    etc.focus();
+  } else {
+    etc.style.display = 'none';
+  }
+}
+
+function selectOpts(values, sel, placeholder) {
+  return `<option value="">${esc(placeholder)}</option>` +
+    values.map(v => `<option value="${esc(v)}" ${sel===v?'selected':''}>${esc(v)}</option>`).join('');
+}
+function birthYearOpts(sel) {
+  const opts = Array.from({length:75},(_,i)=>2005-i)
+    .map(y=>`<option value="${y}" ${Number(sel)===y?'selected':''}>${y}년</option>`).join('');
+  return `<option value="">년도 선택</option>${opts}`;
+}
+function careerYearOpts(sel) {
+  const opts = Array.from({length:60},(_,i)=>2030-i)
+    .map(y=>`<option value="${y}" ${Number(sel)===y?'selected':''}>${y}년</option>`).join('');
+  return `<option value="">년도 *</option>${opts}`;
+}
+function monthOpts(sel, req=false) {
+  const opts = Array.from({length:12},(_,i)=>String(i+1).padStart(2,'0'))
+    .map(m=>`<option value="${m}" ${sel===m?'selected':''}>${m}월</option>`).join('');
+  return `<option value="">${req?'월 *':'월'}</option>${opts}`;
+}
+function dayOpts(sel) {
+  const opts = Array.from({length:31},(_,i)=>String(i+1).padStart(2,'0'))
+    .map(d=>`<option value="${d}" ${sel===d?'selected':''}>${d}일</option>`).join('');
+  return `<option value="">일 선택</option>${opts}`;
+}
+
+/* ══════════════════════════════════════════════════════════════
+   Nav Toggle
+══════════════════════════════════════════════════════════════ */
+document.getElementById('nav-group-toggle').addEventListener('click', () => {
+  const hdr  = document.getElementById('nav-group-toggle');
+  const body = document.getElementById('nav-group-body');
+  hdr.classList.toggle('collapsed');
+  body.classList.toggle('collapsed');
+});
+
+function setActiveNav(id) {
+  document.querySelectorAll('.nav-item').forEach(el => el.classList.remove('active'));
+  const el = document.getElementById(id);
+  if (el) el.classList.add('active');
+}
+
+function handleNavRegister() {
+  setActiveNav('nav-register');
+  loadInstructor();
+}
+
+/* ══════════════════════════════════════════════════════════════
+   Row Template Functions (Dynamic Tables)
+══════════════════════════════════════════════════════════════ */
+function homepageRowHtml(name='', url='') {
+  return `<tr>
+    <td><input class="form-input" data-field="hp_name" maxlength="200" placeholder="명칭" value="${esc(name)}"></td>
+    <td><input class="form-input" data-field="hp_url" maxlength="200" placeholder="https://" value="${esc(url)}"></td>
+    <td style="width:76px;text-align:center;white-space:nowrap;">
+      <button type="button" class="btn-row-op btn-row-add" title="행 추가" onclick="addRow(this,'homepage')">+</button>
+      <button type="button" class="btn-row-op btn-row-del" title="행 삭제" onclick="removeRow(this,'homepage')">−</button>
+    </td>
+  </tr>`;
+}
+
+function educationRowHtml(type='', school='', dept='', major='') {
+  return `<tr>
+    <td style="width:115px;">
+      <select class="form-select" data-field="edu_type">
+        ${selectOpts(EDU_TYPES, type, '구분 선택')}
+      </select>
+    </td>
+    <td><input class="form-input" data-field="school_name" maxlength="100" placeholder="학교명" value="${esc(school)}"></td>
+    <td><input class="form-input" data-field="department" maxlength="100" placeholder="학과" value="${esc(dept)}"></td>
+    <td><input class="form-input" data-field="major" maxlength="100" placeholder="전공" value="${esc(major)}"></td>
+    <td style="width:76px;text-align:center;white-space:nowrap;">
+      <button type="button" class="btn-row-op btn-row-add" title="행 추가" onclick="addRow(this,'education')">+</button>
+      <button type="button" class="btn-row-op btn-row-del" title="행 삭제" onclick="removeRow(this,'education')">−</button>
+    </td>
+  </tr>`;
+}
+
+function careerRowHtml(type='', company='', sy='', sm='', ey='', em='') {
+  return `<tr>
+    <td style="width:100px;">
+      <select class="form-select" data-field="career_type">
+        ${selectOpts(CAREER_TYPES, type, '구분')}
+      </select>
+    </td>
+    <td><input class="form-input" data-field="company_name" maxlength="100" placeholder="기업/기관명" value="${esc(company)}"></td>
+    <td style="width:100px;"><select class="form-select" data-field="start_year">${careerYearOpts(sy)}</select></td>
+    <td style="width:76px;"><select class="form-select" data-field="start_month">${monthOpts(sm)}</select></td>
+    <td style="width:100px;"><select class="form-select" data-field="end_year">${careerYearOpts(ey)}</select></td>
+    <td style="width:76px;"><select class="form-select" data-field="end_month">${monthOpts(em)}</select></td>
+    <td style="width:76px;text-align:center;white-space:nowrap;">
+      <button type="button" class="btn-row-op btn-row-add" title="행 추가" onclick="addRow(this,'career')">+</button>
+      <button type="button" class="btn-row-op btn-row-del" title="행 삭제" onclick="removeRow(this,'career')">−</button>
+    </td>
+  </tr>`;
+}
+
+function lectureRowHtml(company='', topic='') {
+  return `<tr>
+    <td style="width:30%;"><input class="form-input" data-field="company_name" maxlength="100" placeholder="기업/기관명" value="${esc(company)}"></td>
+    <td><input class="form-input" data-field="topic" maxlength="300" placeholder="강의 주제" value="${esc(topic)}"></td>
+    <td style="width:76px;text-align:center;white-space:nowrap;">
+      <button type="button" class="btn-row-op btn-row-add" title="행 추가" onclick="addRow(this,'lecture')">+</button>
+      <button type="button" class="btn-row-op btn-row-del" title="행 삭제" onclick="removeRow(this,'lecture')">−</button>
+    </td>
+  </tr>`;
+}
+
+/* ══════════════════════════════════════════════════════════════
+   Dynamic Row Add / Remove
+══════════════════════════════════════════════════════════════ */
+const TBODY_IDS = {
+  homepage: 'homepage-body',
+  education: 'education-body',
+  career: 'career-body',
+  lecture: 'lecture-body',
+};
+const ROW_FNS = {
+  homepage:  () => homepageRowHtml(),
+  education: () => educationRowHtml(),
+  career:    () => careerRowHtml(),
+  lecture:   () => lectureRowHtml(),
+};
+
+function addRow(btn, type) {
+  const tbody = document.getElementById(TBODY_IDS[type]);
+  if (!tbody) return;
+  const tmp = document.createElement('tbody');
+  tmp.innerHTML = ROW_FNS[type]();
+  tbody.appendChild(tmp.firstElementChild);
+}
+
+function removeRow(btn, type) {
+  const tbody = document.getElementById(TBODY_IDS[type]);
+  if (!tbody) return;
+  const row = btn.closest('tr');
+  if (tbody.querySelectorAll('tr').length <= 1) {
+    // 마지막 행은 삭제하지 않고 내용만 초기화
+    row.querySelectorAll('input').forEach(el => el.value = '');
+    row.querySelectorAll('select').forEach(el => el.value = '');
+    return;
+  }
+  row.remove();
+}
+
+/* ══════════════════════════════════════════════════════════════
+   Collect Dynamic Table Rows
+══════════════════════════════════════════════════════════════ */
+function collectRows(tbodyId, fields) {
+  const tbody = document.getElementById(tbodyId);
+  if (!tbody) return [];
+  const result = [];
+  tbody.querySelectorAll('tr').forEach(row => {
+    const obj = {};
+    fields.forEach(f => {
+      const el = row.querySelector(`[data-field="${f}"]`);
+      obj[f] = el ? el.value.trim() : '';
+    });
+    if (Object.values(obj).some(v => v !== '')) result.push(obj);
+  });
+  return result;
+}
+
+/* ══════════════════════════════════════════════════════════════
+   Attachment Handling
+══════════════════════════════════════════════════════════════ */
+function handleAttachmentSelect(input) {
+  Array.from(input.files).forEach(f => {
+    attachmentState.push({ file_name: f.name, file_size: f.size, is_new: true });
+  });
+  input.value = '';
+  renderAttachments();
+}
+
+function removeAttachment(idx) {
+  attachmentState.splice(idx, 1);
+  renderAttachments();
+}
+
+function renderAttachments() {
+  const container = document.getElementById('attachment-list');
+  if (!container) return;
+  if (attachmentState.length === 0) { container.innerHTML = ''; return; }
+  container.innerHTML = attachmentState.map((a, i) => `
+    <div class="attach-item">
+      <i class="fa-solid fa-file" style="color:#888;font-size:12px;flex-shrink:0;"></i>
+      <span class="attach-name">${esc(a.file_name)}</span>
+      <span class="attach-size">${fmtSize(a.file_size)}</span>
+      <button type="button" class="attach-del" onclick="removeAttachment(${i})" title="삭제">&times;</button>
+    </div>`).join('');
+}
+
+/* ══════════════════════════════════════════════════════════════
+   Profile Image Handling
+══════════════════════════════════════════════════════════════ */
+function handleProfileImage(input) {
+  const file = input.files[0];
+  if (!file) return;
+  if (file.size > 3 * 1024 * 1024) {
+    showToast('사진 파일은 3MB 이하만 가능합니다.', 'warning');
+    return;
+  }
+  const reader = new FileReader();
+  reader.onload = e => {
+    profileImageBase64 = e.target.result;
+    const img = document.getElementById('profile-img-preview');
+    if (img) { img.src = profileImageBase64; img.classList.add('visible'); }
+    const ph = document.getElementById('profile-placeholder');
+    if (ph) ph.style.display = 'none';
+  };
+  reader.readAsDataURL(file);
+}
+
+/* ══════════════════════════════════════════════════════════════
+   Tag Input
+══════════════════════════════════════════════════════════════ */
+/* 휴대전화 자동 하이픈 포맷 — 숫자만 추출 후 XXX-XXXX-XXXX 형식 */
+function formatPhoneHyphen(val) {
+  const d = val.replace(/\D/g, '').slice(0, 11);
+  if (d.length <= 3)  return d;
+  if (d.length <= 7)  return d.slice(0,3) + '-' + d.slice(3);
+  return d.slice(0,3) + '-' + d.slice(3,7) + '-' + d.slice(7);
+}
+
+function toggleForeignLang() {
+  const avail = document.querySelector('input[name="f_foreign_lang_avail"]:checked')?.value;
+  const row = document.getElementById('foreign-lang-types-row');
+  if (!row) return;
+  if (avail === '가능') {
+    row.style.display = 'flex';
+  } else {
+    row.style.display = 'none';
+    document.querySelectorAll('input[name="f_foreign_lang_type"]').forEach(cb => cb.checked = false);
+  }
+}
+
+function initTagInput(hiddenId, listId, textId) {
+  const hidden  = document.getElementById(hiddenId);
+  const list    = document.getElementById(listId);
+  const textEl  = document.getElementById(textId);
+  if (!hidden || !list || !textEl) return;
+
+  let tags = (hidden.value || '').split(',').map(t => t.trim()).filter(Boolean);
+
+  function renderTags() {
+    list.innerHTML = '';
+    tags.forEach((tag, i) => {
+      const item = document.createElement('span');
+      item.className = 'tag-item';
+      item.innerHTML = `${tag}<button type="button" class="tag-del" data-i="${i}" tabindex="-1">&#x2715;</button>`;
+      item.querySelector('.tag-del').addEventListener('click', () => { tags.splice(i, 1); sync(); });
+      list.appendChild(item);
+    });
+    hidden.value = tags.join(', ');
+  }
+
+  function sync() { renderTags(); textEl.focus(); }
+
+  function addTag(raw) {
+    raw.split(',').map(t => t.trim()).filter(Boolean).forEach(t => {
+      if (t && !tags.includes(t)) tags.push(t);
+    });
+    sync();
+  }
+
+  textEl.addEventListener('keydown', e => {
+    if (e.key === 'Enter' || e.key === ',') {
+      e.preventDefault();
+      const val = textEl.value.trim().replace(/,$/, '');
+      if (val) { addTag(val); textEl.value = ''; }
+    } else if (e.key === 'Backspace' && !textEl.value && tags.length) {
+      tags.pop(); sync();
+    }
+  });
+
+  textEl.addEventListener('blur', () => {
+    const val = textEl.value.trim().replace(/,$/, '');
+    if (val) { addTag(val); textEl.value = ''; }
+  });
+
+  renderTags();
+}
+
+/* ══════════════════════════════════════════════════════════════
+   FORM HTML Generator
+══════════════════════════════════════════════════════════════ */
+function buildFormHtml(p) {
+  p = p || {};
+  const hpRows = (p.homepages && p.homepages.length > 0)
+    ? p.homepages.map(h => homepageRowHtml(h.hp_name, h.hp_url)).join('')
+    : homepageRowHtml();
+  const eduRows = (p.educations && p.educations.length > 0)
+    ? p.educations.map(e => educationRowHtml(e.edu_type, e.school_name, e.department, e.major)).join('')
+    : educationRowHtml();
+  const careerRows = (p.careers && p.careers.length > 0)
+    ? p.careers.map(c => careerRowHtml(c.career_type, c.company_name, c.start_year, c.start_month, c.end_year, c.end_month)).join('')
+    : careerRowHtml();
+  const lectureRows = (p.lectures && p.lectures.length > 0)
+    ? p.lectures.map(l => lectureRowHtml(l.company_name, l.topic)).join('')
+    : lectureRowHtml();
+
+  const flAvail = p.foreign_lang_avail || '';
+  const flTypes = (p.foreign_lang_types || '').split(',').map(t => t.trim()).filter(Boolean);
+  const FL_LANGS = ['영어', '중국어', '일본어', '베트남어'];
+  const flLangChecks = FL_LANGS.map(lang => `
+    <label style="display:inline-flex;align-items:center;gap:5px;cursor:pointer;
+                  background:#f8fafc;border:1px solid #e2e8f0;border-radius:6px;
+                  padding:5px 12px;font-size:13px;user-select:none;">
+      <input type="checkbox" name="f_foreign_lang_type" value="${lang}"
+             ${flTypes.includes(lang) ? 'checked' : ''}> ${lang}
+    </label>`).join('');
+  const flTypesRowStyle = `display:${flAvail === '가능' ? 'flex' : 'none'};align-items:center;gap:8px;flex-wrap:wrap;margin-top:8px;`;
+
+  return `
+  <div class="content-card">
+    <div class="content-card-header">
+      <h2><i class="fa-solid fa-user-tie" style="margin-right:8px;"></i>강사 정보 등록</h2>
+      ${currentInstructorId ? `<button class="btn btn-secondary" style="font-size:12px;padding:6px 14px;" onclick="cancelEdit()"><i class="fa-solid fa-xmark"></i> 취소</button>` : ''}
+    </div>
+
+    <!-- ── 기본 정보 ─────────────────────────────── -->
+    <div class="sec-hdr">기본 정보</div>
+    <table class="reg-table" style="padding:4px 12px;">
+      <colgroup><col style="width:110px"><col><col style="width:110px"><col></colgroup>
+
+      <tr>
+        <td class="rl">성명<span class="req">*</span></td>
+        <td><input class="form-input" id="f_name" maxlength="100" placeholder="성명 입력" value="${esc(p.instructor_name||'')}"></td>
+        <td class="rl">강사 유형<span class="req">*</span></td>
+        <td>
+          ${(()=>{
+            const cur = p.instructor_type || '';
+            const isEtc = cur && !INSTRUCTOR_TYPES.slice(0,-1).includes(cur);
+            const selVal = isEtc ? '기타' : cur;
+            const opts = INSTRUCTOR_TYPES.map(t =>
+              `<option value="${esc(t)}"${selVal===t?' selected':''}>${esc(t==='기타'?'기타 (직접 입력)':t)}</option>`
+            ).join('');
+            return `<select class="form-select" id="f_type" onchange="onTypeChange()" style="margin-bottom:0;">
+                      <option value="">선택하세요</option>${opts}
+                    </select>
+                    <input type="text" id="f_type_etc"
+                      placeholder="강사 유형을 입력하세요 (30자 이내)"
+                      maxlength="30"
+                      value="${isEtc ? esc(cur) : ''}"
+                      style="margin-top:5px;width:100%;box-sizing:border-box;
+                             display:${isEtc ? 'block' : 'none'};
+                             border:1.5px solid #cbd5e1;border-radius:7px;
+                             padding:7px 10px;font-size:13px;font-family:inherit;outline:none;"
+                      onfocus="this.style.borderColor='#667eea'"
+                      onblur="this.style.borderColor='#cbd5e1'">`;
+          })()}
+        </td>
+      </tr>
+
+      <tr>
+        <td class="rl">생년월일<span class="req">*</span></td>
+        <td>
+          <div style="display:flex;gap:5px;">
+            <select class="form-select" id="f_birth_year" style="flex:2;">${birthYearOpts(p.birth_year)}</select>
+            <select class="form-select" id="f_birth_month" style="flex:1.5;">${monthOpts(p.birth_month||'')}</select>
+            <select class="form-select" id="f_birth_day" style="flex:1.5;">${dayOpts(p.birth_day||'')}</select>
+          </div>
+        </td>
+        <td class="rl">성별<span class="req">*</span></td>
+        <td><select class="form-select" id="f_gender">${selectOpts(GENDERS, p.gender||'', '성별 선택')}</select></td>
+      </tr>
+
+      <tr>
+        <td class="rl">이메일<span class="req">*</span></td>
+        <td><input class="form-input" id="f_email" maxlength="200" placeholder="example@email.com" value="${esc(p.email||'')}"></td>
+        <td class="rl">휴대전화<span class="req">*</span></td>
+        <td><input class="form-input" id="f_mobile" maxlength="13" inputmode="numeric"
+                   placeholder="010-0000-0000"
+                   value="${esc(formatPhoneHyphen(p.mobile_phone||''))}"
+                   oninput="this.value=formatPhoneHyphen(this.value)"></td>
+      </tr>
+
+      <tr>
+        <td class="rl">소속<span class="req">*</span></td>
+        <td><input class="form-input" id="f_org" maxlength="200" placeholder="소속 기관명" value="${esc(p.organization||'')}"></td>
+        <td class="rl">직급<span class="req">*</span></td>
+        <td><input class="form-input" id="f_position" maxlength="100" placeholder="직급/직책" value="${esc(p.position||'')}"></td>
+      </tr>
+
+      <tr>
+        <td class="rl">소속 전화</td>
+        <td><input class="form-input" id="f_office_phone" maxlength="100" placeholder="02-0000-0000" value="${esc(p.office_phone||'')}"></td>
+        <td class="rl">Vendor</td>
+        <td><input class="form-input" id="f_vendor" maxlength="20" readonly value="${esc(p.vendor||'')}" style="background:#f0f0f0;color:#888;cursor:default;"></td>
+      </tr>
+
+      <tr>
+        <td class="rl">소속 주소</td>
+        <td colspan="3"><input class="form-input" id="f_office_addr" maxlength="300" placeholder="소속 주소" value="${esc(p.office_address||'')}"></td>
+      </tr>
+
+      <tr>
+        <td class="rl" style="vertical-align:top;padding-top:14px;">홈페이지</td>
+        <td colspan="3" style="padding:8px 10px;">
+          <table class="sub-table">
+            <thead>
+              <tr>
+                <th style="width:36%;">명칭</th>
+                <th>URL</th>
+                <th style="width:76px;text-align:center;">추가/삭제</th>
+              </tr>
+            </thead>
+            <tbody id="homepage-body">${hpRows}</tbody>
+          </table>
+        </td>
+      </tr>
+
+      <tr>
+        <td class="rl" style="vertical-align:top;padding-top:14px;">학력<span class="req">*</span></td>
+        <td colspan="3" style="padding:8px 10px;">
+          <table class="sub-table">
+            <thead>
+              <tr>
+                <th style="width:110px;">구분</th>
+                <th>학교명</th>
+                <th>학과</th>
+                <th>전공</th>
+                <th style="width:76px;text-align:center;">추가/삭제</th>
+              </tr>
+            </thead>
+            <tbody id="education-body">${eduRows}</tbody>
+          </table>
+        </td>
+      </tr>
+
+      <tr>
+        <td class="rl" style="vertical-align:top;padding-top:12px;">첨부 파일</td>
+        <td colspan="3" style="padding:8px 10px;">
+          <input type="file" id="attachment-input" multiple
+                 accept=".pdf,.doc,.docx,.xls,.xlsx,.ppt,.pptx,.hwp,.hwpx,.zip,.jpg,.jpeg,.png"
+                 style="display:none;" onchange="handleAttachmentSelect(this)">
+          <button type="button" class="btn btn-secondary" style="font-size:12.5px;padding:5px 14px;" onclick="document.getElementById('attachment-input').click()">
+            <i class="fa-solid fa-paperclip"></i> 파일 선택
+          </button>
+          <div style="font-size:11.5px;color:#94a3b8;margin-top:6px;line-height:1.8;">
+            <span><i class="fa-solid fa-circle-info" style="margin-right:3px;"></i>형식: PDF, DOC, DOCX, XLS, XLSX, PPT, PPTX, HWP, ZIP, JPG, PNG</span><br>
+            <span style="padding-left:15px;">용량: 파일당 <strong style="color:#64748b;">10MB 이하</strong> &nbsp;·&nbsp; 최대 <strong style="color:#64748b;">5개</strong></span>
+          </div>
+          <div class="attach-list" id="attachment-list"></div>
+        </td>
+      </tr>
+    </table>
+
+    <!-- ── 경력 및 역량 ─────────────────────────── -->
+    <div class="sec-hdr">경력 및 역량</div>
+    <table class="reg-table" style="padding:4px 12px;">
+      <colgroup><col style="width:110px"><col></colgroup>
+
+      <tr>
+        <td class="rl" style="vertical-align:top;padding-top:14px;">주요 경력<span class="req">*</span></td>
+        <td style="padding:8px 10px;">
+          <table class="sub-table">
+            <thead>
+              <tr>
+                <th style="width:100px;">구분</th>
+                <th>기업/기관명</th>
+                <th style="text-align:center;width:100px;">시작 년도<span class="req">*</span></th>
+                <th style="text-align:center;width:76px;">시작 월</th>
+                <th style="text-align:center;width:100px;">종료 년도<span class="req">*</span></th>
+                <th style="text-align:center;width:76px;">종료 월</th>
+                <th style="width:76px;text-align:center;">추가/삭제</th>
+              </tr>
+            </thead>
+            <tbody id="career-body">${careerRows}</tbody>
+          </table>
+        </td>
+      </tr>
+
+      <tr>
+        <td class="rl" style="vertical-align:top;padding-top:14px;">출강</td>
+        <td style="padding:8px 10px;">
+          <table class="sub-table">
+            <thead>
+              <tr>
+                <th style="width:32%;">기업/기관명</th>
+                <th>주제</th>
+                <th style="width:76px;text-align:center;">추가/삭제</th>
+              </tr>
+            </thead>
+            <tbody id="lecture-body">${lectureRows}</tbody>
+          </table>
+        </td>
+      </tr>
+
+      <tr>
+        <td class="rl" style="vertical-align:top;padding-top:14px;">외국어 강의<span class="req">*</span></td>
+        <td style="padding:10px 10px 8px;">
+          <div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap;">
+            <span style="font-size:13px;color:#374151;font-weight:500;min-width:60px;">가능 여부</span>
+            <label style="display:inline-flex;align-items:center;gap:5px;cursor:pointer;
+                          background:#f8fafc;border:1px solid #e2e8f0;border-radius:6px;
+                          padding:5px 12px;font-size:13px;user-select:none;">
+              <input type="radio" name="f_foreign_lang_avail" value="가능"
+                     ${flAvail === '가능' ? 'checked' : ''}
+                     onchange="toggleForeignLang()"> 가능
+            </label>
+            <label style="display:inline-flex;align-items:center;gap:5px;cursor:pointer;
+                          background:#f8fafc;border:1px solid #e2e8f0;border-radius:6px;
+                          padding:5px 12px;font-size:13px;user-select:none;">
+              <input type="radio" name="f_foreign_lang_avail" value="불가능"
+                     ${flAvail === '불가능' ? 'checked' : ''}
+                     onchange="toggleForeignLang()"> 불가능
+            </label>
+          </div>
+          <div id="foreign-lang-types-row" style="${flTypesRowStyle}">
+            <span style="font-size:13px;color:#374151;font-weight:500;min-width:60px;">
+              어종<span class="req">*</span>
+            </span>
+            ${flLangChecks}
+          </div>
+        </td>
+      </tr>
+
+      <tr>
+        <td class="rl" style="vertical-align:top;padding-top:10px;">전문 역량<span class="req">*</span></td>
+        <td style="padding:6px 10px;">
+          <textarea class="form-textarea" id="f_expertise" rows="4" maxlength="300" placeholder="전문 역량을 입력하세요.">${esc(p.expertise||'')}</textarea>
+        </td>
+      </tr>
+
+      <tr>
+        <td class="rl" style="vertical-align:top;padding-top:10px;">강의 분야<span class="req">*</span></td>
+        <td style="padding:6px 10px;">
+          <div class="tag-input-wrap" id="f_lecture_field_wrap" onclick="document.getElementById('f_lecture_field_text').focus()">
+            <div id="tag-list-lecture" style="display:contents;"></div>
+            <input type="text" class="tag-text-input" id="f_lecture_field_text" placeholder="입력 후 Enter 또는 쉼표(,)">
+          </div>
+          <input type="hidden" id="f_lecture_field" value="${esc(p.lecture_field||'')}">
+        </td>
+      </tr>
+    </table>
+
+    <!-- ── 강사 사진 ─────────────────────────────── -->
+    <div class="sec-hdr">강사 사진</div>
+    <table class="reg-table" style="padding:4px 12px;">
+      <colgroup><col style="width:110px"><col></colgroup>
+      <tr>
+        <td class="rl">강사 사진</td>
+        <td style="padding:10px;">
+          <div style="display:flex;align-items:center;gap:14px;">
+            <input type="file" id="profile-input" accept=".jpg,.jpeg,.png" style="display:none;" onchange="handleProfileImage(this)">
+            <div style="display:flex;flex-direction:column;gap:8px;">
+              <div style="display:flex;align-items:center;gap:12px;">
+                <button type="button" class="btn btn-secondary" style="font-size:12.5px;padding:5px 14px;" onclick="document.getElementById('profile-input').click()">
+                  <i class="fa-solid fa-image"></i> 파일 선택
+                </button>
+                <img id="profile-img-preview" class="profile-preview ${profileImageBase64?'visible':''}"
+                     src="${profileImageBase64||''}" alt="강사 사진">
+              </div>
+              <div id="profile-placeholder" style="${profileImageBase64?'display:none;':''}"></div>
+              <div style="font-size:11.5px;color:#94a3b8;line-height:1.8;">
+                <span><i class="fa-solid fa-circle-info" style="margin-right:3px;"></i>형식: JPG, PNG</span><br>
+                <span style="padding-left:15px;">용량: <strong style="color:#64748b;">3MB 이하</strong></span><br>
+                <span style="padding-left:15px;">권장 규격: <strong style="color:#64748b;">가로 300px 이상</strong> &nbsp;·&nbsp; 증명사진 비율 <strong style="color:#64748b;">3:4</strong> (예: 300×400px)</span>
+              </div>
+            </div>
+          </div>
+        </td>
+      </tr>
+    </table>
+
+    <!-- ── 개인정보 동의 ──────────────────────────── -->
+    <div class="sec-hdr">개인정보 동의</div>
+    <div style="padding:12px 24px 0;">
+      <div class="privacy-box">
+        <div class="privacy-box-header">
+          <span><i class="fa-solid fa-shield-halved" style="margin-right:6px;"></i>개인정보 수집 및 이용 동의</span>
+        </div>
+        <div class="privacy-box-body">
+          본 동의서는 사외 강사 등록 및 관리를 위한 개인정보 수집·이용에 관한 사항을 안내합니다.
+          <ol>
+            <li><b>수집 항목:</b> 성명, 생년월일, 이메일, 연락처, 소속, 직급, 경력사항 등 강사 등록에 필요한 정보</li>
+            <li><b>이용 목적:</b> 강사 관리, 강의 배정, 강사료 처리, 교육 운영</li>
+            <li><b>보유 기간:</b> 강사 등록일로부터 계약 종료 후 3년</li>
+            <li><b>동의 거부 권리:</b> 동의를 거부할 수 있으나, 미동의 시 강사 등록이 제한됩니다.</li>
+          </ol>
+        </div>
+        <div class="privacy-check-row">
+          <input type="checkbox" id="f_privacy" ${p.privacy_consent?'checked':''}>
+          <label for="f_privacy">위 개인정보 수집 및 이용에 동의합니다.</label>
+        </div>
+      </div>
+    </div>
+
+    <!-- ── 저장 버튼 ─────────────────────────────── -->
+    <div class="form-footer">
+      <button type="button" class="btn btn-secondary" onclick="cancelEdit()">
+        <i class="fa-solid fa-xmark"></i> 취소
+      </button>
+      <button type="button" class="btn btn-success" onclick="saveInstructor()">
+        <i class="fa-solid fa-floppy-disk"></i> 저장
+      </button>
+    </div>
+  </div>`;
+}
+
+function showForm(prefill) {
+  const p = prefill || {};
+  attachmentState = (p.attachments || []).map(a => ({ file_name: a.file_name, file_size: a.file_size, is_new: false }));
+  profileImageBase64 = p.profile_image_url || null;
+
+  document.getElementById('content-area').innerHTML = buildFormHtml(p);
+  renderAttachments();
+  initTagInput('f_lecture_field', 'tag-list-lecture', 'f_lecture_field_text');
+}
+
+/* ══════════════════════════════════════════════════════════════
+   VIEW HTML
+══════════════════════════════════════════════════════════════ */
+function buildViewHtml(d) {
+  const hpHtml = d.homepages && d.homepages.length > 0
+    ? `<table class="view-sub-table">
+        <thead><tr><th style="width:36%">명칭</th><th>URL</th></tr></thead>
+        <tbody>${d.homepages.map(h=>`<tr><td>${esc(h.hp_name||'')}</td><td>${esc(h.hp_url||'')}</td></tr>`).join('')}</tbody>
+       </table>`
+    : '<span style="color:#aaa;font-size:12.5px;">없음</span>';
+
+  const eduHtml = d.educations && d.educations.length > 0
+    ? `<table class="view-sub-table">
+        <thead><tr><th style="width:110px">구분</th><th>학교명</th><th>학과</th><th>전공</th></tr></thead>
+        <tbody>${d.educations.map(e=>`<tr><td>${esc(e.edu_type||'')}</td><td>${esc(e.school_name||'')}</td><td>${esc(e.department||'')}</td><td>${esc(e.major||'')}</td></tr>`).join('')}</tbody>
+       </table>`
+    : '<span style="color:#aaa;font-size:12.5px;">없음</span>';
+
+  const attachHtml = d.attachments && d.attachments.length > 0
+    ? d.attachments.map(a=>`<div class="attach-item" style="max-width:360px;">
+        <i class="fa-solid fa-file" style="color:#888;font-size:11px;flex-shrink:0;"></i>
+        <span class="attach-name">${esc(a.file_name||'')}</span>
+        <span class="attach-size">${fmtSize(a.file_size)}</span>
+      </div>`).join('')
+    : '<span style="color:#aaa;font-size:12.5px;">없음</span>';
+
+  const careerHtml = d.careers && d.careers.length > 0
+    ? `<table class="view-sub-table">
+        <thead>
+          <tr>
+            <th style="width:100px">구분</th><th>기업/기관명</th>
+            <th colspan="2" style="text-align:center">시작</th>
+            <th colspan="2" style="text-align:center">종료</th>
+          </tr>
+        </thead>
+        <tbody>${d.careers.map(c=>`<tr>
+          <td>${esc(c.career_type||'')}</td>
+          <td>${esc(c.company_name||'')}</td>
+          <td style="text-align:center;width:90px;">${esc(c.start_year||'')}</td>
+          <td style="text-align:center;width:65px;">${esc(c.start_month||'')}</td>
+          <td style="text-align:center;width:90px;">${esc(c.end_year||'')}</td>
+          <td style="text-align:center;width:65px;">${esc(c.end_month||'')}</td>
+        </tr>`).join('')}</tbody>
+       </table>`
+    : '<span style="color:#aaa;font-size:12.5px;">없음</span>';
+
+  const lectureHtml = d.lectures && d.lectures.length > 0
+    ? `<table class="view-sub-table">
+        <thead><tr><th style="width:32%">기업/기관명</th><th>주제</th></tr></thead>
+        <tbody>${d.lectures.map(l=>`<tr><td>${esc(l.company_name||'')}</td><td>${esc(l.topic||'')}</td></tr>`).join('')}</tbody>
+       </table>`
+    : '<span style="color:#aaa;font-size:12.5px;">없음</span>';
+
+  return `
+  <div class="content-card">
+    <div class="content-card-header">
+      <h2><i class="fa-solid fa-user-tie" style="margin-right:8px;"></i>강사 정보</h2>
+      <button class="btn btn-secondary" style="font-size:12px;padding:6px 14px;" onclick="editInstructor()">
+        <i class="fa-solid fa-pen"></i> 수정
+      </button>
+    </div>
+
+    <!-- 기본 정보 -->
+    <div class="sec-hdr">기본 정보</div>
+    <!-- 사진 + 6행 블록 (소속 전화·소속 주소 포함) -->
+    <table class="view-table" style="padding:4px 0 0;">
+      <colgroup>
+        <col style="width:214px">
+        <col style="width:100px">
+        <col>
+        <col style="width:100px">
+        <col>
+      </colgroup>
+      <tr>
+        <td rowspan="6" style="text-align:left;vertical-align:middle;padding:12px 20px 12px 24px;">
+          ${d.profile_image_url
+            ? `<img src="${esc(d.profile_image_url)}" alt="강사 사진" style="width:166px;height:200px;object-fit:cover;border-radius:8px;border:1px solid #ddd;">`
+            : `<div style="width:166px;height:200px;background:#e5e7eb;border-radius:8px;display:inline-flex;align-items:center;justify-content:center;"><i class="fa-solid fa-user" style="font-size:60px;color:#9ca3af;"></i></div>`}
+        </td>
+        <td class="view-label">성명</td><td class="view-value">${esc(d.instructor_name||'')}</td>
+        <td class="view-label">강사 유형</td><td class="view-value">${esc(d.instructor_type||'')}</td>
+      </tr>
+      <tr>
+        <td class="view-label">생년월일</td>
+        <td class="view-value">${[d.birth_year,d.birth_month,d.birth_day].filter(Boolean).join(' / ')}</td>
+        <td class="view-label">성별</td><td class="view-value">${esc(d.gender||'')}</td>
+      </tr>
+      <tr>
+        <td class="view-label">이메일</td><td class="view-value">${esc(d.email||'')}</td>
+        <td class="view-label">휴대전화</td><td class="view-value">${esc(d.mobile_phone||'')}</td>
+      </tr>
+      <tr>
+        <td class="view-label">소속</td><td class="view-value">${esc(d.organization||'')}</td>
+        <td class="view-label">직급</td><td class="view-value">${esc(d.position||'')}</td>
+      </tr>
+      <tr>
+        <td class="view-label">소속 전화</td><td class="view-value">${esc(d.office_phone||'')}</td>
+        <td class="view-label">Vendor</td><td class="view-value">${esc(d.vendor||'')}</td>
+      </tr>
+      <tr>
+        <td class="view-label">소속 주소</td>
+        <td class="view-value" colspan="3">${esc(d.office_address||'')}</td>
+      </tr>
+    </table>
+    <!-- 홈페이지·학력·첨부 파일 — 경력 및 역량과 동일한 110px 레이블 컬럼으로 정렬 -->
+    <table class="view-table" style="padding:0 12px 4px;">
+      <colgroup><col style="width:110px"><col></colgroup>
+      <tr>
+        <td class="view-label" style="vertical-align:top;padding-top:12px;">홈페이지</td>
+        <td class="view-value">${hpHtml}</td>
+      </tr>
+      <tr>
+        <td class="view-label" style="vertical-align:top;padding-top:12px;">학력</td>
+        <td class="view-value">${eduHtml}</td>
+      </tr>
+      <tr>
+        <td class="view-label" style="vertical-align:top;padding-top:12px;">첨부 파일</td>
+        <td class="view-value"><div class="attach-list">${attachHtml}</div></td>
+      </tr>
+    </table>
+
+    <!-- 경력 및 역량 -->
+    <div class="sec-hdr">경력 및 역량</div>
+    <table class="view-table" style="padding:4px 12px;">
+      <colgroup><col style="width:110px"><col></colgroup>
+      <tr>
+        <td class="view-label" style="vertical-align:top;padding-top:12px;">주요 경력</td>
+        <td class="view-value">${careerHtml}</td>
+      </tr>
+      <tr>
+        <td class="view-label" style="vertical-align:top;padding-top:12px;">출강</td>
+        <td class="view-value">${lectureHtml}</td>
+      </tr>
+      <tr>
+        <td class="view-label" style="vertical-align:top;padding-top:8px;">외국어 강의</td>
+        <td class="view-value">
+          ${d.foreign_lang_avail === '가능'
+            ? `<span style="background:#d1fae5;color:#065f46;font-size:12.5px;font-weight:600;
+                            padding:3px 10px;border-radius:20px;border:1px solid #6ee7b7;margin-right:8px;">가능</span>
+               ${(d.foreign_lang_types||'').split(',').map(t=>t.trim()).filter(Boolean)
+                 .map(t=>`<span class="tag-item" style="margin:2px 0;">${esc(t)}</span>`).join(' ')}`
+            : d.foreign_lang_avail === '불가능'
+              ? `<span style="background:#fee2e2;color:#dc2626;font-size:12.5px;font-weight:600;
+                              padding:3px 10px;border-radius:20px;border:1px solid #fca5a5;">불가능</span>`
+              : '<span style="color:#aaa;font-size:12.5px;">미입력</span>'}
+        </td>
+      </tr>
+      <tr>
+        <td class="view-label" style="vertical-align:top;padding-top:8px;">전문 역량</td>
+        <td class="view-value" style="white-space:pre-wrap;">${esc(d.expertise||'')}</td>
+      </tr>
+      <tr>
+        <td class="view-label" style="vertical-align:top;padding-top:8px;">강의 분야</td>
+        <td class="view-value">${(d.lecture_field||'').split(',').map(t=>t.trim()).filter(Boolean).map(t=>`<span class="tag-item" style="margin:2px 0;">${esc(t)}</span>`).join(' ') || '<span style="color:#aaa;font-size:12.5px;">없음</span>'}</td>
+      </tr>
+    </table>
+
+    <!-- 개인정보 동의 -->
+    <div class="sec-hdr">개인정보 동의</div>
+    <div style="padding:12px 24px 20px;">
+      <div class="privacy-box">
+        <div class="privacy-box-header" style="display:flex;align-items:center;justify-content:space-between;">
+          <span><i class="fa-solid fa-shield-halved" style="margin-right:6px;"></i>개인정보 수집 및 이용 동의</span>
+          <button type="button" style="padding:3px 12px;font-size:12px;font-weight:600;border:1px solid #a78bfa;border-radius:5px;background:#fff;color:#7c3aed;cursor:pointer;font-family:inherit;">연장</button>
+        </div>
+        <div class="privacy-box-body">
+          본 동의서는 사외 강사 등록 및 관리를 위한 개인정보 수집·이용에 관한 사항을 안내합니다.
+          <ol>
+            <li><b>수집 항목:</b> 성명, 생년월일, 이메일, 연락처, 소속, 직급, 경력사항 등 강사 등록에 필요한 정보</li>
+            <li><b>이용 목적:</b> 강사 관리, 강의 배정, 강사료 처리, 교육 운영</li>
+            <li><b>보유 기간:</b> 강사 등록일로부터 계약 종료 후 3년</li>
+            <li><b>동의 거부 권리:</b> 동의를 거부할 수 있으나, 미동의 시 강사 등록이 제한됩니다.</li>
+          </ol>
+        </div>
+        <div class="privacy-check-row">
+          <input type="checkbox" id="v_privacy" ${d.privacy_consent?'checked':''} disabled>
+          <label for="v_privacy">위 개인정보 수집 및 이용에 동의합니다.</label>
+        </div>
+      </div>
+    </div>
+
+    <!-- 담당자 후기 -->
+    <div class="sec-hdr">담당자 후기</div>
+    <div style="padding:12px 24px 20px;" id="instructor-reviews-container">
+      <div style="text-align:center;color:#94a3b8;font-size:13px;padding:20px 0;">
+        <i class="fa-solid fa-spinner fa-spin"></i> 후기 로딩 중...
+      </div>
+    </div>
+
+  </div>`;
+}
+
+async function showView(data) {
+  document.getElementById('content-area').innerHTML = buildViewHtml(data);
+  await loadInstructorReviews(data.email);
+}
+
+let _reviewEnrichedData = [];
+
+const _REVIEW_SAMPLE = [
+  {
+    course_name:'과정명1', course_no:'차수명1', tab:'교육과정',
+    star_score:4.5, reviewer_name:'김운영', reviewer_id:'wy.kim', updated_at:'2026-06-19',
+    strength:'풍부한 현업 경험을 바탕으로 실제 사례 중심의 강의를 진행하여 학습자의 이해도와 몰입도를 높임',
+    improvement:'최신 산업 동향과 신기술 사례를 지속적으로 반영하여 교육 콘텐츠의 최신성을 강화할 필요가 있음',
+    note:'최근 3년간 기업 맞춤형 교육을 다수 수행했으며 교육 만족도 평가 결과가 우수한 편임',
+    fee:{period:'2026-06-10(화) 09:00 ~ 2026-06-13(금) 17:00',rows:[
+      {date:'2026-06-10',time:'09:00 ~ 12:00',subject:'과목1',type:'주 강사',hourly:40000,hours:'03:00',amount:120000,signed:'2026-06-20',sent:'',settled:''},
+      {date:'2026-06-11',time:'09:00 ~ 12:00',subject:'과목2',type:'주 강사',hourly:40000,hours:'03:00',amount:120000,signed:'2026-06-20',sent:'',settled:''},
+      {date:'2026-06-12',time:'09:00 ~ 12:00',subject:'과목3',type:'주 강사',hourly:40000,hours:'03:00',amount:120000,signed:'2026-06-20',sent:'',settled:''},
+      {date:'2026-06-13',time:'09:00 ~ 12:00',subject:'과목4',type:'주 강사',hourly:40000,hours:'03:00',amount:120000,signed:'2026-06-20',sent:'',settled:''},
+    ]},
+  },
+  {
+    course_name:'마이데이터 기반 자산 관리', course_no:'26년 1차수', tab:'교육과정',
+    star_score:4.5, reviewer_name:'박운영', reviewer_id:'wy.park', updated_at:'2026-06-17',
+    strength:'복잡한 전문 지식을 쉽게 설명하는 능력이 뛰어나 다양한 수준의 학습자를 효과적으로 지도함',
+    improvement:'실습 및 참여형 교육 비중을 확대하여 학습자의 실무 적용 능력을 더욱 향상시킬 필요가 있음',
+    note:'입문자 대상 교육 경험이 풍부하며 비전공자 교육 과정 운영 실적을 보유하고 있음',
+    fee:{period:'2026-06-15(월) 09:00 ~ 2026-06-18(목) 17:00',rows:[
+      {date:'2026-06-15',time:'09:00 ~ 12:00',subject:'과목1',type:'주 강사',hourly:40000,hours:'03:00',amount:120000,signed:'2026-06-22',sent:'',settled:''},
+      {date:'2026-06-16',time:'09:00 ~ 12:00',subject:'과목3',type:'주 강사',hourly:40000,hours:'03:00',amount:120000,signed:'2026-06-22',sent:'',settled:''},
+      {date:'2026-06-17',time:'09:00 ~ 12:00',subject:'과목5',type:'주 강사',hourly:40000,hours:'03:00',amount:120000,signed:'2026-06-22',sent:'',settled:''},
+      {date:'2026-06-18',time:'09:00 ~ 12:00',subject:'과목7',type:'주 강사',hourly:40000,hours:'03:00',amount:120000,signed:'2026-06-22',sent:'',settled:''},
+    ]},
+  },
+  {
+    course_name:'과정명2', course_no:'차수명2', tab:'교육과정',
+    star_score:4.5, reviewer_name:'최운영', reviewer_id:'wy.choi', updated_at:'2026-06-01',
+    strength:'프로젝트 수행 경험을 활용하여 문제 해결 중심의 교육을 제공하고 실무 활용도를 높임',
+    improvement:'최신 기술 트렌드 및 시장 변화에 대한 사례들 추가 보강할 필요가 있음',
+    note:'반도체 설계 및 공정 분야 강의 경험 다수 보유하고 있음',
+    fee:{period:'2026-06-20(토) 09:00 ~ 2026-06-23(화) 17:00',rows:[
+      {date:'2026-06-20',time:'09:00 ~ 12:00',subject:'과목1',type:'주 강사',hourly:40000,hours:'03:00',amount:120000,signed:'2026-06-25',sent:'',settled:''},
+      {date:'2026-06-21',time:'09:00 ~ 12:00',subject:'과목2',type:'주 강사',hourly:40000,hours:'03:00',amount:120000,signed:'2026-06-25',sent:'',settled:''},
+      {date:'2026-06-22',time:'09:00 ~ 12:00',subject:'과목3',type:'주 강사',hourly:40000,hours:'03:00',amount:120000,signed:'2026-06-25',sent:'',settled:''},
+      {date:'2026-06-23',time:'09:00 ~ 12:00',subject:'과목4',type:'주 강사',hourly:40000,hours:'03:00',amount:120000,signed:'2026-06-25',sent:'',settled:''},
+    ]},
+  },
+  {
+    course_name:'AI 활용 실무', course_no:'26년 1차수', tab:'POPcon',
+    star_score:4.0, reviewer_name:'이운영', reviewer_id:'wy.lee', updated_at:'2026-06-10',
+    strength:'AI 도구의 실무 활용 방법을 현장 중심으로 설명하여 현업 담당자의 즉각적인 적용이 가능함',
+    improvement:'수강생 수준별 맞춤 예제 보강으로 초급자의 이해도를 높일 필요가 있음',
+    note:'POPcon 방식으로 운영 시 발표 자료 사전 제출 필요',
+    fee:{period:'2026-06-05(금) 13:00 ~ 2026-06-07(일) 17:00',rows:[
+      {date:'2026-06-05',time:'13:00 ~ 17:00',subject:'과목A',type:'주 강사',hourly:50000,hours:'04:00',amount:200000,signed:'2026-06-12',sent:'',settled:''},
+      {date:'2026-06-06',time:'09:00 ~ 17:00',subject:'과목B',type:'주 강사',hourly:50000,hours:'08:00',amount:400000,signed:'2026-06-12',sent:'',settled:''},
+      {date:'2026-06-07',time:'09:00 ~ 13:00',subject:'과목C',type:'주 강사',hourly:50000,hours:'04:00',amount:200000,signed:'2026-06-12',sent:'',settled:''},
+    ]},
+  },
+];
+
+async function loadInstructorReviews(email) {
+  const container = document.getElementById('instructor-reviews-container');
+  if (!container) return;
+  _reviewEnrichedData = [];
+  if (!email) {
+    _reviewEnrichedData = _REVIEW_SAMPLE;
+    container.innerHTML = buildReviewTabsHtml(_REVIEW_SAMPLE);
+    return;
+  }
+  try {
+    const { data: reviews, error } = await db
+      .from('instructor_reviews')
+      .select('star_score, strength, improvement, note, updated_at')
+      .eq('instructor_email', email)
+      .order('updated_at', { ascending: false });
+    if (error) throw error;
+    if (!reviews || !reviews.length) {
+      _reviewEnrichedData = _REVIEW_SAMPLE;
+      container.innerHTML = buildReviewTabsHtml(_REVIEW_SAMPLE);
+      return;
+    }
+    _reviewEnrichedData = reviews.map((r, i) => ({
+      ...(_REVIEW_SAMPLE[i % _REVIEW_SAMPLE.length]),
+      star_score:  r.star_score,
+      strength:    r.strength,
+      improvement: r.improvement,
+      note:        r.note,
+      updated_at:  r.updated_at,
+    }));
+    container.innerHTML = buildReviewTabsHtml(_reviewEnrichedData);
+  } catch(err) {
+    container.innerHTML = '<div style="color:#ef4444;font-size:13px;padding:8px 0;">후기 로드 오류: ' + esc(err.message||'') + '</div>';
+  }
+}
+
+function buildReviewTabsHtml(reviews) {
+  const TAB_NAMES = ['교육과정', 'POPcon'];
+  const tabs = TAB_NAMES.map(t => {
+    const active = t === '교육과정';
+    const cnt = reviews.filter(r => r.tab === t).length;
+    const badge = cnt ? `<span style="margin-left:5px;background:${active?'#dbeafe':'#f1f5f9'};color:${active?'#2563eb':'#94a3b8'};font-size:10px;font-weight:600;padding:1px 7px;border-radius:10px;">${cnt}</span>` : '';
+    return `<button id="review-tab-${t}" onclick="switchReviewTab('${t}')"
+      onmouseover="if(!this.style.borderBottom.includes('2563eb'))this.style.color='#1e293b'"
+      onmouseout="if(!this.style.borderBottom.includes('2563eb'))this.style.color='#64748b'"
+      style="padding:10px 20px;font-size:13px;font-weight:${active?'700':'400'};
+             color:${active?'#2563eb':'#64748b'};background:none;border:none;
+             border-bottom:${active?'2px solid #2563eb':'2px solid transparent'};
+             cursor:pointer;transition:all .15s;font-family:inherit;">${t}${badge}</button>`;
+  }).join('');
+  const panels = TAB_NAMES.map(t => {
+    const filtered = reviews.filter(r => r.tab === t);
+    return `<div id="review-panel-${t}" style="display:${t==='교육과정'?'':'none'};">${buildReviewTableHtml(filtered)}</div>`;
+  }).join('');
+  return `<div>
+    <div style="border:1.5px solid #e2e8f0;border-radius:10px;overflow:hidden;">
+      <div style="display:flex;border-bottom:1px solid #e2e8f0;background:#fff;">${tabs}</div>
+      ${panels}
+    </div>
+    <div id="fee-history-panel" style="display:none;"></div>
+  </div>`;
+}
+
+function buildReviewTableHtml(reviews) {
+  if (!reviews.length) {
+    return '<div style="color:#94a3b8;font-size:13px;padding:28px 0;text-align:center;"><i class="fa-regular fa-comment-dots" style="font-size:20px;margin-bottom:8px;display:block;"></i>등록된 담당자 후기가 없습니다.</div>';
+  }
+  const cell = (s) => s
+    ? `<div style="font-size:11.5px;color:#1e293b;line-height:1.55;">${esc(s)}</div>`
+    : `<span style="color:#cbd5e1;font-size:11.5px;">-</span>`;
+  const rows = reviews.map((r, i) => {
+    const score   = r.star_score || 0;
+    const filled  = Math.floor(score);
+    const hasHalf = (score - filled) >= 0.5;
+    const stars   = Array.from({length:5}, (_,j) => {
+      if (j < filled)              return `<span style="color:#f59e0b;font-size:15px;line-height:1;">★</span>`;
+      if (j === filled && hasHalf) return `<span style="font-size:15px;line-height:1;background:linear-gradient(90deg,#f59e0b 50%,#e2e8f0 50%);-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text;">★</span>`;
+      return `<span style="color:#e2e8f0;font-size:15px;line-height:1;">★</span>`;
+    }).join('');
+    const courseFull = esc(r.course_name||'') + ' / ' + esc(r.course_no||'');
+    const dateStr = r.updated_at
+      ? new Date(r.updated_at).toLocaleDateString('ko-KR', {year:'numeric',month:'2-digit',day:'2-digit'})
+      : '-';
+    const gIdx = _reviewEnrichedData.indexOf(r);
+    return `
+      <tr data-fee-idx="${gIdx}" style="border-bottom:1px solid #f1f5f9;vertical-align:middle;transition:background .15s;">
+        <td style="padding:8px 6px;text-align:center;font-size:11.5px;font-weight:700;color:#94a3b8;white-space:nowrap;">${i+1}</td>
+        <td style="padding:8px 6px;max-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">
+          <span style="font-size:12px;color:#1e293b;" title="${courseFull}">${courseFull}</span>
+        </td>
+        <td style="padding:8px 6px;text-align:center;white-space:nowrap;">
+          ${stars}<span style="font-size:11px;font-weight:700;color:#f59e0b;margin-left:3px;">${score}<span style="font-size:10px;color:#94a3b8;font-weight:400;">/5</span></span>
+        </td>
+        <td style="padding:8px 6px;">${cell(r.strength)}</td>
+        <td style="padding:8px 6px;">${cell(r.improvement)}</td>
+        <td style="padding:8px 6px;">${cell(r.note)}</td>
+        <td style="padding:8px 6px;text-align:center;white-space:nowrap;">
+          <div style="font-size:11.5px;color:#1e293b;font-weight:500;">${esc(r.reviewer_name||'')}</div>
+          <div style="font-size:10.5px;color:#94a3b8;">${esc(r.reviewer_id||'')}</div>
+        </td>
+        <td style="padding:8px 6px;white-space:nowrap;font-size:11.5px;color:#64748b;text-align:center;">${esc(dateStr)}</td>
+        <td style="padding:8px 6px;text-align:center;">
+          <button onclick="showFeeHistoryPanel(${gIdx})"
+            style="padding:3px 8px;font-size:11px;color:#475569;background:#f8fafc;border:1px solid #e2e8f0;
+                   border-radius:5px;cursor:pointer;font-family:inherit;white-space:nowrap;"
+            onmouseover="this.style.background='#e2e8f0'" onmouseout="this.style.background='#f8fafc'">조회</button>
+        </td>
+      </tr>`;
+  }).join('');
+  return `
+    <table style="width:100%;border-collapse:collapse;table-layout:fixed;">
+      <colgroup>
+        <col style="width:28px">
+        <col style="width:17%">
+        <col style="width:120px">
+        <col><col><col>
+        <col style="width:76px">
+        <col style="width:82px">
+        <col style="width:54px">
+      </colgroup>
+      <thead>
+        <tr style="background:#f8fafc;border-bottom:1.5px solid #e2e8f0;">
+          <th style="padding:8px 6px;font-size:11px;font-weight:700;color:#94a3b8;text-align:center;">NO</th>
+          <th style="padding:8px 6px;font-size:11px;font-weight:700;color:#1e293b;text-align:left;">교육과정명</th>
+          <th style="padding:8px 6px;font-size:11px;font-weight:700;color:#64748b;text-align:center;white-space:nowrap;">종합 만족도</th>
+          <th style="padding:8px 6px;font-size:11px;font-weight:700;color:#0369a1;text-align:center;">강의 품질</th>
+          <th style="padding:8px 6px;font-size:11px;font-weight:700;color:#0369a1;text-align:center;">운영 협업</th>
+          <th style="padding:8px 6px;font-size:11px;font-weight:700;color:#64748b;text-align:center;">섭외 참고</th>
+          <th style="padding:8px 6px;font-size:11px;font-weight:700;color:#64748b;text-align:center;">등록자</th>
+          <th style="padding:8px 6px;font-size:11px;font-weight:700;color:#64748b;text-align:center;white-space:nowrap;">등록 일자</th>
+          <th style="padding:8px 6px;font-size:11px;font-weight:700;color:#64748b;text-align:center;white-space:nowrap;">강사료 이력</th>
+        </tr>
+      </thead>
+      <tbody>${rows}</tbody>
+    </table>`;
+}
+
+function switchReviewTab(tab) {
+  ['교육과정', 'POPcon'].forEach(t => {
+    const btn   = document.getElementById('review-tab-' + t);
+    const panel = document.getElementById('review-panel-' + t);
+    const active = t === tab;
+    if (btn) {
+      btn.style.fontWeight   = active ? '700' : '400';
+      btn.style.color        = active ? '#2563eb' : '#64748b';
+      btn.style.borderBottom = active ? '2px solid #2563eb' : '2px solid transparent';
+    }
+    if (panel) panel.style.display = active ? '' : 'none';
+  });
+  closeFeeHistoryPanel();
+}
+
+function showFeeHistoryPanel(idx) {
+  // 이전 활성 행 초기화
+  document.querySelectorAll('tr[data-fee-active]').forEach(tr => {
+    tr.style.background = '';
+    tr.removeAttribute('data-fee-active');
+  });
+  // 현재 행 강조
+  const activeRow = document.querySelector(`tr[data-fee-idx="${idx}"]`);
+  if (activeRow) { activeRow.style.background = '#eff6ff'; activeRow.setAttribute('data-fee-active', '1'); }
+
+  const r = _reviewEnrichedData[idx];
+  if (!r || !r.fee) return;
+  const fee = r.fee;
+  const courseFull = esc((r.course_name||'') + ' / ' + (r.course_no||''));
+  let totalMin = 0, totalAmt = 0;
+  fee.rows.forEach(row => {
+    if (row.hours) { const p = row.hours.split(':'); totalMin += (parseInt(p[0])||0)*60 + (parseInt(p[1])||0); }
+    totalAmt += row.amount || 0;
+  });
+  const totalHr = Math.floor(totalMin/60).toString().padStart(2,'0') + ':' + (totalMin%60).toString().padStart(2,'0');
+  const feeRows = fee.rows.map(row => `
+    <tr style="border-bottom:1px solid #f1f5f9;">
+      <td style="padding:8px;font-size:12px;text-align:center;">${esc(row.date)}</td>
+      <td style="padding:8px;font-size:12px;text-align:center;white-space:nowrap;">${esc(row.time)}</td>
+      <td style="padding:8px;font-size:12px;">${esc(row.subject)}</td>
+      <td style="padding:8px;font-size:12px;text-align:center;">${esc(row.type)}</td>
+      <td style="padding:8px;font-size:12px;text-align:right;">${(row.hourly||0).toLocaleString()}</td>
+      <td style="padding:8px;font-size:12px;text-align:center;">${esc(row.hours)}</td>
+      <td style="padding:8px;font-size:12px;text-align:right;">${(row.amount||0).toLocaleString()}</td>
+      <td style="padding:8px;font-size:12px;text-align:center;${!row.signed?'color:#94a3b8':''}">${row.signed||'-'}</td>
+      <td style="padding:8px;font-size:12px;text-align:center;${!row.sent?'color:#94a3b8':''}">${row.sent||'-'}</td>
+      <td style="padding:8px;font-size:12px;text-align:center;${!row.settled?'color:#94a3b8':''}">${row.settled||'-'}</td>
+    </tr>`).join('');
+  const panel = document.getElementById('fee-history-panel');
+  if (!panel) return;
+  panel.style.display = '';
+  panel.innerHTML = `
+    <div style="margin-top:16px;border:1.5px solid #e2e8f0;border-radius:10px;padding:20px;background:#fff;">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px;">
+        <div style="font-size:14px;font-weight:700;color:#1e293b;">${courseFull}</div>
+        <button onclick="closeFeeHistoryPanel()"
+          style="background:none;border:none;font-size:18px;color:#94a3b8;cursor:pointer;line-height:1;padding:12px 14px;margin:-10px -10px -10px 0;"
+          onmouseover="this.style.color='#475569'" onmouseout="this.style.color='#94a3b8'">✕</button>
+      </div>
+      <table style="width:100%;border-collapse:collapse;border:1px solid #e2e8f0;margin-bottom:16px;">
+        <tr style="border-bottom:1px solid #e2e8f0;">
+          <th style="padding:9px 16px;font-size:12.5px;font-weight:600;color:#475569;background:#f8fafc;width:170px;text-align:center;white-space:nowrap;">과정명 / POPcon명</th>
+          <td style="padding:9px 16px;font-size:12.5px;color:#1e293b;">${courseFull}</td>
+        </tr>
+        <tr>
+          <th style="padding:9px 16px;font-size:12.5px;font-weight:600;color:#475569;background:#f8fafc;text-align:center;white-space:nowrap;">학습 기간</th>
+          <td style="padding:9px 16px;font-size:12.5px;color:#1e293b;">${esc(fee.period)}</td>
+        </tr>
+      </table>
+      <div style="overflow-x:auto;">
+        <table style="width:100%;border-collapse:collapse;border:1px solid #e2e8f0;min-width:820px;">
+          <thead>
+            <tr style="background:#f8fafc;border-bottom:1.5px solid #e2e8f0;">
+              <th style="padding:8px;font-size:11.5px;font-weight:700;color:#475569;text-align:center;white-space:nowrap;">날짜</th>
+              <th style="padding:8px;font-size:11.5px;font-weight:700;color:#475569;text-align:center;white-space:nowrap;">시간</th>
+              <th style="padding:8px;font-size:11.5px;font-weight:700;color:#475569;text-align:center;">과목</th>
+              <th style="padding:8px;font-size:11.5px;font-weight:700;color:#475569;text-align:center;white-space:nowrap;">출강 유형</th>
+              <th style="padding:8px;font-size:11.5px;font-weight:700;color:#475569;text-align:right;white-space:nowrap;">시간당 강사료</th>
+              <th style="padding:8px;font-size:11.5px;font-weight:700;color:#475569;text-align:center;white-space:nowrap;">강의 시간</th>
+              <th style="padding:8px;font-size:11.5px;font-weight:700;color:#475569;text-align:right;white-space:nowrap;">강사료 지급 금액</th>
+              <th style="padding:8px;font-size:11.5px;font-weight:700;color:#475569;text-align:center;white-space:nowrap;">서명 완료일</th>
+              <th style="padding:8px;font-size:11.5px;font-weight:700;color:#475569;text-align:center;white-space:nowrap;">전송 완료일</th>
+              <th style="padding:8px;font-size:11.5px;font-weight:700;color:#475569;text-align:center;white-space:nowrap;">정산 완료일</th>
+            </tr>
+          </thead>
+          <tbody>
+            ${feeRows}
+            <tr style="background:#f8fafc;border-top:2px solid #e2e8f0;">
+              <td colspan="4" style="padding:8px;"></td>
+              <td style="padding:8px;font-size:12px;font-weight:700;text-align:right;color:#475569;">합계</td>
+              <td style="padding:8px;font-size:12.5px;font-weight:700;text-align:center;color:#1e293b;">${totalHr}</td>
+              <td style="padding:8px;font-size:12.5px;font-weight:700;text-align:right;color:#1e293b;">${totalAmt.toLocaleString()}</td>
+              <td colspan="3" style="padding:8px;"></td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+      <div style="text-align:right;margin-top:14px;">
+        <button onclick="closeFeeHistoryPanel()"
+          style="padding:6px 20px;font-size:13px;color:#475569;background:#fff;border:1.5px solid #e2e8f0;
+                 border-radius:8px;cursor:pointer;font-family:inherit;"
+          onmouseover="this.style.background='#f8fafc'" onmouseout="this.style.background='#fff'">닫기</button>
+      </div>
+    </div>`;
+  panel.scrollIntoView({behavior:'smooth', block:'nearest'});
+}
+
+function closeFeeHistoryPanel() {
+  document.querySelectorAll('tr[data-fee-active]').forEach(tr => {
+    tr.style.background = '';
+    tr.removeAttribute('data-fee-active');
+  });
+  const panel = document.getElementById('fee-history-panel');
+  if (panel) panel.style.display = 'none';
+}
+
+/* ══════════════════════════════════════════════════════════════
+   영구탈퇴
+══════════════════════════════════════════════════════════════ */
+function openWithdrawModal(instrId, instrName) {
+  document.getElementById('withdraw-modal')?.remove();
+  const modal = document.createElement('div');
+  modal.id = 'withdraw-modal';
+  modal.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.55);z-index:9999;display:flex;align-items:center;justify-content:center;';
+  modal.innerHTML = `
+    <div style="background:#fff;border-radius:14px;padding:0;width:440px;max-width:94vw;
+                box-shadow:0 20px 60px rgba(0,0,0,.3);overflow:hidden;">
+      <!-- 모달 헤더: 위험 행위 색상 통일 -->
+      <div style="background:linear-gradient(90deg,#dc2626 0%,#b91c1c 100%);
+                  padding:18px 24px;display:flex;align-items:center;gap:10px;">
+        <i class="fa-solid fa-triangle-exclamation" style="color:#fff;font-size:18px;"></i>
+        <h3 style="margin:0;font-size:15px;font-weight:700;color:#fff;">영구탈퇴 최종 확인</h3>
+      </div>
+      <!-- 모달 바디 -->
+      <div style="padding:24px 28px 28px;">
+        <p style="font-size:13.5px;color:#374151;line-height:1.75;margin:0 0 8px;">
+          <strong style="color:#dc2626;">${esc(instrName)}</strong> 강사를 영구탈퇴 처리합니다.
+          탈퇴 후 모든 정보가 즉시 삭제되며 <strong>복구할 수 없습니다.</strong>
+        </p>
+        <!-- 입력 안내: 강사 성명 강조 -->
+        <p style="font-size:13px;color:#6b7280;margin:0 0 10px;">
+          아래 입력란에 강사 성명
+          <strong style="color:#1e293b;background:#f1f5f9;padding:1px 6px;border-radius:4px;font-size:13.5px;">${esc(instrName)}</strong>
+          을(를) 그대로 입력하면 탈퇴 버튼이 활성화됩니다.
+        </p>
+        <input id="withdraw-confirm-input" type="text"
+          style="width:100%;box-sizing:border-box;border:1.5px solid #e2e8f0;border-radius:8px;
+                 padding:10px 12px;font-size:14px;font-family:inherit;outline:none;margin-bottom:20px;
+                 transition:border-color .15s;"
+          placeholder="강사 성명 입력"
+          autocomplete="off"
+          onfocus="this.style.borderColor='#dc2626'"
+          onblur="this.style.borderColor=this.value.trim()==='${esc(instrName)}'?'#16a34a':'#e2e8f0'">
+        <div style="display:flex;gap:10px;justify-content:flex-end;">
+          <button onclick="document.getElementById('withdraw-modal').remove()"
+            style="padding:9px 22px;border:1.5px solid #cbd5e1;border-radius:8px;background:#fff;
+                   font-size:13px;cursor:pointer;color:#374151;font-family:inherit;
+                   transition:background .15s;"
+            onmouseover="this.style.background='#f8fafc'"
+            onmouseout="this.style.background='#fff'">
+            <i class="fa-solid fa-xmark" style="margin-right:5px;"></i>취소
+          </button>
+          <button id="withdraw-ok-btn" disabled
+            onclick="confirmWithdraw('${esc(instrId)}','${esc(instrName)}')"
+            style="padding:9px 22px;background:#dc2626;color:#fff;border:none;border-radius:8px;
+                   font-size:13px;font-weight:600;font-family:inherit;
+                   opacity:0.38;cursor:not-allowed;transition:opacity .15s,background .15s;">
+            <i class="fa-solid fa-user-slash" style="margin-right:5px;"></i>영구탈퇴 확인
+          </button>
+        </div>
+      </div>
+    </div>`;
+  document.body.appendChild(modal);
+
+  const input = document.getElementById('withdraw-confirm-input');
+  const okBtn = document.getElementById('withdraw-ok-btn');
+  input.addEventListener('input', function() {
+    const match = this.value.trim() === instrName;
+    okBtn.disabled = !match;
+    okBtn.style.opacity = match ? '1' : '0.38';
+    okBtn.style.cursor = match ? 'pointer' : 'not-allowed';
+    this.style.borderColor = this.value.trim() === ''
+      ? '#e2e8f0'
+      : match ? '#16a34a' : '#dc2626';
+  });
+  input.focus();
+}
+
+async function confirmWithdraw(instrId, instrName) {
+  document.getElementById('withdraw-modal')?.remove();
+  showSpinner();
+  try {
+    const { error } = await db.from('instructors')
+      .update({ is_deleted: true, deleted_at: new Date().toISOString() })
+      .eq('id', instrId);
+    if (error) throw error;
+    showToast(`"${instrName}" 강사가 영구탈퇴 처리되었습니다.`, 'success');
+    currentInstructorId = null;
+    localStorage.removeItem('instructor_id');
+    await loadInstructor();
+  } catch (err) {
+    showToast('처리 중 오류: ' + (err.message || ''), 'error');
+  } finally { hideSpinner(); }
+}
+
+/* ══════════════════════════════════════════════════════════════
+   DB: Load Instructor
+══════════════════════════════════════════════════════════════ */
+async function loadInstructor() {
+  showSpinner();
+  try {
+    const id = localStorage.getItem('instructor_id');
+    if (id) {
+      const data = await loadAllData(id);
+      if (data) { showView(data); return; }
+      localStorage.removeItem('instructor_id');
+      currentInstructorId = null;
+    }
+    const { data: latest } = await db.from('instructors').select('id')
+      .order('created_at', { ascending: false }).limit(1).maybeSingle();
+    if (latest) {
+      localStorage.setItem('instructor_id', latest.id);
+      const data = await loadAllData(latest.id);
+      if (data) { showView(data); return; }
+    }
+    showForm(null);
+  } catch (err) {
+    showToast('데이터 로드 중 오류가 발생했습니다.', 'error');
+    showForm(null);
+  } finally {
+    hideSpinner();
+  }
+}
+
+async function loadAllData(instrId) {
+  try {
+    const [instrRes, hpRes, eduRes, attachRes, careerRes, lectureRes] = await Promise.all([
+      db.from('instructors').select('*').eq('id', instrId).single(),
+      db.from('instructor_homepages').select('*').eq('instructor_id', instrId).order('sort_order'),
+      db.from('instructor_educations').select('*').eq('instructor_id', instrId).order('sort_order'),
+      db.from('instructor_attachments').select('*').eq('instructor_id', instrId).order('sort_order'),
+      db.from('instructor_careers').select('*').eq('instructor_id', instrId).order('sort_order'),
+      db.from('instructor_lecture_records').select('*').eq('instructor_id', instrId).order('sort_order'),
+    ]);
+    if (instrRes.error || !instrRes.data) return null;
+    currentInstructorId = instrId;
+    return {
+      ...instrRes.data,
+      homepages:   hpRes.data || [],
+      educations:  eduRes.data || [],
+      attachments: attachRes.data || [],
+      careers:     careerRes.data || [],
+      lectures:    lectureRes.data || [],
+    };
+  } catch { return null; }
+}
+
+/* ══════════════════════════════════════════════════════════════
+   소속기관 업체 선택 로직
+══════════════════════════════════════════════════════════════ */
+async function initOrgFieldState(p) {
+  const orgEl  = document.getElementById('f_org');
+  const addrEl = document.getElementById('f_office_addr');
+  if (!orgEl) return;
+
+  if (!p || !p.organization) {
+    // 신규 등록: 직접 입력 불가, 업체 버튼으로만 입력
+    setOrgReadonly(true);
+    orgFromList = false;
+    return;
+  }
+
+  // 수정 모드: 저장된 소속기관이 업체 목록에 있는지 확인
+  try {
+    const { data } = await db.from('tax_invoice_companies')
+      .select('id').eq('company_name', p.organization);
+    if (data && data.length > 0) {
+      setOrgReadonly(true);
+      orgFromList = true;
+    } else {
+      setOrgReadonly(false);
+      orgFromList = false;
+    }
+  } catch {
+    setOrgReadonly(false);
+    orgFromList = false;
+  }
+}
+
+function setOrgReadonly(readonly) {
+  const orgEl  = document.getElementById('f_org');
+  const addrEl = document.getElementById('f_office_addr');
+  [orgEl, addrEl].forEach(el => {
+    if (!el) return;
+    el.readOnly = readonly;
+    el.style.background = readonly ? '#f0f0f0' : '';
+    el.style.color      = readonly ? '#555'    : '';
+    el.style.cursor     = readonly ? 'default' : '';
+  });
+}
+
+async function openOrgSelectPopup() {
+  showSpinner();
+  let companies = [];
+  try {
+    const { data } = await db.from('tax_invoice_companies').select('*').order('company_name');
+    companies = data || [];
+  } finally { hideSpinner(); }
+
+  const rows = companies.length > 0
+    ? companies.map(c => `
+        <tr style="cursor:pointer;" title="클릭하여 선택"
+            onclick="selectOrgCompany('${esc(c.company_name)}','${esc(c.address||'')}')">
+          <td>${esc(c.company_name)}</td>
+          <td>${esc(c.business_number||'—')}</td>
+          <td>${esc(c.ceo_name||'—')}</td>
+          <td>${esc(c.business_type||'—')}</td>
+          <td>${esc(c.address||'—')}</td>
+        </tr>`).join('')
+    : `<tr><td colspan="5" class="empty-table">등록된 업체가 없습니다.</td></tr>`;
+
+  const html = `
+  <div class="modal-overlay active" id="org-select-overlay" onclick="closeOrgSelectOnBackdrop(event)">
+    <div class="modal" style="width:760px;max-width:96vw;" role="dialog" aria-modal="true">
+      <div class="modal-header">
+        <h3><i class="fa-solid fa-building" style="margin-right:6px;"></i>업체 벤더 선택</h3>
+        <button class="modal-close" onclick="closeOrgSelect()">&times;</button>
+      </div>
+      <div class="modal-body" style="padding:0;max-height:400px;overflow-y:auto;">
+        <table class="data-table" style="margin:0;">
+          <thead><tr>
+            <th>업체명(상호)</th>
+            <th>사업자등록번호</th>
+            <th>대표자명</th>
+            <th>업태/종목</th>
+            <th>사업장주소</th>
+          </tr></thead>
+          <tbody>${rows}</tbody>
+        </table>
+      </div>
+      <div class="modal-footer" style="justify-content:space-between;">
+        <button class="btn btn-secondary" onclick="enableDirectOrgInput()">
+          <i class="fa-solid fa-pencil"></i> 직접 입력
+        </button>
+        <button class="btn btn-secondary" onclick="closeOrgSelect()">
+          <i class="fa-solid fa-xmark"></i> 취소
+        </button>
+      </div>
+    </div>
+  </div>`;
+  document.body.insertAdjacentHTML('beforeend', html);
+}
+
+function closeOrgSelect() {
+  const el = document.getElementById('org-select-overlay');
+  if (el) el.remove();
+}
+function closeOrgSelectOnBackdrop(e) {
+  if (e.target.id === 'org-select-overlay' && _mousedownTarget === e.target) closeOrgSelect();
+}
+
+function selectOrgCompany(name, addr) {
+  const orgEl  = document.getElementById('f_org');
+  const addrEl = document.getElementById('f_office_addr');
+  if (orgEl)  orgEl.value  = name;
+  if (addrEl) addrEl.value = addr;
+  setOrgReadonly(true);
+  orgFromList = true;
+  closeOrgSelect();
+  showToast('업체가 선택되었습니다.', 'success');
+}
+
+function enableDirectOrgInput() {
+  setOrgReadonly(false);
+  orgFromList = false;
+  closeOrgSelect();
+  const orgEl = document.getElementById('f_org');
+  if (orgEl) { orgEl.value = ''; orgEl.focus(); }
+  const addrEl = document.getElementById('f_office_addr');
+  if (addrEl) addrEl.value = '';
+  showToast('직접 입력 모드로 전환되었습니다.', 'success');
+}
+
+/* ══════════════════════════════════════════════════════════════
+   Edit / Cancel
+══════════════════════════════════════════════════════════════ */
+async function editInstructor() {
+  if (!currentInstructorId) { showForm(null); return; }
+  showSpinner();
+  try {
+    const data = await loadAllData(currentInstructorId);
+    if (data) showForm(data);
+    else showForm(null);
+  } finally { hideSpinner(); }
+}
+
+async function cancelEdit() {
+  if (!currentInstructorId) { showForm(null); return; }
+  showSpinner();
+  try {
+    const data = await loadAllData(currentInstructorId);
+    if (data) showView(data); else showForm(null);
+  } finally { hideSpinner(); }
+}
+
+/* ══════════════════════════════════════════════════════════════
+   Validation
+══════════════════════════════════════════════════════════════ */
+function validateForm() {
+  const required = [
+    ['f_name', '성명'],
+    ['f_type', '강사 유형'],
+    ['f_birth_year', '생년월일(년도)'],
+    ['f_birth_month', '생년월일(월)'],
+    ['f_birth_day', '생년월일(일)'],
+    ['f_gender', '성별'],
+    ['f_email', '이메일'],
+    ['f_mobile', '휴대전화'],
+    ['f_org', '소속'],
+    ['f_position', '직급'],
+    ['f_expertise', '전문 역량'],
+    ['f_lecture_field', '강의 분야'],
+  ];
+  for (const [id, label] of required) {
+    const el = document.getElementById(id);
+    if (!el || !el.value.trim()) {
+      showToast(`"${label}"은(는) 필수 입력 항목입니다.`, 'warning');
+      el && el.focus();
+      return false;
+    }
+  }
+  if (document.getElementById('f_type')?.value === '기타') {
+    const etc = document.getElementById('f_type_etc');
+    if (!etc || !etc.value.trim()) {
+      showToast('"강사 유형 (기타)"에 내용을 입력해주세요.', 'warning');
+      etc && etc.focus();
+      return false;
+    }
+  }
+  const flAvailEl = document.querySelector('input[name="f_foreign_lang_avail"]:checked');
+  if (!flAvailEl) {
+    showToast('"외국어 강의 가능 여부"를 선택해주세요.', 'warning');
+    return false;
+  }
+  if (flAvailEl.value === '가능') {
+    const flChecked = document.querySelectorAll('input[name="f_foreign_lang_type"]:checked');
+    if (!flChecked.length) {
+      showToast('"어종"을 하나 이상 선택해주세요.', 'warning');
+      return false;
+    }
+  }
+  return true;
+}
+
+/* ══════════════════════════════════════════════════════════════
+   DB: Save Instructor
+══════════════════════════════════════════════════════════════ */
+async function saveInstructor() {
+  if (!validateForm()) return;
+
+  const mainData = {
+    instructor_name:  document.getElementById('f_name').value.trim(),
+    instructor_type:  document.getElementById('f_type').value === '기타'
+                        ? (document.getElementById('f_type_etc')?.value.trim() || '기타')
+                        : document.getElementById('f_type').value,
+    birth_year:       document.getElementById('f_birth_year').value || null,
+    birth_month:      document.getElementById('f_birth_month').value || null,
+    birth_day:        document.getElementById('f_birth_day').value || null,
+    gender:           document.getElementById('f_gender').value,
+    email:            document.getElementById('f_email').value.trim(),
+    mobile_phone:     document.getElementById('f_mobile').value.trim(),
+    organization:     document.getElementById('f_org').value.trim(),
+    position:         document.getElementById('f_position').value.trim(),
+    office_phone:     document.getElementById('f_office_phone').value.trim(),
+    office_address:   document.getElementById('f_office_addr').value.trim(),
+    expertise:           document.getElementById('f_expertise').value.trim(),
+    lecture_field:       document.getElementById('f_lecture_field').value.trim(),
+    foreign_lang_avail:  document.querySelector('input[name="f_foreign_lang_avail"]:checked')?.value || null,
+    foreign_lang_types:  [...document.querySelectorAll('input[name="f_foreign_lang_type"]:checked')].map(cb => cb.value).join(',') || null,
+    vendor:           document.getElementById('f_vendor')?.value || null,
+    profile_image_url: profileImageBase64 || null,
+    privacy_consent:  document.getElementById('f_privacy').checked,
+    updated_at:       new Date().toISOString(),
+  };
+
+  const homepages  = collectRows('homepage-body',  ['hp_name','hp_url']);
+  const educations = collectRows('education-body', ['edu_type','school_name','department','major']);
+  const careers    = collectRows('career-body',    ['career_type','company_name','start_year','start_month','end_year','end_month']);
+  const lectures   = collectRows('lecture-body',   ['company_name','topic']);
+
+  showSpinner();
+  try {
+    let instrId = currentInstructorId;
+    if (instrId) {
+      const { error } = await db.from('instructors').update(mainData).eq('id', instrId);
+      if (error) throw error;
+    } else {
+      const { data, error } = await db.from('instructors').insert(mainData).select('id').single();
+      if (error) throw error;
+      instrId = data.id;
+      localStorage.setItem('instructor_id', instrId);
+      currentInstructorId = instrId;
+    }
+
+    // 자식 테이블 삭제 후 재삽입
+    await Promise.all([
+      db.from('instructor_homepages').delete().eq('instructor_id', instrId),
+      db.from('instructor_educations').delete().eq('instructor_id', instrId),
+      db.from('instructor_attachments').delete().eq('instructor_id', instrId),
+      db.from('instructor_careers').delete().eq('instructor_id', instrId),
+      db.from('instructor_lecture_records').delete().eq('instructor_id', instrId),
+    ]);
+
+    const insertAll = [];
+    if (homepages.length > 0)
+      insertAll.push(db.from('instructor_homepages').insert(homepages.map((r,i)=>({...r, instructor_id:instrId, sort_order:i}))));
+    if (educations.length > 0)
+      insertAll.push(db.from('instructor_educations').insert(educations.map((r,i)=>({...r, instructor_id:instrId, sort_order:i}))));
+    if (attachmentState.length > 0)
+      insertAll.push(db.from('instructor_attachments').insert(attachmentState.map((r,i)=>({ file_name:r.file_name, file_size:r.file_size, instructor_id:instrId, sort_order:i }))));
+    if (careers.length > 0)
+      insertAll.push(db.from('instructor_careers').insert(careers.map((r,i)=>({...r, instructor_id:instrId, sort_order:i}))));
+    if (lectures.length > 0)
+      insertAll.push(db.from('instructor_lecture_records').insert(lectures.map((r,i)=>({...r, instructor_id:instrId, sort_order:i}))));
+
+    await Promise.all(insertAll);
+
+    showToast('강사 정보가 저장되었습니다.', 'success');
+    const data = await loadAllData(instrId);
+    if (data) showView(data);
+  } catch (err) {
+    showToast('저장 중 오류: ' + (err.message || ''), 'error');
+  } finally {
+    hideSpinner();
+  }
+}
+
+/* ══════════════════════════════════════════════════════════════
+   Nav: 업체 벤더
+══════════════════════════════════════════════════════════════ */
+function handleNavTaxCompany() {
+  setActiveNav('nav-tax-company');
+  loadTaxCompanies();
+}
+
+/* ══════════════════════════════════════════════════════════════
+   DB: 업체 벤더 목록
+══════════════════════════════════════════════════════════════ */
+async function loadTaxCompanies() {
+  showSpinner();
+  try {
+    const { data, error } = await db.from('tax_invoice_companies').select('*').order('created_at', { ascending: false });
+    if (error) throw error;
+    showTaxCompanyList(data || []);
+  } catch (err) {
+    showToast('업체 목록 로드 중 오류: ' + (err.message || ''), 'error');
+    showTaxCompanyList([]);
+  } finally { hideSpinner(); }
+}
+
+function showTaxCompanyList(companies) {
+  const rows = companies.length > 0
+    ? companies.map((c,i) => `
+      <tr ondblclick="openTaxModal('${c.id}')" style="cursor:pointer;" title="더블클릭 수정">
+        <td>${i+1}</td>
+        <td>${esc(c.company_name)}</td>
+        <td>${esc(c.business_number||'—')}</td>
+        <td>${esc(c.ceo_name||'—')}</td>
+        <td>${esc(c.business_type||'—')}</td>
+        <td>${esc(c.address||'—')}</td>
+        <td>${esc(c.vendor||'—')}</td>
+        <td class="action-cell">
+          <button class="btn-edit btn-sm" onclick="openTaxModal('${c.id}')">수정</button>
+          <button class="btn-delete btn-sm" onclick="deleteTaxCompany('${c.id}','${esc(c.company_name)}')">삭제</button>
+        </td>
+      </tr>`).join('')
+    : `<tr><td colspan="8" class="empty-table">등록된 업체가 없습니다.</td></tr>`;
+
+  const html = `
+  <div class="content-card">
+    <div class="content-card-header">
+      <h2><i class="fa-solid fa-file-invoice" style="margin-right:8px;"></i>업체 벤더</h2>
+    </div>
+    <div class="list-toolbar">
+      <button class="btn btn-primary" onclick="openTaxModal(null)"><i class="fa-solid fa-plus"></i> 항목 추가</button>
+    </div>
+    <table class="data-table">
+      <thead><tr>
+        <th style="width:44px;">No.</th><th>업체명(상호)</th><th>사업자등록번호</th>
+        <th>대표자명</th><th>업태/종목</th><th>사업장주소</th><th>Vendor</th>
+        <th style="width:100px;">수정/삭제</th>
+      </tr></thead>
+      <tbody>${rows}</tbody>
+    </table>
+  </div>`;
+  document.getElementById('content-area').innerHTML = html;
+}
+
+/* ══════════════════════════════════════════════════════════════
+   Tax Modal
+══════════════════════════════════════════════════════════════ */
+async function openTaxModal(id) {
+  let prefill = {};
+  if (id) {
+    showSpinner();
+    try { const { data } = await db.from('tax_invoice_companies').select('*').eq('id', id).single(); if (data) prefill = data; }
+    finally { hideSpinner(); }
+  }
+  const html = `
+  <div class="modal-overlay active" id="tax-modal-overlay" onclick="closeTaxOnBackdrop(event)">
+    <div class="modal" role="dialog">
+      <div class="modal-header">
+        <h3>${id?'업체 벤더 수정':'업체 벤더 추가'}</h3>
+        <button class="modal-close" onclick="closeTaxModal()">&times;</button>
+      </div>
+      <div class="modal-body">
+        <input type="hidden" id="tax-id" value="${id||''}">
+        <div class="modal-field"><label>업체명(상호)<span class="req">*</span></label>
+          <input class="form-input" id="tx-name" maxlength="100" placeholder="업체명" value="${esc(prefill.company_name||'')}"></div>
+        <div class="modal-field"><label>사업자등록번호</label>
+          <input class="form-input" id="tx-biz" maxlength="100" placeholder="000-00-00000" value="${esc(prefill.business_number||'')}"></div>
+        <div class="modal-field"><label>대표자명</label>
+          <input class="form-input" id="tx-ceo" maxlength="100" placeholder="대표자명" value="${esc(prefill.ceo_name||'')}"></div>
+        <div class="modal-field"><label>업태/종목</label>
+          <input class="form-input" id="tx-type" maxlength="100" placeholder="서비스업/교육" value="${esc(prefill.business_type||'')}"></div>
+        <div class="modal-field"><label>사업장 주소</label>
+          <input class="form-input" id="tx-addr" maxlength="100" placeholder="사업장 주소" value="${esc(prefill.address||'')}"></div>
+        <div class="modal-field"><label>Vendor</label>
+          <input class="form-input" id="tx-vendor" maxlength="20" placeholder="Vendor" value="${esc(prefill.vendor||'')}"></div>
+      </div>
+      <div class="modal-footer">
+        <button class="btn btn-secondary" onclick="closeTaxModal()"><i class="fa-solid fa-xmark"></i> 취소</button>
+        <button class="btn btn-success" style="padding:8px 28px;" onclick="saveTaxCompany()"><i class="fa-solid fa-floppy-disk"></i> 저장</button>
+      </div>
+    </div>
+  </div>`;
+  document.body.insertAdjacentHTML('beforeend', html);
+  document.getElementById('tx-name').focus();
+}
+function closeTaxModal() { const el = document.getElementById('tax-modal-overlay'); if (el) el.remove(); }
+function closeTaxOnBackdrop(e) { if (e.target.id === 'tax-modal-overlay' && _mousedownTarget === e.target) closeTaxModal(); }
+
+async function saveTaxCompany() {
+  const name = document.getElementById('tx-name').value.trim();
+  if (!name) { showToast('업체명은 필수 입력 항목입니다.', 'warning'); return; }
+  const id = document.getElementById('tax-id').value;
+  const data = {
+    company_name:    name,
+    business_number: document.getElementById('tx-biz').value.trim(),
+    ceo_name:        document.getElementById('tx-ceo').value.trim(),
+    business_type:   document.getElementById('tx-type').value.trim(),
+    address:         document.getElementById('tx-addr').value.trim(),
+    vendor:          document.getElementById('tx-vendor').value.trim(),
+  };
+  showSpinner();
+  try {
+    const res = id
+      ? await db.from('tax_invoice_companies').update(data).eq('id', id).select().single()
+      : await db.from('tax_invoice_companies').insert(data).select().single();
+    if (res.error) throw res.error;
+    showToast(id ? '수정되었습니다.' : '추가되었습니다.', 'success');
+    closeTaxModal();
+    await loadTaxCompanies();
+  } catch (err) { showToast('저장 오류: ' + (err.message || ''), 'error'); }
+  finally { hideSpinner(); }
+}
+
+async function deleteTaxCompany(id, name) {
+  if (!confirm(`"${name}" 업체를 삭제하시겠습니까?`)) return;
+  showSpinner();
+  try {
+    const { error } = await db.from('tax_invoice_companies').delete().eq('id', id);
+    if (error) throw error;
+    showToast('삭제되었습니다.', 'success');
+    await loadTaxCompanies();
+  } catch (err) { showToast('삭제 오류: ' + (err.message || ''), 'error'); }
+  finally { hideSpinner(); }
+}
+
+/* ══════════════════════════════════════════════════════════════
+   Auth
+══════════════════════════════════════════════════════════════ */
+async function doLogout() {
+  currentUser = null;
+  currentInstructorId = null;
+  // UI를 즉시 전환 (SIGNED_OUT 이벤트 도착 전에도 확실히 처리)
+  document.getElementById('app').style.display = 'none';
+  const authEl = document.getElementById('auth-container');
+  if (authEl) {
+    authEl.style.display = 'flex';
+    const emailEl  = document.getElementById('login-email');
+    const pwdEl    = document.getElementById('login-password');
+    if (emailEl) emailEl.value = '';
+    if (pwdEl)   pwdEl.value   = '';
+  }
+  await window._signOut?.();
+}
+
+/* ══════════════════════════════════════════════════════════════
+   Helpers
+══════════════════════════════════════════════════════════════ */
+function generateTempPassword() {
+  const chars = 'ABCDEFGHJKMNPQRSTUVWXYZabcdefghjkmnpqrstuvwxyz23456789';
+  return Array.from({length: 8}, () => chars[Math.floor(Math.random() * chars.length)]).join('');
+}
+function generateToken() {
+  return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, c => {
+    const r = Math.random() * 16 | 0;
+    return (c === 'x' ? r : (r & 0x3 | 0x8)).toString(16);
+  });
+}
+
+/* ══════════════════════════════════════════════════════════════
+   Nav: 강사정보 등록요청
+══════════════════════════════════════════════════════════════ */
+function handleNavInstrRequest() {
+  setActiveNav('nav-instr-request');
+  loadInstrRequests();
+}
+
+async function loadInstrRequests() {
+  showSpinner();
+  try {
+    const { data, error } = await db.from('instructor_requests').select('*').order('created_at', { ascending: false });
+    if (error) throw error;
+    showInstrRequestList(data || []);
+  } catch (err) {
+    showToast('목록 로드 중 오류: ' + (err.message || ''), 'error');
+    showInstrRequestList([]);
+  } finally { hideSpinner(); }
+}
+
+let _irAllItems = [];
+
+function showInstrRequestList(items) {
+  _irAllItems = items;
+  selectedRequestId = null;
+
+  const checkboxItems = INSTRUCTOR_TYPES.map(t => `
+    <label style="display:flex;align-items:center;gap:8px;padding:6px 12px;cursor:pointer;
+                  border-radius:6px;font-size:13px;color:#374151;white-space:nowrap;
+                  transition:background .1s;"
+           onmouseover="this.style.background='#f1f5f9'" onmouseout="this.style.background=''">
+      <input type="checkbox" value="${esc(t)}" onchange="filterIRList()"
+        style="width:15px;height:15px;cursor:pointer;accent-color:#667eea;">
+      ${esc(t)}
+    </label>`).join('');
+
+  document.getElementById('content-area').innerHTML = `
+  <div class="content-card">
+    <div class="content-card-header">
+      <h2><i class="fa-solid fa-paper-plane" style="margin-right:8px;"></i>강사정보 등록요청</h2>
+    </div>
+
+    <!-- 검색 + 버튼 툴바 -->
+    <div style="display:flex;align-items:center;gap:8px;padding:12px 20px 10px;flex-wrap:wrap;">
+      <!-- 강사유형 다중선택 드롭다운 -->
+      <div style="position:relative;" id="ir-type-dropdown-wrap">
+        <button type="button" id="ir-type-dropdown-btn"
+          onclick="toggleIRTypeDropdown(event)"
+          style="height:36px;padding:0 12px;border:1.5px solid #e2e8f0;border-radius:8px;
+                 font-size:13px;font-family:inherit;color:#374151;background:#fff;cursor:pointer;
+                 display:flex;align-items:center;gap:6px;white-space:nowrap;min-width:180px;
+                 justify-content:space-between;">
+          <span id="ir-type-label">전체 유형</span>
+          <i class="fa-solid fa-chevron-down" style="font-size:11px;color:#94a3b8;"></i>
+        </button>
+        <div id="ir-type-panel"
+          style="display:none;position:fixed;z-index:9000;
+                 background:#fff;border:1.5px solid #e2e8f0;border-radius:10px;
+                 box-shadow:0 8px 24px rgba(0,0,0,.12);padding:6px 0;min-width:220px;">
+          <div style="padding:6px 12px 4px;border-bottom:1px solid #f1f5f9;margin-bottom:2px;">
+            <button type="button" onclick="clearIRTypeFilter()"
+              style="font-size:12px;color:#667eea;background:none;border:none;cursor:pointer;
+                     padding:0;font-family:inherit;font-weight:600;">전체 해제</button>
+          </div>
+          ${checkboxItems}
+        </div>
+      </div>
+
+      <!-- 키워드 검색 -->
+      <div style="position:relative;flex:1;min-width:180px;max-width:280px;">
+        <i class="fa-solid fa-magnifying-glass"
+           style="position:absolute;left:10px;top:50%;transform:translateY(-50%);color:#94a3b8;font-size:13px;pointer-events:none;"></i>
+        <input id="ir-filter-kw" type="text" placeholder="강사명 또는 이메일 검색"
+          oninput="filterIRList()"
+          style="width:100%;box-sizing:border-box;height:36px;padding:0 10px 0 32px;
+                 border:1.5px solid #e2e8f0;border-radius:8px;font-size:13px;
+                 font-family:inherit;outline:none;"
+          onfocus="this.style.borderColor='#667eea'" onblur="this.style.borderColor='#e2e8f0'">
+      </div>
+
+      <!-- 버튼 (오른쪽) -->
+      <div style="display:flex;gap:8px;margin-left:auto;">
+        <button class="btn btn-secondary" style="height:36px;padding:0 16px;font-size:13px;white-space:nowrap;" onclick="openInstrRequestModal(null)">
+          <i class="fa-solid fa-plus"></i> 항목 추가</button>
+        <button class="btn btn-secondary" style="height:36px;padding:0 16px;font-size:13px;white-space:nowrap;" onclick="openExcelPasteModal()">
+          <i class="fa-solid fa-table-cells"></i> 엑셀 붙여넣기</button>
+        <button class="btn btn-success"   style="height:36px;padding:0 16px;font-size:13px;white-space:nowrap;" onclick="openRegRequestPopup()">
+          <i class="fa-solid fa-paper-plane"></i> 요청 메일 발송</button>
+      </div>
+    </div>
+
+    <table class="data-table">
+      <thead><tr>
+        <th style="width:44px;">선택</th>
+        <th>성명</th><th>강사유형</th><th>핸드폰</th><th>이메일</th><th>생년월일</th>
+        <th style="width:90px;">상태</th>
+        <th style="width:100px;">수정/삭제</th>
+      </tr></thead>
+      <tbody id="ir-tbody">${buildIRRows(items)}</tbody>
+    </table>
+  </div>`;
+}
+
+function buildIRRows(items) {
+  if (!items.length) return `<tr><td colspan="8" class="empty-table">조건에 맞는 결과가 없습니다.</td></tr>`;
+  return items.map(v => `
+    <tr id="req-row-${v.id}">
+      <td style="text-align:center;">
+        <input type="radio" name="req-radio" value="${v.id}"
+          onchange="selectReqRow('${v.id}')"
+          style="width:22px;height:22px;cursor:pointer;accent-color:#667eea;">
+      </td>
+      <td>${esc(v.full_name || '—')}</td>
+      <td>${esc(v.instructor_type || '—')}</td>
+      <td>${esc(v.mobile || '—')}</td>
+      <td>${esc(v.email || '—')}</td>
+      <td>${esc(v.birth_date || '—')}</td>
+      <td style="text-align:center;">${v.is_requested
+        ? '<span class="badge-requested">요청완료</span>'
+        : '<span class="badge-pending">미요청</span>'}</td>
+      <td class="action-cell">
+        <button class="btn-edit btn-sm" onclick="openInstrRequestModal('${v.id}')">수정</button>
+        <button class="btn-delete btn-sm" onclick="deleteInstrRequest('${v.id}','${esc(v.full_name||'')}')">삭제</button>
+      </td>
+    </tr>`).join('');
+}
+
+function toggleIRTypeDropdown(e) {
+  e.stopPropagation();
+  const panel = document.getElementById('ir-type-panel');
+  const btn   = document.getElementById('ir-type-dropdown-btn');
+  if (!panel || !btn) return;
+  const isOpen = panel.style.display !== 'none';
+  if (isOpen) {
+    panel.style.display = 'none';
+    btn.style.borderColor = '#e2e8f0';
+  } else {
+    const r = btn.getBoundingClientRect();
+    panel.style.top  = (r.bottom + 4) + 'px';
+    panel.style.left = r.left + 'px';
+    panel.style.display = 'block';
+    btn.style.borderColor = '#667eea';
+  }
+}
+
+function clearIRTypeFilter() {
+  document.querySelectorAll('#ir-type-panel input[type="checkbox"]')
+    .forEach(cb => { cb.checked = false; });
+  filterIRList();
+}
+
+function filterIRList() {
+  const checked = [...document.querySelectorAll('#ir-type-panel input[type="checkbox"]:checked')]
+    .map(cb => cb.value);
+  const kw = (document.getElementById('ir-filter-kw')?.value || '').trim().toLowerCase();
+
+  // 버튼 라벨 갱신
+  const label = document.getElementById('ir-type-label');
+  if (label) {
+    if (!checked.length) label.textContent = '전체 유형';
+    else if (checked.length === 1) label.textContent = checked[0];
+    else label.textContent = `${checked[0]} 외 ${checked.length - 1}개`;
+  }
+
+  const filtered = _irAllItems.filter(v => {
+    const vType = v.instructor_type || '';
+    const typeMatch = !checked.length || checked.some(sel => {
+      if (sel === '기타') return vType && !INSTRUCTOR_TYPES.slice(0,-1).includes(vType);
+      return vType === sel;
+    });
+    const kwMatch = !kw ||
+      (v.full_name || '').toLowerCase().includes(kw) ||
+      (v.email || '').toLowerCase().includes(kw);
+    return typeMatch && kwMatch;
+  });
+  const tbody = document.getElementById('ir-tbody');
+  if (tbody) tbody.innerHTML = buildIRRows(filtered);
+  selectedRequestId = null;
+}
+
+// 패널 외부 클릭 시 닫기
+document.addEventListener('click', function(e) {
+  const wrap = document.getElementById('ir-type-dropdown-wrap');
+  if (wrap && !wrap.contains(e.target)) {
+    const panel = document.getElementById('ir-type-panel');
+    const btn   = document.getElementById('ir-type-dropdown-btn');
+    if (panel) panel.style.display = 'none';
+    if (btn)   btn.style.borderColor = '#e2e8f0';
+  }
+});
+
+function selectReqRow(id) {
+  // 이전 하이라이트 제거
+  document.querySelectorAll('tr.row-selected').forEach(r => r.classList.remove('row-selected'));
+  selectedRequestId = id;
+  const row = document.getElementById('req-row-' + id);
+  if (row) row.classList.add('row-selected');
+}
+
+/* ══════════════════════════════════════════════════════════════
+   강사정보 등록요청 Modal (추가/수정)
+══════════════════════════════════════════════════════════════ */
+async function openInstrRequestModal(id) {
+  let p = {};
+  if (id) {
+    showSpinner();
+    try { const { data } = await db.from('instructor_requests').select('*').eq('id', id).single(); if (data) p = data; }
+    finally { hideSpinner(); }
+  }
+  document.body.insertAdjacentHTML('beforeend', `
+  <div class="modal-overlay active" id="ir-modal-overlay" onclick="closeIROnBackdrop(event)">
+    <div class="modal" role="dialog">
+      <div class="modal-header">
+        <h3>${id ? '등록요청 수정' : '등록요청 추가'}</h3>
+        <button class="modal-close" onclick="closeIRModal()">&times;</button>
+      </div>
+      <div class="modal-body">
+        <input type="hidden" id="ir-id" value="${id || ''}">
+        <div class="modal-field"><label>성명<span class="req">*</span></label>
+          <input class="form-input" id="ir-name" maxlength="100" placeholder="성명" value="${esc(p.full_name||'')}"></div>
+        <div class="modal-field"><label>핸드폰</label>
+          <input class="form-input" id="ir-mobile" maxlength="100" placeholder="010-0000-0000" value="${esc(p.mobile||'')}"></div>
+        <div class="modal-field"><label>이메일</label>
+          <input class="form-input" id="ir-email" maxlength="100" placeholder="example@email.com" value="${esc(p.email||'')}"></div>
+        <div class="modal-field"><label>생년월일</label>
+          <input class="form-input" id="ir-birth" maxlength="20" placeholder="YYYYMMDD" value="${esc(p.birth_date||'')}"></div>
+        <div class="modal-field"><label>강사유형</label>
+          ${(()=>{
+            const cur = p.instructor_type || '';
+            const isEtc = cur && !INSTRUCTOR_TYPES.slice(0,-1).includes(cur);
+            const selVal = isEtc ? '기타' : cur;
+            const opts = INSTRUCTOR_TYPES.map(t =>
+              `<option value="${esc(t)}"${selVal===t?' selected':''}>${esc(t==='기타'?'기타 (직접 입력)':t)}</option>`
+            ).join('');
+            return `<select class="form-select" id="ir-type" onchange="onIRTypeChange()" style="margin-bottom:0;">
+                      <option value="">선택하세요</option>${opts}
+                    </select>
+                    <input type="text" id="ir-type-etc"
+                      placeholder="강사 유형을 입력하세요 (30자 이내)"
+                      maxlength="30"
+                      value="${isEtc ? esc(cur) : ''}"
+                      style="margin-top:6px;width:100%;box-sizing:border-box;
+                             display:${isEtc ? 'block' : 'none'};
+                             border:1.5px solid #cbd5e1;border-radius:7px;
+                             padding:7px 10px;font-size:13px;font-family:inherit;outline:none;"
+                      onfocus="this.style.borderColor='#667eea'"
+                      onblur="this.style.borderColor='#cbd5e1'">`;
+          })()}
+        </div>
+        <div class="modal-field"><label>상태</label>
+          <select class="form-select" id="ir-status">
+            <option value="false" ${!p.is_requested ? 'selected' : ''}>미요청</option>
+            <option value="true"  ${p.is_requested  ? 'selected' : ''}>요청완료</option>
+          </select></div>
+      </div>
+      <div class="modal-footer">
+        <button class="btn btn-secondary" onclick="closeIRModal()"><i class="fa-solid fa-xmark"></i> 취소</button>
+        <button class="btn btn-success" style="padding:8px 28px;" onclick="saveInstrRequest()"><i class="fa-solid fa-floppy-disk"></i> 저장</button>
+      </div>
+    </div>
+  </div>`);
+  document.getElementById('ir-name').focus();
+}
+function closeIRModal() { const el = document.getElementById('ir-modal-overlay'); if (el) el.remove(); }
+function closeIROnBackdrop(e) { if (e.target.id === 'ir-modal-overlay' && _mousedownTarget === e.target) closeIRModal(); }
+
+async function saveInstrRequest() {
+  const name = document.getElementById('ir-name').value.trim();
+  if (!name) { showToast('성명은 필수 입력 항목입니다.', 'warning'); return; }
+  const id   = document.getElementById('ir-id').value;
+  const irTypeSel = document.getElementById('ir-type')?.value || '';
+  const irTypeVal = irTypeSel === '기타'
+    ? (document.getElementById('ir-type-etc')?.value.trim() || '기타')
+    : irTypeSel;
+  const data = {
+    full_name:       name,
+    instructor_type: irTypeVal || null,
+    mobile:          document.getElementById('ir-mobile').value.trim(),
+    email:           document.getElementById('ir-email').value.trim(),
+    birth_date:      document.getElementById('ir-birth').value.trim(),
+    is_requested:    document.getElementById('ir-status').value === 'true',
+  };
+  showSpinner();
+  try {
+    const res = id
+      ? await db.from('instructor_requests').update(data).eq('id', id).select().single()
+      : await db.from('instructor_requests').insert(data).select().single();
+    if (res.error) throw res.error;
+    showToast(id ? '수정되었습니다.' : '추가되었습니다.', 'success');
+    closeIRModal();
+    await loadInstrRequests();
+  } catch (err) { showToast('저장 오류: ' + (err.message || ''), 'error'); }
+  finally { hideSpinner(); }
+}
+
+/* ── 엑셀 붙여넣기 ── */
+let _pasteRowSeq = 0;
+const _PASTE_RE = {
+  email: /^[^\s@]+@[^\s@]+\.[^\s@]+$/,
+  phone: /^\d{2,3}-\d{3,4}-\d{4}$/,
+  birth: /^(\d{8}|\d{4}-\d{2}-\d{2})$/,
+};
+
+function openExcelPasteModal() {
+  document.getElementById('excel-paste-modal')?.remove();
+  _pasteRowSeq = 0;
+  const modal = document.createElement('div');
+  modal.id = 'excel-paste-modal';
+  modal.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,0.45);z-index:2000;display:flex;align-items:center;justify-content:center;';
+  modal.innerHTML = `
+    <div style="background:#fff;border-radius:16px;width:740px;max-width:96vw;max-height:90vh;
+                display:flex;flex-direction:column;box-shadow:0 8px 40px rgba(0,0,0,0.18);">
+
+      <!-- 헤더 -->
+      <div style="padding:24px 28px 0;flex-shrink:0;">
+        <h3 style="font-size:16px;font-weight:700;margin:0 0 10px;">엑셀 데이터 붙여넣기</h3>
+        <p style="font-size:12.5px;color:#64748b;margin:0 0 10px;line-height:1.7;">
+          엑셀에서 아래 순서로 열을 맞춰 복사한 후 붙여넣으세요.<br>
+          <strong style="color:#2563eb;">성명 → 이메일 → 핸드폰 → 생년월일</strong>
+          <span style="color:#94a3b8;font-size:11.5px;margin-left:6px;">(생년월일은 선택)</span>
+        </p>
+        <div style="background:#f8fafc;border:1.5px dashed #cbd5e1;border-radius:8px;
+                    padding:8px 14px;margin-bottom:14px;font-size:12px;color:#475569;font-family:monospace;">
+          김일수&nbsp;&nbsp;ilsoo.kim@gmail.com&nbsp;&nbsp;010-1234-5678&nbsp;&nbsp;1985-03-15<br>
+          이창수&nbsp;&nbsp;csoo.lee@naver.com&nbsp;&nbsp;&nbsp;010-4321-5678
+        </div>
+
+        <!-- 붙여넣기 textarea -->
+        <div style="margin-bottom:14px;">
+          <textarea id="excel-paste-area" rows="4"
+            style="width:100%;box-sizing:border-box;border:1.5px solid #cbd5e1;border-radius:8px;
+                   padding:10px 12px;font-size:13px;font-family:monospace;resize:none;outline:none;"
+            onpaste="handleExcelPaste(event)"
+            oninput="onExcelPasteAreaInput()"
+            placeholder="엑셀에서 복사한 데이터를 여기에 Ctrl+V 로 붙여넣으면 자동으로 아래 목록에 추가됩니다."></textarea>
+          <div id="excel-manual-warn" style="display:none;margin-top:6px;padding:9px 12px;
+               border-radius:8px;background:#fffbeb;border:1.5px solid #fcd34d;
+               font-size:12.5px;color:#92400e;display:flex;gap:8px;align-items:flex-start;">
+            <i class="fa-solid fa-triangle-exclamation" style="margin-top:1px;flex-shrink:0;color:#d97706;"></i>
+            <span>수기 입력은 지원하지 않습니다. 엑셀에서 셀을 선택 후 <strong>복사(Ctrl+C) → 붙여넣기(Ctrl+V)</strong> 해주세요.</span>
+          </div>
+        </div>
+
+        <!-- 테이블 툴바 -->
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px;">
+          <span id="paste-row-count" style="font-size:12.5px;color:#64748b;">0행</span>
+          <button onclick="addPasteRow()"
+            style="padding:6px 14px;background:#f1f5f9;color:#374151;border:1.5px solid #cbd5e1;
+                   border-radius:7px;font-size:12.5px;font-weight:600;cursor:pointer;font-family:inherit;">
+            <i class="fa-solid fa-plus" style="margin-right:4px;color:#2563eb;"></i>행 추가
+          </button>
+        </div>
+      </div>
+
+      <!-- 편집 테이블 (스크롤) -->
+      <div style="flex:1;overflow-y:auto;padding:0 28px;min-height:80px;">
+        <table style="width:100%;border-collapse:collapse;font-size:13px;">
+          <thead>
+            <tr style="background:#f1f5f9;position:sticky;top:0;z-index:1;">
+              <th style="padding:9px 10px;text-align:left;font-weight:600;color:#374151;border-bottom:1px solid #e2e8f0;">성명 <span style="color:#e53e3e;">*</span></th>
+              <th style="padding:9px 10px;text-align:left;font-weight:600;color:#374151;border-bottom:1px solid #e2e8f0;">이메일</th>
+              <th style="padding:9px 10px;text-align:left;font-weight:600;color:#374151;border-bottom:1px solid #e2e8f0;">핸드폰</th>
+              <th style="padding:9px 10px;text-align:left;font-weight:600;color:#374151;border-bottom:1px solid #e2e8f0;">생년월일</th>
+              <th style="width:40px;border-bottom:1px solid #e2e8f0;"></th>
+            </tr>
+          </thead>
+          <tbody id="paste-table-body"></tbody>
+        </table>
+        <div id="paste-empty-msg" style="text-align:center;padding:24px;color:#94a3b8;font-size:13px;">
+          엑셀에서 붙여넣거나 <strong>행 추가</strong>로 직접 입력하세요.
+        </div>
+      </div>
+
+      <!-- 푸터 -->
+      <div style="padding:16px 28px 24px;display:flex;justify-content:flex-end;gap:10px;flex-shrink:0;border-top:1px solid #f1f5f9;margin-top:8px;">
+        <button class="btn btn-secondary" style="white-space:nowrap;padding:9px 20px;"
+                onclick="document.getElementById('excel-paste-modal').remove()">취소</button>
+        <button class="btn btn-primary" style="padding:9px 24px;"
+                onclick="confirmExcelPaste()">
+          <i class="fa-solid fa-floppy-disk" style="margin-right:6px;"></i>저장
+        </button>
+      </div>
+    </div>`;
+  document.body.appendChild(modal);
+
+  const ta = document.getElementById('excel-paste-area');
+  ta.focus();
+}
+
+function addPasteRow(name='', email='', mobile='', birth='') {
+  const tbody = document.getElementById('paste-table-body');
+  if (!tbody) return;
+  const rid = ++_pasteRowSeq;
+  const tr = document.createElement('tr');
+  tr.id = `paste-tr-${rid}`;
+  tr.style.borderBottom = '1px solid #f1f5f9';
+  const inp = (val, ph, vtype='', extra='') => {
+    const blurFn = vtype
+      ? `validatePasteField(this,'${vtype}')`
+      : `this.style.borderColor='#e2e8f0'`;
+    return `<input type="text" value="${esc(val)}" placeholder="${ph}"
+      style="width:100%;box-sizing:border-box;border:1px solid #e2e8f0;border-radius:6px;
+             padding:6px 8px;font-size:12.5px;font-family:inherit;outline:none;"
+      onfocus="this.style.borderColor='#2563eb'" onblur="${blurFn}" ${extra}>`;
+  };
+  tr.innerHTML = `
+    <td style="padding:5px 6px;">${inp(name,  '성명')}</td>
+    <td style="padding:5px 6px;">${inp(email, '이메일', 'email')}</td>
+    <td style="padding:5px 6px;">${inp(mobile,'010-0000-0000','phone','oninput="this.value=formatPhoneHyphen(this.value)"')}</td>
+    <td style="padding:5px 6px;">${inp(birth, 'YYYYMMDD', 'birth')}</td>
+    <td style="padding:5px 8px;text-align:center;">
+      <button type="button" onclick="removePasteRow(this)"
+        style="background:none;border:none;cursor:pointer;color:#cbd5e1;font-size:16px;line-height:1;padding:2px 4px;"
+        onmouseover="this.style.color='#ef4444'" onmouseout="this.style.color='#cbd5e1'"
+        title="삭제">&times;</button>
+    </td>`;
+  tbody.appendChild(tr);
+  updatePasteRowCount();
+}
+
+function removePasteRow(btn) {
+  btn.closest('tr')?.remove();
+  updatePasteRowCount();
+}
+
+function updatePasteRowCount() {
+  const count = document.getElementById('paste-table-body')?.querySelectorAll('tr').length || 0;
+  const cnt = document.getElementById('paste-row-count');
+  if (cnt) cnt.textContent = `${count}행`;
+  const empty = document.getElementById('paste-empty-msg');
+  if (empty) empty.style.display = count ? 'none' : 'block';
+}
+
+function applyExcelPaste() {
+  const ta = document.getElementById('excel-paste-area');
+  if (!ta || !ta.value.trim()) return;
+
+  const raw = ta.value;
+  const { valid, invalid, colMismatch, formatError } = parseExcelText(raw);
+
+  if (formatError) {
+    showExcelPasteError(formatError);
+    ta.value = '';
+    return;
+  }
+  if (!valid.length) {
+    showExcelPasteError('인식된 데이터가 없습니다.\n성명이 포함된 행이 한 건 이상 있어야 합니다.');
+    ta.value = '';
+    return;
+  }
+
+  // 형식 검사 — 오류 행은 목록 추가 제외
+  const fmtOk = [], fmtBad = [];
+  valid.forEach(r => {
+    const email = (r[1] || '').trim();
+    const phone = (r[2] || '').trim();
+    const birth = (r[3] || '').trim();
+    const errs = [];
+    if (!email)                              errs.push('이메일 필수');
+    else if (!_PASTE_RE.email.test(email))   errs.push('이메일 형식');
+    if (phone && !_PASTE_RE.phone.test(phone)) errs.push('핸드폰 형식');
+    if (birth && !_PASTE_RE.birth.test(birth)) errs.push('생년월일 형식');
+    if (errs.length) fmtBad.push({ name: r[0]||'', errs });
+    else fmtOk.push(r);
+  });
+  showPasteFormatWarn(fmtBad);
+
+  // 기존 행의 이메일 중복 체크 세트 구성 (이메일 기준으로만 판단)
+  const existingEmails = new Set();
+  document.getElementById('paste-table-body')?.querySelectorAll('tr').forEach(tr => {
+    const e = (tr.querySelectorAll('input[type="text"]')[1]?.value || '').trim().toLowerCase();
+    if (e) existingEmails.add(e);
+  });
+
+  let added = 0;
+  const dupRows = [];
+  fmtOk.forEach(r => {
+    const e = (r[1] || '').trim().toLowerCase();
+    if (e && existingEmails.has(e)) { dupRows.push({ name: r[0]||'', email: r[1]||'' }); return; }
+    if (e) existingEmails.add(e);   // 같은 배치 내 중복 방지
+    addPasteRow(r[0]||'', r[1]||'', r[2]||'', r[3]||'');
+    added++;
+  });
+  showPasteDupWarn(dupRows);
+  ta.value = '';
+
+  const parts = [];
+  if (added)              parts.push(`${added}행 추가`);
+  if (dupRows.length)     parts.push(`중복 ${dupRows.length}행 제외`);
+  if (fmtBad.length)      parts.push(`형식 오류 ${fmtBad.length}행 제외`);
+  if (invalid.length)     parts.push(`성명 누락 ${invalid.length}행 제외`);
+  if (colMismatch.length) parts.push(`컬럼 수 불일치 ${colMismatch.length}행 제외`);
+
+  const hasIssue = dupRows.length > 0 || fmtBad.length > 0 || invalid.length > 0 || colMismatch.length > 0;
+  if (added === 0 && hasIssue) {
+    showToast(`추가된 행이 없습니다. (${parts.slice(1).join(', ')})`, 'warning');
+  } else {
+    showToast(parts.join(', ') + ' 완료', hasIssue ? 'warning' : 'success');
+  }
+}
+
+function parseExcelText(raw) {
+  const lines = raw.trim().split('\n').filter(l => l.trim());
+  if (!lines.length) return { valid: [], invalid: [], colMismatch: [], formatError: null };
+
+  // 탭 구분자가 전혀 없으면 엑셀 형식이 아님
+  const hasTab = lines.some(l => l.includes('\t'));
+  if (!hasTab) {
+    return {
+      valid: [], invalid: [],
+      formatError: '엑셀 형식이 아닙니다.\n엑셀에서 셀을 선택한 뒤 복사(Ctrl+C)하고 붙여넣어 주세요.\n(탭으로 구분된 데이터가 필요합니다)'
+    };
+  }
+
+  const valid = [], invalid = [], colMismatch = [];
+  lines.forEach(line => {
+    const cols = line.split('\t').map(c => c.trim());
+    if (!cols[0]) { invalid.push(cols); return; }        // 성명 없는 행
+    if (cols.length > 4) { colMismatch.push(cols); return; } // 컬럼 수 초과
+    valid.push(cols);
+  });
+
+  return { valid, invalid, colMismatch, formatError: null };
+}
+
+function _makePasteWarnDiv(id, bgColor, borderColor, textColor, titleHtml, items) {
+  document.getElementById(id)?.remove();
+  const div = document.createElement('div');
+  div.id = id;
+  div.style.cssText = `position:relative;margin-top:8px;padding:10px 32px 10px 14px;border-radius:8px;background:${bgColor};border:1.5px solid ${borderColor};font-size:12.5px;color:${textColor};`;
+  div.innerHTML = `
+    <button onclick="document.getElementById('${id}').remove()"
+      style="position:absolute;top:6px;right:8px;background:none;border:none;cursor:pointer;
+             font-size:15px;line-height:1;color:${textColor};opacity:.6;padding:2px 4px;"
+      onmouseover="this.style.opacity='1'" onmouseout="this.style.opacity='.6'">×</button>
+    <div style="font-weight:600;margin-bottom:6px;">${titleHtml}</div>
+    <ul style="margin:0;padding-left:16px;line-height:1.8;">${items}</ul>`;
+  document.getElementById('excel-paste-area')?.closest('div')?.after(div);
+}
+
+function showPasteFormatWarn(badRows) {
+  if (!badRows.length) { document.getElementById('paste-fmt-warn')?.remove(); return; }
+  const items = badRows.map(r =>
+    `<li style="padding:2px 0;">${esc(r.name||'(성명없음)')} — <span style="color:#dc2626;">${r.errs.join(', ')}</span></li>`
+  ).join('');
+  _makePasteWarnDiv('paste-fmt-warn', '#fff7ed', '#fb923c', '#92400e',
+    `⚠ 형식 오류 ${badRows.length}행 제외됨 (목록에 추가되지 않음)`, items);
+}
+
+function showPasteDupWarn(dupRows) {
+  if (!dupRows.length) { document.getElementById('paste-dup-warn')?.remove(); return; }
+  const items = dupRows.map(r =>
+    `<li style="padding:2px 0;">${esc(r.name)} — <span style="color:#64748b;">${esc(r.email)}</span> (이미 목록에 존재)</li>`
+  ).join('');
+  _makePasteWarnDiv('paste-dup-warn', '#fff1f2', '#fca5a5', '#991b1b',
+    `⚠ 중복 ${dupRows.length}행 제외됨 (목록에 추가되지 않음)`, items);
+}
+
+function handleExcelPaste(e) {
+  const ta   = document.getElementById('excel-paste-area');
+  const warn = document.getElementById('excel-manual-warn');
+  if (!ta) return;
+  const pasted = e.clipboardData?.getData('text') || '';
+  e.preventDefault();
+  ta.value = pasted;
+  if (warn) warn.style.display = 'none';
+  document.getElementById('paste-fmt-warn')?.remove();
+  document.getElementById('paste-dup-warn')?.remove();
+  setTimeout(applyExcelPaste, 50);
+}
+
+function onExcelPasteAreaInput() {
+  const ta   = document.getElementById('excel-paste-area');
+  const warn = document.getElementById('excel-manual-warn');
+  if (!ta || !warn) return;
+  const val = ta.value;
+  if (!val.trim()) { warn.style.display = 'none'; return; }
+  // 탭이 없으면 수기 입력으로 판단
+  warn.style.display = val.includes('\t') ? 'none' : 'flex';
+}
+
+function showExcelPasteError(msg) {
+  const area = document.getElementById('excel-paste-area');
+  const existing = document.getElementById('excel-paste-error');
+  if (existing) existing.remove();
+  const div = document.createElement('div');
+  div.id = 'excel-paste-error';
+  div.style.cssText = `
+    margin-top:8px;padding:10px 14px;border-radius:8px;
+    background:#fff5f5;border:1.5px solid #fecaca;
+    font-size:12.5px;color:#dc2626;line-height:1.7;white-space:pre-line;
+    display:flex;gap:8px;align-items:flex-start;
+  `;
+  div.innerHTML = `<i class="fa-solid fa-circle-exclamation" style="margin-top:2px;flex-shrink:0;"></i><span>${esc(msg)}</span>`;
+  area?.parentNode?.insertAdjacentElement('afterend', div);
+  setTimeout(() => div.remove(), 6000);
+}
+
+function renderExcelPreview() {} /* Copy Test 전용 — 별도 유지 */
+
+/* 붙여넣기 테이블 개별 필드 실시간 형식 검사 */
+function validatePasteField(input, type) {
+  const v = input.value.trim();
+  if (!v) { input.style.borderColor = '#e2e8f0'; input.title = ''; return; }
+  let ok;
+  ok = _PASTE_RE[type] ? _PASTE_RE[type].test(v) : true;
+  input.style.borderColor = ok ? '#e2e8f0' : '#ef4444';
+  input.title = ok ? '' : ({ email:'형식: mailid@domain.com', phone:'형식: 010-1234-5678', birth:'형식: YYYYMMDD 또는 YYYY-MM-DD' }[type] || '');
+}
+
+/* 행 형식 유효성 검사 — { valid, invalid: [{...row, errors:[]}] } */
+function validateInsertRows(rows) {
+  const valid = [], invalid = [];
+  rows.forEach(r => {
+    const errs = [];
+    if (!r.email)                                           errs.push('이메일 필수');
+    else if (!_PASTE_RE.email.test(r.email))                errs.push('이메일 형식');
+    if (r.mobile     && !_PASTE_RE.phone.test(r.mobile))   errs.push('핸드폰 형식');
+    if (r.birth_date && !_PASTE_RE.birth.test(r.birth_date)) errs.push('생년월일 형식');
+    if (errs.length) invalid.push({ ...r, errors: errs });
+    else valid.push(r);
+  });
+  return { valid, invalid };
+}
+
+/* 형식 오류 경고 모달 */
+function showFormatErrorModal(invalidItems, onSaveAnyway) {
+  document.getElementById('fmt-error-modal')?.remove();
+  const listHtml = invalidItems.map(r =>
+    `<li style="padding:6px 0;border-bottom:1px solid #fee2e2;font-size:12.5px;color:#1e293b;">
+      <strong>${esc(r.full_name)}</strong>
+      <span style="color:#64748b;margin:0 6px;">${esc(r.email||'-')}</span>
+      <span style="color:#dc2626;font-size:12px;">[${r.errors.join(', ')}]</span>
+    </li>`
+  ).join('');
+  const modal = document.createElement('div');
+  modal.id = 'fmt-error-modal';
+  modal.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.45);z-index:9999;display:flex;align-items:center;justify-content:center;';
+  modal.innerHTML = `
+    <div style="background:#fff;border-radius:14px;padding:28px 32px;width:480px;max-width:94vw;box-shadow:0 20px 60px rgba(0,0,0,.25);">
+      <div style="display:flex;align-items:center;gap:10px;margin-bottom:14px;">
+        <span style="font-size:26px;">⚠️</span>
+        <h3 style="margin:0;font-size:16px;color:#1e293b;">입력 형식 오류</h3>
+      </div>
+      <p style="font-size:13px;color:#475569;margin:0 0 14px;">
+        아래 <strong>${invalidItems.length}건</strong>의 데이터에 형식 오류가 있습니다.<br>
+        ${onSaveAnyway ? '오류 항목을 제외하고 나머지만 저장할 수 있습니다.' : '모든 항목에 오류가 있어 저장되지 않습니다.'}
+      </p>
+      <ul style="list-style:none;margin:0 0 20px;padding:4px 14px;max-height:220px;overflow-y:auto;
+                 border:1px solid #fecaca;border-radius:8px;background:#fff5f5;">
+        ${listHtml}
+      </ul>
+      <div style="background:#f8fafc;border-radius:8px;padding:10px 14px;margin-bottom:18px;font-size:12px;color:#475569;line-height:1.8;">
+        <strong>올바른 형식</strong><br>
+        이메일: mailid@domain.com &nbsp;|&nbsp; 핸드폰: 010-1234-5678 &nbsp;|&nbsp; 생년월일: YYYYMMDD 또는 YYYY-MM-DD
+      </div>
+      <div style="display:flex;gap:10px;justify-content:flex-end;">
+        <button onclick="document.getElementById('fmt-error-modal').remove()"
+          style="padding:8px 20px;border:1.5px solid #cbd5e1;border-radius:8px;background:#fff;
+                 font-size:13px;cursor:pointer;color:#374151;">닫기</button>
+        ${onSaveAnyway ? `
+        <button id="fmt-save-anyway-btn"
+          style="padding:8px 20px;background:#2563eb;color:#fff;border:none;border-radius:8px;
+                 font-size:13px;font-weight:600;cursor:pointer;">
+          오류 제외하고 저장
+        </button>` : ''}
+      </div>
+    </div>`;
+  document.body.appendChild(modal);
+  if (onSaveAnyway) {
+    document.getElementById('fmt-save-anyway-btn').addEventListener('click', () => {
+      document.getElementById('fmt-error-modal').remove();
+      onSaveAnyway();
+    });
+  }
+}
+
+/* 이미 등록된 이메일 조회 — emails: string[] → 중복된 email string[] 반환 */
+async function fetchDuplicateEmails(emails) {
+  const nonEmpty = emails.filter(Boolean);
+  if (!nonEmpty.length) return [];
+  const [reqRes, instRes] = await Promise.all([
+    db.from('instructor_requests').select('email').in('email', nonEmpty),
+    db.from('instructors').select('email').in('email', nonEmpty),
+  ]);
+  if (reqRes.error) throw reqRes.error;
+  if (instRes.error) throw instRes.error;
+  const found = new Set([
+    ...(reqRes.data || []).map(r => r.email),
+    ...(instRes.data || []).map(r => r.email),
+  ]);
+  return [...found];
+}
+
+/* 중복 이메일 경고 모달
+   duplicates: [{name, email}]
+   onSaveAnyway: 중복 제외하고 저장 callback (null이면 버튼 숨김) */
+function showDuplicateModal(duplicates, onSaveAnyway) {
+  document.getElementById('dup-email-modal')?.remove();
+  const listHtml = duplicates.map(d =>
+    `<li style="padding:6px 0;border-bottom:1px solid #f1f5f9;font-size:13px;">
+       <span style="font-weight:600;color:#1e293b;">${esc(d.name)}</span>
+       &nbsp;<span style="color:#64748b;">${esc(d.email)}</span>
+     </li>`
+  ).join('');
+  const modal = document.createElement('div');
+  modal.id = 'dup-email-modal';
+  modal.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.45);z-index:9999;display:flex;align-items:center;justify-content:center;';
+  modal.innerHTML = `
+    <div style="background:#fff;border-radius:14px;padding:28px 32px;width:440px;max-width:94vw;box-shadow:0 20px 60px rgba(0,0,0,.25);">
+      <div style="display:flex;align-items:center;gap:10px;margin-bottom:14px;">
+        <span style="font-size:26px;">⚠️</span>
+        <h3 style="margin:0;font-size:16px;color:#1e293b;">이미 등록된 이메일</h3>
+      </div>
+      <p style="font-size:13px;color:#475569;margin:0 0 14px;">
+        아래 <strong>${duplicates.length}건</strong>은 이미 등록요청 목록에 존재하는 이메일입니다.<br>
+        ${onSaveAnyway ? '중복 항목을 제외하고 나머지만 저장할 수 있습니다.' : '모든 항목이 중복이므로 저장되지 않습니다.'}
+      </p>
+      <ul style="list-style:none;margin:0 0 20px;padding:4px 14px;max-height:200px;overflow-y:auto;
+                 border:1px solid #fecaca;border-radius:8px;background:#fff5f5;">
+        ${listHtml}
+      </ul>
+      <div style="display:flex;gap:10px;justify-content:flex-end;">
+        <button onclick="document.getElementById('dup-email-modal').remove()"
+          style="padding:8px 20px;border:1.5px solid #cbd5e1;border-radius:8px;background:#fff;
+                 font-size:13px;cursor:pointer;color:#374151;">닫기</button>
+        ${onSaveAnyway ? `
+        <button id="dup-save-anyway-btn"
+          style="padding:8px 20px;background:#2563eb;color:#fff;border:none;border-radius:8px;
+                 font-size:13px;font-weight:600;cursor:pointer;">
+          중복 제외하고 저장
+        </button>` : ''}
+      </div>
+    </div>`;
+  document.body.appendChild(modal);
+  if (onSaveAnyway) {
+    document.getElementById('dup-save-anyway-btn').addEventListener('click', () => {
+      document.getElementById('dup-email-modal').remove();
+      onSaveAnyway();
+    });
+  }
+}
+
+async function confirmExcelPaste() {
+  // textarea에 미처리 내용이 남아있으면 차단
+  const ta = document.getElementById('excel-paste-area');
+  if (ta && ta.value.trim()) {
+    const hasTab = ta.value.includes('\t');
+    if (!hasTab) {
+      showExcelPasteError('붙여넣기 영역에 처리되지 않은 텍스트가 있습니다.\n엑셀에서 복사(Ctrl+C) 후 붙여넣기(Ctrl+V)로 입력해 주세요.\n수기 입력은 지원하지 않습니다.');
+      document.getElementById('excel-paste-area')?.focus();
+      return;
+    }
+    // 탭은 있지만 아직 적용 안 된 경우 — 자동 적용
+    applyExcelPaste();
+    return;
+  }
+
+  // 편집 테이블에서 데이터 수집
+  const trs = document.querySelectorAll('#paste-table-body tr');
+  if (!trs.length) { showToast('저장할 행이 없습니다.', 'warning'); return; }
+
+  const inserts = [];
+  trs.forEach(tr => {
+    const inputs = tr.querySelectorAll('input');
+    const name = inputs[0]?.value.trim();
+    if (!name) return;
+    inserts.push({
+      full_name:    name,
+      email:        inputs[1]?.value.trim() || null,
+      mobile:       inputs[2]?.value.trim() || null,
+      birth_date:   inputs[3]?.value.trim() || null,
+      is_requested: false,
+    });
+  });
+  if (!inserts.length) { showToast('성명이 입력된 행이 없습니다.', 'warning'); return; }
+
+  // 형식 유효성 검사
+  const { valid: fmtValid, invalid: fmtInvalid } = validateInsertRows(inserts);
+  if (fmtInvalid.length) {
+    showFormatErrorModal(fmtInvalid, fmtValid.length ? () => _doExcelSave(fmtValid) : null);
+    return;
+  }
+
+  await _doExcelSave(inserts);
+}
+
+async function _doExcelSave(inserts) {
+  showSpinner();
+  try {
+    const dupEmails = await fetchDuplicateEmails(inserts.map(r => r.email));
+    if (dupEmails.length) {
+      const dupItems = inserts
+        .filter(r => r.email && dupEmails.includes(r.email))
+        .map(r => ({ name: r.full_name, email: r.email }));
+      const unique = inserts.filter(r => !r.email || !dupEmails.includes(r.email));
+      hideSpinner();
+      showDuplicateModal(dupItems, unique.length ? async () => {
+        showSpinner();
+        try {
+          const { error } = await db.from('instructor_requests').insert(unique);
+          if (error) throw error;
+          document.getElementById('excel-paste-modal')?.remove();
+          showToast(`${unique.length}건 추가 완료 (${dupItems.length}건 중복 제외)`, 'success');
+          await loadInstrRequests();
+        } catch (err) { showToast('저장 오류: ' + (err.message || ''), 'error'); }
+        finally { hideSpinner(); }
+      } : null);
+      return;
+    }
+    const { error } = await db.from('instructor_requests').insert(inserts);
+    if (error) throw error;
+    document.getElementById('excel-paste-modal')?.remove();
+    showToast(`${inserts.length}건이 추가되었습니다.`, 'success');
+    await loadInstrRequests();
+  } catch (err) {
+    showToast('저장 오류: ' + (err.message || ''), 'error');
+  } finally { hideSpinner(); }
+}
+
+async function deleteInstrRequest(id, name) {
+  if (!confirm(`"${name}" 항목을 삭제하시겠습니까?`)) return;
+  showSpinner();
+  try {
+    const { error } = await db.from('instructor_requests').delete().eq('id', id);
+    if (error) throw error;
+    showToast('삭제되었습니다.', 'success');
+    await loadInstrRequests();
+  } catch (err) { showToast('삭제 오류: ' + (err.message || ''), 'error'); }
+  finally { hideSpinner(); }
+}
+
+/* ══════════════════════════════════════════════════════════════
+   등록 요청 팝업
+══════════════════════════════════════════════════════════════ */
+async function openRegRequestPopup() {
+  if (!selectedRequestId) { showToast('등록 요청할 항목을 선택해 주세요.', 'warning'); return; }
+
+  showSpinner();
+  let rec;
+  try {
+    const { data, error } = await db.from('instructor_requests').select('*').eq('id', selectedRequestId).single();
+    if (error || !data) throw new Error('항목 조회 실패');
+    rec = data;
+  } catch (err) { showToast(err.message, 'error'); hideSpinner(); return; }
+
+  // 임시 비밀번호 및 토큰 생성
+  const tempPw    = generateTempPassword();
+  const token     = generateToken();
+  const appUrl    = window.location.href.split('?')[0];
+
+  // Supabase Auth 계정 생성 (임시 비밀번호, 최초 로그인 시 비밀번호 변경 강제)
+  try {
+    const tmpClient = createClient(SUPABASE_URL, SUPABASE_KEY, {
+      auth: { storageKey: 'ir_tmp_' + Date.now(), persistSession: false, autoRefreshToken: false },
+    });
+    const { data: signUpData, error: signUpError } = await tmpClient.auth.signUp({
+      email: rec.email,
+      password: tempPw,
+      options: { data: { force_password_change: true } },
+    });
+    if (signUpError) throw new Error(signUpError.message);
+    // signUpData.user === null 이면 기존 계정 존재 → 패스워드 갱신 불가
+    if (!signUpData?.user) {
+      hideSpinner();
+      showToast('이미 등록된 계정입니다. Supabase 대시보드에서 비밀번호를 직접 초기화해 주세요.', 'warning');
+      return;
+    }
+    // email_confirmed_at 이 null 이면 이메일 인증 설정이 ON → 강사가 바로 로그인 불가
+    if (!signUpData.user.email_confirmed_at) {
+      hideSpinner();
+      showToast(
+        '⚠️ Supabase 이메일 인증이 활성화되어 있어 강사가 즉시 로그인할 수 없습니다.\n' +
+        'Supabase 대시보드 → Authentication → Providers → Email → "Confirm email" 을 OFF로 변경하세요.\n' +
+        '변경 후 방금 생성된 계정(Authentication → Users)을 삭제하고 다시 시도하세요.',
+        'error',
+        8000
+      );
+      return;
+    }
+    // instructor_requests 갱신
+    await db.from('instructor_requests').update({
+      temp_password: tempPw,
+      login_token:   token,
+    }).eq('id', selectedRequestId);
+  } catch (err) { showToast('계정 처리 오류: ' + (err.message || ''), 'error'); hideSpinner(); return; }
+  finally { hideSpinner(); }
+
+  const emailBody =
+`안녕하세요. DS부문 사외강사 담당자입니다.
+
+아래 URL 링크로 접속하셔서 사외 강사 정보를 등록해 주시기 바랍니다.
+
+  • 접속 URL      : ${appUrl}
+  • 접속 계정    : ${rec.email}
+  • 임시 비밀번호 : ${tempPw}
+
+※ 최초 로그인 시 비밀번호 변경이 필요합니다.
+
+감사합니다.`;
+
+  const subject = encodeURIComponent('사외 강사 정보 등록 안내 메일');
+  const body    = encodeURIComponent(emailBody);
+  const mailto  = `mailto:${rec.email}?subject=${subject}&body=${body}`;
+
+  document.body.insertAdjacentHTML('beforeend', `
+  <div class="modal-overlay active" id="rr-modal-overlay" onclick="closeRROnBackdrop(event)">
+    <div class="modal" style="max-width:1440px;width:95vw;border-radius:16px;overflow:hidden;" role="dialog">
+      <div class="modal-header" style="background:linear-gradient(135deg,#667eea 0%,#764ba2 100%);padding:22px 36px;">
+        <h3 style="color:#fff;font-size:19px;font-weight:700;display:flex;align-items:center;gap:10px;">
+          <i class="fa-solid fa-envelope-open-text" style="font-size:21px;"></i>강사정보 등록 안내 메일
+        </h3>
+        <button class="modal-close" onclick="closeRRModal()" style="color:#fff;opacity:0.85;font-size:22px;">&times;</button>
+      </div>
+      <div class="modal-body" style="padding:28px 36px 18px;">
+        <div style="background:#f8f9ff;border:1px solid #e0e3f0;border-radius:10px;padding:16px 22px;margin-bottom:20px;">
+          <div style="display:flex;align-items:center;gap:10px;margin-bottom:10px;">
+            <span style="font-size:14px;color:#888;min-width:40px;">수신</span>
+            <span style="font-size:14px;color:#222;font-weight:700;">${esc(rec.email)}</span>
+          </div>
+          <div style="display:flex;align-items:center;gap:10px;">
+            <span style="font-size:14px;color:#888;min-width:40px;">제목</span>
+            <span style="font-size:14px;color:#222;font-weight:700;">사외 강사 정보 등록 안내 메일</span>
+          </div>
+        </div>
+        <div class="email-preview" style="font-size:15px;line-height:1.9;padding:24px 28px;white-space:normal;">
+          <p>안녕하세요. DS부문 사외강사 담당자입니다.</p>
+          <p>아래 URL 링크로 접속하셔서 사외 강사 정보를 등록해 주시기 바랍니다.</p>
+          <table class="email-info-table">
+            <tr>
+              <td class="lbl">접속 URL</td>
+              <td class="sep">:</td>
+              <td class="val">${esc(appUrl)}</td>
+            </tr>
+            <tr>
+              <td class="lbl">접속 계정</td>
+              <td class="sep">:</td>
+              <td class="val">${esc(rec.email)}</td>
+            </tr>
+            <tr>
+              <td class="lbl">임시 비밀번호</td>
+              <td class="sep">:</td>
+              <td class="val">${esc(tempPw)}</td>
+            </tr>
+          </table>
+          <p style="margin-top:12px;font-size:14px;color:#2563eb;">※ 최초 로그인 시 비밀번호 변경이 필요합니다.</p>
+          <p>감사합니다.</p>
+        </div>
+      </div>
+      <div class="modal-footer" style="padding:18px 36px 24px;gap:10px;">
+        <button class="btn btn-secondary" style="padding:10px 28px;font-size:14px;" onclick="closeRRModal()">
+          <i class="fa-solid fa-xmark"></i> 닫기</button>
+        <button class="btn btn-success" style="padding:10px 36px;font-size:14px;font-weight:700;"
+          onclick="sendRegRequest('${selectedRequestId}','${mailto.replace(/'/g,'\\\'')}')" >
+          <i class="fa-solid fa-paper-plane"></i> 메일 발송
+        </button>
+      </div>
+    </div>
+  </div>`);
+}
+
+async function sendRegRequest(id, mailto) {
+  showSpinner();
+  try {
+    await db.from('instructor_requests').update({
+      is_requested: true,
+      requested_at: new Date().toISOString(),
+    }).eq('id', id);
+    showToast('등록 요청이 완료되었습니다.', 'success');
+  } catch (err) { showToast('상태 업데이트 오류: ' + (err.message || ''), 'error'); }
+  finally { hideSpinner(); }
+  window.location.href = mailto;
+  closeRRModal();
+  await loadInstrRequests();
+}
+
+function closeRRModal()           { const el = document.getElementById('rr-modal-overlay'); if (el) el.remove(); }
+function closeRROnBackdrop(e)     { if (e.target.id === 'rr-modal-overlay' && _mousedownTarget === e.target) closeRRModal(); }
+
+/* ══════════════════════════════════════════════════════════════
+   Nav: 개인 벤더
+══════════════════════════════════════════════════════════════ */
+function handleNavPersonalVendor() {
+  setActiveNav('nav-personal-vendor');
+  loadPersonalVendors();
+}
+
+/* ══════════════════════════════════════════════════════════════
+   Copy Test
+══════════════════════════════════════════════════════════════ */
+function handleNavCopyTest() {
+  setActiveNav('nav-copy-test');
+  showCopyTestPage();
+}
+
+/* ══════════════════════════════════════════════════════════════
+   담당자 후기
+══════════════════════════════════════════════════════════════ */
+let reviewInstructors   = [];        // instructor_requests에서 로드된 강사 목록
+let reviewCountMap      = {};        // email → 후기 건수
+let reviewSelectedIdx   = null;      // 현재 선택된 강사 인덱스
+let reviewCurrentStar   = 0;         // 확정 별점
+let reviewHoverStar     = 0;         // hover 중 임시 별점
+
+function handleNavReview() {
+  setActiveNav('nav-review');
+  showReviewPage();
+}
+
+const REVIEW_BADGE_NONE = '<span style="display:inline-block;background:#f1f5f9;color:#94a3b8;font-size:12px;font-weight:500;padding:3px 10px;border-radius:20px;border:1px solid #e2e8f0;white-space:nowrap;">미등록</span>';
+function reviewBadgeDone(cnt) {
+  return `<span style="display:inline-block;background:#d1fae5;color:#065f46;font-size:12px;font-weight:600;padding:3px 10px;border-radius:20px;border:1px solid #6ee7b7;white-space:nowrap;">등록 ${cnt}건</span>`;
+}
+
+async function showReviewPage() {
+  reviewSelectedIdx = null;
+  reviewCurrentStar = 0;
+  reviewHoverStar   = 0;
+  reviewInstructors = [];
+  reviewCountMap    = {};
+
+  // instructor_requests에서 강사 목록 로드
+  showSpinner();
+  try {
+    const { data: instrs, error } = await db
+      .from('instructor_requests')
+      .select('full_name, email, mobile, birth_date')
+      .order('full_name');
+    if (error) throw error;
+    reviewInstructors = instrs || [];
+
+    // 후기 건수 집계
+    if (reviewInstructors.length) {
+      const emails = reviewInstructors.map(i => i.email).filter(Boolean);
+      if (emails.length) {
+        const { data: cnts } = await db
+          .from('instructor_reviews')
+          .select('instructor_email')
+          .in('instructor_email', emails);
+        (cnts || []).forEach(r => {
+          reviewCountMap[r.instructor_email] = (reviewCountMap[r.instructor_email] || 0) + 1;
+        });
+      }
+    }
+  } catch(err) {
+    showToast('강사 목록 로드 오류: ' + (err.message || ''), 'error');
+  } finally { hideSpinner(); }
+
+  const rows = reviewInstructors.length
+    ? reviewInstructors.map((ins, i) => {
+        const cnt = reviewCountMap[ins.email] || 0;
+        return `
+        <tr id="review-row-${i}" onclick="selectReviewInstructor(${i})">
+          <td><span class="review-sel-check" id="review-check-${i}" style="display:none;"><i class="fa-solid fa-check-circle"></i></span></td>
+          <td style="font-weight:600;">${esc(ins.full_name || '')}</td>
+          <td>${esc(ins.email || '')}</td>
+          <td>${esc(ins.mobile || '')}</td>
+          <td>${esc(ins.birth_date || '')}</td>
+          <td id="review-status-${i}" style="text-align:center;padding-left:0;padding-right:0;">
+            ${cnt > 0 ? reviewBadgeDone(cnt) : REVIEW_BADGE_NONE}
+          </td>
+        </tr>`;
+      }).join('')
+    : '<tr><td colspan="6" style="text-align:center;color:#94a3b8;padding:24px;">등록요청 강사가 없습니다.</td></tr>';
+
+  document.getElementById('content-area').innerHTML = `
+  <div class="content-card">
+    <div class="content-card-header">
+      <h2><i class="fa-solid fa-star" style="margin-right:8px;"></i>사외 강사 교육 담당자 후기</h2>
+    </div>
+
+    <div class="review-guide-box">
+      <i class="fa-solid fa-circle-info"></i>
+      교육 담당자로서 선택하신 사외 강사에 대한 후기를 작성해주세요.
+      동일 강사에 대해 여러 건의 후기를 등록할 수 있습니다.
+    </div>
+
+    <div style="padding:18px 24px 0;">
+      <div class="sec-hdr" style="margin:0 0 10px;padding:0 0 8px;">강사 목록 (등록요청)</div>
+      <div style="overflow-x:auto;">
+        <table class="review-instr-table">
+          <thead>
+            <tr>
+              <th style="width:36px;"></th>
+              <th>이름</th>
+              <th>이메일</th>
+              <th>휴대폰</th>
+              <th>생년월일</th>
+              <th style="width:90px;text-align:center;padding-left:0;padding-right:0;">후기</th>
+            </tr>
+          </thead>
+          <tbody id="review-instr-tbody">${rows}</tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- 후기 입력 폼: 강사 선택 전 숨김 -->
+    <div id="review-form-area" style="display:none; padding:24px;">
+      <div class="review-form-wrap">
+
+        <!-- 선택 강사 컨텍스트 뱃지 -->
+        <div style="margin-bottom:20px;">
+          <span class="review-ctx-badge">
+            <i class="fa-solid fa-user-check"></i>
+            <span id="review-ctx-name"></span>
+            <span id="review-ctx-email" style="font-weight:400; color:#b45309; margin-left:4px;"></span>
+          </span>
+        </div>
+
+        <!-- 종합 만족도 -->
+        <div style="margin-bottom:20px;">
+          <div class="sec-hdr" style="margin:0 0 12px;padding:0 0 6px;">종합 만족도 <span style="color:#e53e3e;">*</span></div>
+          <div class="star-row" onmouseleave="resetReviewStarHover()">
+            ${[1,2,3,4,5].map(i => `
+            <span class="star-wrap" id="star-wrap-${i}">
+              <span class="star-half left-half"
+                onmouseenter="hoverReviewStar(${i - 0.5})"
+                onclick="setReviewStar(${i - 0.5})"></span>
+              <span class="star-half right-half"
+                onmouseenter="hoverReviewStar(${i})"
+                onclick="setReviewStar(${i})"></span>
+              <i class="fa-regular fa-star" id="star-icon-${i}"></i>
+            </span>`).join('')}
+            <span class="star-score-display" id="star-score-display"></span>
+          </div>
+        </div>
+
+        <!-- 강의 품질 -->
+        <div style="margin-bottom:16px;">
+          <div class="sec-hdr" style="margin:0 0 8px;padding:0 0 6px;">강의 품질 <span style="color:#e53e3e;">*</span></div>
+          <textarea id="review-strength" class="form-textarea" rows="3"
+            placeholder="강사의 강점이나 탁월했던 점을 입력해주세요."
+            oninput="updateReviewCharCount('review-strength','strength-count',200); checkReviewSaveBtn()"
+            maxlength="200"></textarea>
+          <div class="char-counter" id="strength-count">0 / 200</div>
+        </div>
+
+        <!-- 운영 협업 -->
+        <div style="margin-bottom:16px;">
+          <div class="sec-hdr" style="margin:0 0 8px;padding:0 0 6px;">운영 협업 <span style="color:#e53e3e;">*</span></div>
+          <textarea id="review-improve" class="form-textarea" rows="3"
+            placeholder="개선이 필요한 점이나 아쉬웠던 부분을 입력해주세요."
+            oninput="updateReviewCharCount('review-improve','improve-count',200); checkReviewSaveBtn()"
+            maxlength="200"></textarea>
+          <div class="char-counter" id="improve-count">0 / 200</div>
+        </div>
+
+        <!-- 섭외 참고 -->
+        <div style="margin-bottom:24px;">
+          <div class="sec-hdr" style="margin:0 0 8px;padding:0 0 6px;">섭외 참고 <span style="color:#e53e3e;">*</span></div>
+          <textarea id="review-note" class="form-textarea" rows="3"
+            placeholder="재초빙 여부, 특이사항 등 담당자만 아는 정보를 입력해주세요."
+            oninput="updateReviewCharCount('review-note','note-count',200); checkReviewSaveBtn()"
+            maxlength="200"></textarea>
+          <div class="char-counter" id="note-count">0 / 200</div>
+        </div>
+
+        <!-- 폼 버튼 -->
+        <div style="display:flex; justify-content:center; gap:12px;">
+          <button class="btn btn-secondary" type="button" onclick="cancelReview()">
+            <i class="fa-solid fa-xmark"></i> 취소
+          </button>
+          <button class="btn btn-success" type="button" id="review-save-btn" disabled onclick="saveReview()">
+            <i class="fa-solid fa-floppy-disk"></i> 저장
+          </button>
+        </div>
+
+      </div>
+    </div>
+  </div>`;
+}
+
+function selectReviewInstructor(idx) {
+  // 이전 선택 해제
+  if (reviewSelectedIdx !== null) {
+    const prevRow   = document.getElementById(`review-row-${reviewSelectedIdx}`);
+    const prevCheck = document.getElementById(`review-check-${reviewSelectedIdx}`);
+    if (prevRow)   prevRow.classList.remove('row-review-selected');
+    if (prevCheck) prevCheck.style.display = 'none';
+  }
+
+  // 같은 행 재클릭 시 선택 해제
+  if (reviewSelectedIdx === idx) {
+    reviewSelectedIdx = null;
+    document.getElementById('review-form-area').style.display = 'none';
+    return;
+  }
+
+  reviewSelectedIdx = idx;
+  const row   = document.getElementById(`review-row-${idx}`);
+  const check = document.getElementById(`review-check-${idx}`);
+  if (row)   row.classList.add('row-review-selected');
+  if (check) check.style.display = 'inline';
+
+  // 폼 영역 업데이트 및 표시 (항상 새 후기 입력)
+  const ins = reviewInstructors[idx];
+  document.getElementById('review-ctx-name').textContent = ins.full_name || '';
+  document.getElementById('review-ctx-email').textContent = ins.email ? `(${ins.email})` : '';
+
+  resetReviewForm();
+  const formArea = document.getElementById('review-form-area');
+  formArea.style.display = 'block';
+  const wrap = formArea.querySelector('.review-form-wrap');
+  if (wrap) { wrap.style.animation = 'none'; requestAnimationFrame(() => { wrap.style.animation = ''; }); }
+  formArea.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+}
+
+function resetReviewForm() {
+  reviewCurrentStar = 0;
+  reviewHoverStar   = 0;
+  renderReviewStars(0);
+  ['review-strength', 'review-improve', 'review-note'].forEach(id => {
+    const el = document.getElementById(id);
+    if (el) el.value = '';
+  });
+  updateReviewCharCount('review-strength', 'strength-count', 200);
+  updateReviewCharCount('review-improve',  'improve-count',  200);
+  updateReviewCharCount('review-note',     'note-count',     200);
+  checkReviewSaveBtn();
+}
+
+function cancelReview() {
+  if (reviewSelectedIdx !== null) {
+    const row   = document.getElementById(`review-row-${reviewSelectedIdx}`);
+    const check = document.getElementById(`review-check-${reviewSelectedIdx}`);
+    if (row)   row.classList.remove('row-review-selected');
+    if (check) check.style.display = 'none';
+  }
+  reviewSelectedIdx = null;
+  document.getElementById('review-form-area').style.display = 'none';
+}
+
+/* 별점 렌더링 — score: 0 ~ 5, 0.5 단위 */
+function renderReviewStars(score) {
+  for (let i = 1; i <= 5; i++) {
+    const wrap = document.getElementById(`star-wrap-${i}`);
+    const icon = document.getElementById(`star-icon-${i}`);
+    if (!wrap || !icon) continue;
+    wrap.classList.remove('lit', 'half', 'hovered');
+    if (score >= i) {
+      icon.className = 'fa-solid fa-star';
+      wrap.classList.add('lit');
+    } else if (score >= i - 0.5) {
+      icon.className = 'fa-solid fa-star-half-stroke';
+      wrap.classList.add('half');
+    } else {
+      icon.className = 'fa-regular fa-star';
+    }
+  }
+  const disp = document.getElementById('star-score-display');
+  if (disp) disp.textContent = score > 0 ? `${score}점` : '';
+}
+
+function setReviewStar(score) {
+  reviewCurrentStar = score;
+  reviewHoverStar   = 0;
+  renderReviewStars(score);
+  checkReviewSaveBtn();
+}
+
+function hoverReviewStar(score) {
+  reviewHoverStar = score;
+  for (let i = 1; i <= 5; i++) {
+    const wrap = document.getElementById(`star-wrap-${i}`);
+    const icon = document.getElementById(`star-icon-${i}`);
+    if (!wrap || !icon) continue;
+    wrap.classList.remove('lit', 'half', 'hovered');
+    const effective = score;
+    if (effective >= i) {
+      icon.className = 'fa-solid fa-star';
+      wrap.classList.add(i <= reviewCurrentStar ? 'lit' : 'hovered');
+    } else if (effective >= i - 0.5) {
+      icon.className = 'fa-solid fa-star-half-stroke';
+      wrap.classList.add(reviewCurrentStar >= i - 0.5 ? 'lit' : 'hovered');
+    } else if (reviewCurrentStar >= i) {
+      icon.className = 'fa-solid fa-star';
+      wrap.classList.add('lit');
+    } else if (reviewCurrentStar >= i - 0.5) {
+      icon.className = 'fa-solid fa-star-half-stroke';
+      wrap.classList.add('lit');
+    } else {
+      icon.className = 'fa-regular fa-star';
+    }
+  }
+  const disp = document.getElementById('star-score-display');
+  if (disp) disp.textContent = score > 0 ? `${score}점` : '';
+}
+
+function resetReviewStarHover() {
+  reviewHoverStar = 0;
+  renderReviewStars(reviewCurrentStar);
+}
+
+/* 글자수 카운터 */
+function updateReviewCharCount(textareaId, counterId, max) {
+  const ta  = document.getElementById(textareaId);
+  const ctr = document.getElementById(counterId);
+  if (!ta || !ctr) return;
+  const len = ta.value.length;
+  ctr.textContent = `${len} / ${max}`;
+  ctr.classList.toggle('warn', len >= max * 0.9);
+}
+
+/* 저장 버튼 활성화 조건 */
+function checkReviewSaveBtn() {
+  const btn = document.getElementById('review-save-btn');
+  if (!btn) return;
+  const str  = (document.getElementById('review-strength')?.value || '').trim();
+  const imp  = (document.getElementById('review-improve')?.value  || '').trim();
+  const note = (document.getElementById('review-note')?.value     || '').trim();
+  btn.disabled = !(reviewCurrentStar > 0 && str && imp && note);
+}
+
+async function saveReview() {
+  const str  = (document.getElementById('review-strength')?.value || '').trim();
+  const imp  = (document.getElementById('review-improve')?.value  || '').trim();
+  const note = (document.getElementById('review-note')?.value     || '').trim();
+
+  if (!reviewCurrentStar) { showToast('종합 만족도(별점)를 선택해주세요.', 'warning'); return; }
+  if (!str)  { showToast('강의 품질을 입력해주세요.', 'warning'); return; }
+  if (!imp)  { showToast('운영 협업을 입력해주세요.', 'warning'); return; }
+  if (!note) { showToast('섭외 참고를 입력해주세요.', 'warning'); return; }
+
+  const ins = reviewInstructors[reviewSelectedIdx];
+  showSpinner();
+  try {
+    const { error } = await db.from('instructor_reviews').insert({
+      instructor_email: ins.email,
+      star_score:       reviewCurrentStar,
+      strength:         str,
+      improvement:      imp,
+      note:             note,
+      updated_at:       new Date().toISOString(),
+    });
+    if (error) throw error;
+
+    // 건수 업데이트 및 뱃지 갱신
+    reviewCountMap[ins.email] = (reviewCountMap[ins.email] || 0) + 1;
+    const statusCell = document.getElementById(`review-status-${reviewSelectedIdx}`);
+    if (statusCell) statusCell.innerHTML = reviewBadgeDone(reviewCountMap[ins.email]);
+    showToast('후기가 저장되었습니다.', 'success');
+    cancelReview();
+  } catch (err) {
+    showToast('저장 오류: ' + (err.message || ''), 'error');
+  } finally { hideSpinner(); }
+}
+
+/* ══════════════════════════════════════════════════════════════
+   영구 탈퇴
+══════════════════════════════════════════════════════════════ */
+function handleNavWithdraw() {
+  setActiveNav('nav-withdraw');
+  showWithdrawPage();
+}
+
+function showWithdrawPage() {
+  document.getElementById('content-area').innerHTML = `
+  <div class="content-card" style="max-width:600px;margin:0 auto;">
+    <!-- 헤더: 미니멀 텍스트 스타일 -->
+    <div style="padding:28px 32px 0;">
+      <h2 style="margin:0 0 12px;font-size:17px;font-weight:700;color:#111827;">
+        (안내) 강사 정보 영구 삭제
+      </h2>
+      <hr style="margin:0 0 28px;border:none;border-top:1px solid #e5e7eb;">
+    </div>
+
+    <!-- 본문 -->
+    <div style="padding:0 32px 32px;">
+      <p style="margin:0 0 16px;font-size:14px;color:#374151;line-height:1.9;">
+        강사 정보 삭제 시 강사님이 등록한 프로필 정보뿐만 아니라, 당사에 출강한 이력, 강의 후기 등 활동 정보가 즉시 삭제됩니다.
+      </p>
+      <p style="margin:0 0 16px;font-size:14px;color:#374151;line-height:1.9;">
+        이에 따라 당사의 교육 담당자가 강사님의 전문성 및 활동 이력을 확인할 수 없으며, 향후 출강제안이나 협업 요청이 어려워질 수 있습니다.
+      </p>
+      <p style="margin:0 0 16px;font-size:14px;color:#374151;line-height:1.9;">
+        삭제 후에는 정보 복구 불가하므로 신중하게 결정해 주시기 바랍니다.
+      </p>
+      <p style="margin:0 0 32px;font-size:14px;color:#374151;line-height:1.9;">
+        강사 정보를 삭제하시겠습니까?
+      </p>
+
+      <!-- 버튼: 취소(좌) — 영구 탈퇴(우), 중앙 정렬 -->
+      <div style="display:flex;justify-content:center;gap:12px;">
+        <button style="padding:9px 28px;font-size:14px;font-family:inherit;
+                       background:#fff;color:#374151;
+                       border:1px solid #d1d5db;border-radius:6px;
+                       cursor:pointer;"
+                onmouseover="this.style.background='#f9fafb'"
+                onmouseout="this.style.background='#fff'"
+                onclick="handleNavRegister()">
+          취소
+        </button>
+        <button style="padding:9px 28px;font-size:14px;font-family:inherit;
+                       background:#fff;color:#374151;
+                       border:1px solid #d1d5db;border-radius:6px;
+                       cursor:pointer;"
+                onmouseover="this.style.background='#f9fafb'"
+                onmouseout="this.style.background='#fff'"
+                onclick="triggerWithdrawFromMenu()">
+          영구 탈퇴
+        </button>
+      </div>
+    </div>
+  </div>`;
+}
+
+async function triggerWithdrawFromMenu() {
+  if (!currentInstructorId) {
+    showToast('탈퇴 처리할 강사 정보가 없습니다.', 'warning');
+    return;
+  }
+  showSpinner();
+  try {
+    const { data, error } = await db.from('instructors')
+      .select('instructor_name').eq('id', currentInstructorId).single();
+    if (error || !data) throw new Error('강사 정보를 불러올 수 없습니다.');
+    hideSpinner();
+    openWithdrawModal(currentInstructorId, data.instructor_name);
+  } catch (err) {
+    hideSpinner();
+    showToast(err.message || '오류가 발생했습니다.', 'error');
+  }
+}
+
+function parseCopyTestText(raw) {
+  return raw.trim().split('\n')
+    .map(line => line.split('\t').map(c => c.trim()))
+    .filter(cols => cols.some(c => c));
+}
+
+function renderCopyTestPreview() {
+  const raw = document.getElementById('ct-paste-area').value;
+  const rows = parseCopyTestText(raw);
+  const preview = document.getElementById('ct-preview');
+  const counter = document.getElementById('ct-counter');
+  const saveBtn = document.getElementById('ct-save-btn');
+
+  if (!rows.length) {
+    preview.innerHTML = '<p style="color:#94a3b8;font-size:13px;text-align:center;padding:20px;">붙여넣은 데이터가 없습니다.</p>';
+    counter.textContent = '';
+    saveBtn.disabled = true;
+    return;
+  }
+
+  const validCount = rows.filter(r => r[0]?.trim()).length;
+  const warnCount  = rows.length - validCount;
+  counter.innerHTML = `
+    <span style="color:#2563eb;font-weight:600;">${rows.length}행 인식</span>
+    &nbsp;·&nbsp; 저장 가능: <span style="color:#059669;font-weight:600;">${validCount}건</span>
+    ${warnCount ? `&nbsp;·&nbsp; <span style="color:#dc2626;">성명 누락 ${warnCount}건 제외</span>` : ''}`;
+  saveBtn.disabled = validCount === 0;
+
+  const tbody = rows.map((r, i) => {
+    const name  = r[0] || '';
+    const email = r[1] || '';
+    const phone = r[2] || '';
+    const birth = r[3] || '';
+    const missing = !name;
+    const bg = missing ? '#fff5f5' : (i % 2 ? '#f8fafc' : '#fff');
+    return `<tr style="background:${bg};">
+      <td style="padding:8px 12px;text-align:center;color:#94a3b8;font-size:12px;">${i+1}</td>
+      <td style="padding:8px 12px;font-weight:${name?'500':'400'};color:${name?'#1e293b':'#dc2626'};">
+        ${name || '<span style="font-size:11.5px;">⚠ 성명 없음</span>'}
+      </td>
+      <td style="padding:8px 12px;">${esc(email)}</td>
+      <td style="padding:8px 12px;">${esc(phone)}</td>
+      <td style="padding:8px 12px;color:#64748b;">${esc(birth)}</td>
+      <td style="padding:8px 12px;text-align:center;">
+        ${missing
+          ? '<span style="background:#fee2e2;color:#dc2626;font-size:11px;padding:2px 8px;border-radius:10px;">제외</span>'
+          : '<span style="background:#d1fae5;color:#065f46;font-size:11px;padding:2px 8px;border-radius:10px;">저장</span>'}
+      </td>
+    </tr>`;
+  }).join('');
+
+  preview.innerHTML = `
+    <div style="border:1px solid #e2e8f0;border-radius:10px;overflow:hidden;max-height:320px;overflow-y:auto;">
+      <table style="width:100%;border-collapse:collapse;font-size:13px;">
+        <thead>
+          <tr style="background:#f1f5f9;position:sticky;top:0;">
+            <th style="padding:9px 12px;text-align:center;color:#64748b;font-weight:600;width:40px;">#</th>
+            <th style="padding:9px 12px;text-align:left;color:#374151;font-weight:600;">성명</th>
+            <th style="padding:9px 12px;text-align:left;color:#374151;font-weight:600;">이메일</th>
+            <th style="padding:9px 12px;text-align:left;color:#374151;font-weight:600;">핸드폰</th>
+            <th style="padding:9px 12px;text-align:left;color:#374151;font-weight:600;">생년월일</th>
+            <th style="padding:9px 12px;text-align:center;color:#374151;font-weight:600;width:60px;">상태</th>
+          </tr>
+        </thead>
+        <tbody>${tbody}</tbody>
+      </table>
+    </div>`;
+}
+
+async function saveCopyTest() {
+  const trs = document.querySelectorAll('#ct-table-body tr');
+  if (!trs.length) { showToast('저장할 행이 없습니다.', 'warning'); return; }
+
+  const inserts = [];
+  trs.forEach(tr => {
+    const inputs = tr.querySelectorAll('input');
+    const name = inputs[0]?.value.trim();
+    if (!name) return;
+    inserts.push({
+      full_name:    name,
+      email:        inputs[1]?.value.trim() || null,
+      mobile:       inputs[2]?.value.trim() || null,
+      birth_date:   inputs[3]?.value.trim() || null,
+      is_requested: false,
+    });
+  });
+  if (!inserts.length) { showToast('성명이 입력된 행이 없습니다.', 'warning'); return; }
+
+  const btn = document.getElementById('ct-save-btn');
+  btn.disabled = true;
+  btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> 저장 중...';
+  showSpinner();
+  try {
+    const dupEmails = await fetchDuplicateEmails(inserts.map(r => r.email));
+    if (dupEmails.length) {
+      const dupItems = inserts
+        .filter(r => r.email && dupEmails.includes(r.email))
+        .map(r => ({ name: r.full_name, email: r.email }));
+      const unique = inserts.filter(r => !r.email || !dupEmails.includes(r.email));
+      hideSpinner();
+      btn.disabled = false;
+      btn.innerHTML = '<i class="fa-solid fa-floppy-disk"></i> 저장';
+      showDuplicateModal(dupItems, unique.length ? async () => {
+        btn.disabled = true;
+        btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> 저장 중...';
+        showSpinner();
+        try {
+          const { error } = await db.from('instructor_requests').insert(unique);
+          if (error) throw error;
+          showToast(`${unique.length}건 추가 완료 (${dupItems.length}건 중복 제외)`, 'success');
+          document.querySelectorAll('#ct-table-body tr').forEach(tr => tr.remove());
+          updateCTRowCount();
+        } catch (err) { showToast('저장 오류: ' + (err.message || ''), 'error'); }
+        finally { hideSpinner(); btn.disabled = false; btn.innerHTML = '<i class="fa-solid fa-floppy-disk"></i> 저장'; }
+      } : null);
+      return;
+    }
+    const { error } = await db.from('instructor_requests').insert(inserts);
+    if (error) throw error;
+    showToast(`${inserts.length}건이 등록요청 목록에 추가되었습니다.`, 'success');
+    document.querySelectorAll('#ct-table-body tr').forEach(tr => tr.remove());
+    updateCTRowCount();
+  } catch (err) {
+    showToast('저장 오류: ' + (err.message || ''), 'error');
+    btn.disabled = false;
+    btn.innerHTML = '<i class="fa-solid fa-floppy-disk"></i> 저장';
+  } finally { hideSpinner(); }
+}
+
+let _ctRowSeq = 0;
+
+function addCTRow(name='', email='', mobile='', birth='') {
+  const tbody = document.getElementById('ct-table-body');
+  if (!tbody) return;
+  const rid = ++_ctRowSeq;
+  const tr = document.createElement('tr');
+  tr.id = `ct-tr-${rid}`;
+  tr.style.borderBottom = '1px solid #f1f5f9';
+  const inp = (val, ph, extra='') =>
+    `<input type="text" value="${esc(val)}" placeholder="${ph}"
+      style="width:100%;box-sizing:border-box;border:1px solid #e2e8f0;border-radius:6px;
+             padding:6px 8px;font-size:12.5px;font-family:inherit;outline:none;"
+      onfocus="this.style.borderColor='#2563eb'" onblur="this.style.borderColor='#e2e8f0'" ${extra}>`;
+  tr.innerHTML = `
+    <td style="padding:5px 6px;">${inp(name,  '성명')}</td>
+    <td style="padding:5px 6px;">${inp(email, '이메일')}</td>
+    <td style="padding:5px 6px;">${inp(mobile,'010-0000-0000','oninput="this.value=formatPhoneHyphen(this.value)"')}</td>
+    <td style="padding:5px 6px;">${inp(birth, 'YYYYMMDD')}</td>
+    <td style="padding:5px 8px;text-align:center;">
+      <button type="button" onclick="removeCTRow(this)"
+        style="background:none;border:none;cursor:pointer;color:#cbd5e1;font-size:16px;line-height:1;padding:2px 4px;"
+        onmouseover="this.style.color='#ef4444'" onmouseout="this.style.color='#cbd5e1'"
+        title="삭제">&times;</button>
+    </td>`;
+  tbody.appendChild(tr);
+  updateCTRowCount();
+}
+
+function removeCTRow(btn) {
+  btn.closest('tr')?.remove();
+  updateCTRowCount();
+}
+
+function updateCTRowCount() {
+  const count = document.getElementById('ct-table-body')?.querySelectorAll('tr').length || 0;
+  const cnt = document.getElementById('ct-row-count');
+  if (cnt) cnt.textContent = `${count}행`;
+  const empty = document.getElementById('ct-empty-msg');
+  if (empty) empty.style.display = count ? 'none' : 'block';
+  const wrap = document.getElementById('ct-table-wrap');
+  if (wrap) wrap.style.display = count ? 'block' : 'none';
+}
+
+function applyCopyTest() {
+  const ta = document.getElementById('ct-paste-area');
+  if (!ta || !ta.value.trim()) return;
+  const { valid, invalid, formatError } = parseExcelText(ta.value);
+  ta.value = '';
+  if (formatError) { showToast(formatError.split('\n')[0], 'warning'); return; }
+  if (!valid.length) { showToast('성명이 포함된 행이 없습니다.', 'warning'); return; }
+  valid.forEach(r => addCTRow(r[0]||'', r[1]||'', r[2]||'', r[3]||''));
+  if (invalid.length) showToast(`${valid.length}행 추가. 성명 누락 ${invalid.length}행 제외.`, 'warning');
+  else showToast(`${valid.length}행이 추가됐습니다.`, 'success');
+}
+
+function showCopyTestPage() {
+  document.getElementById('content-area').innerHTML = `
+  <div class="content-card">
+    <div class="content-card-header">
+      <h2><i class="fa-solid fa-paste" style="margin-right:8px;"></i>Copy Test — 엑셀 데이터 붙여넣기</h2>
+    </div>
+
+    <!-- 안내 박스 -->
+    <div style="background:#eff6ff;border:1px solid #bfdbfe;border-radius:10px;padding:16px 20px;margin:0 0 20px;">
+      <div style="font-size:13.5px;font-weight:700;color:#1d4ed8;margin-bottom:8px;">
+        <i class="fa-solid fa-circle-info" style="margin-right:6px;"></i>엑셀 준비 방법
+      </div>
+      <p style="font-size:13px;color:#1e3a8a;margin-bottom:10px;">
+        아래 열 순서에 맞춰 엑셀 데이터를 작성한 후, 데이터 범위를 선택하여 <kbd style="background:#dbeafe;border:1px solid #93c5fd;border-radius:4px;padding:1px 6px;font-size:12px;">Ctrl+C</kbd> 로 복사하세요.
+      </p>
+      <table style="border-collapse:collapse;font-size:12.5px;width:auto;">
+        <thead>
+          <tr>
+            <th style="background:#dbeafe;border:1px solid #93c5fd;padding:6px 20px;color:#1e3a8a;">A열: 성명 <span style="color:#dc2626;">*필수</span></th>
+            <th style="background:#dbeafe;border:1px solid #93c5fd;padding:6px 20px;color:#1e3a8a;">B열: 이메일</th>
+            <th style="background:#dbeafe;border:1px solid #93c5fd;padding:6px 20px;color:#1e3a8a;">C열: 핸드폰</th>
+            <th style="background:#dbeafe;border:1px solid #93c5fd;padding:6px 20px;color:#1e3a8a;">D열: 생년월일</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td style="border:1px solid #bfdbfe;padding:6px 20px;text-align:center;color:#374151;">김일수</td>
+            <td style="border:1px solid #bfdbfe;padding:6px 20px;text-align:center;color:#374151;">ilsoo.kim@gmail.com</td>
+            <td style="border:1px solid #bfdbfe;padding:6px 20px;text-align:center;color:#374151;">010-1234-5678</td>
+            <td style="border:1px solid #bfdbfe;padding:6px 20px;text-align:center;color:#374151;">1985-03-15</td>
+          </tr>
+          <tr>
+            <td style="border:1px solid #bfdbfe;padding:6px 20px;text-align:center;color:#374151;">이창수</td>
+            <td style="border:1px solid #bfdbfe;padding:6px 20px;text-align:center;color:#374151;">csoo.lee@naver.com</td>
+            <td style="border:1px solid #bfdbfe;padding:6px 20px;text-align:center;color:#374151;">010-4321-5678</td>
+            <td style="border:1px solid #bfdbfe;padding:6px 20px;text-align:center;color:#374151;"></td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+
+    <!-- 붙여넣기 영역 -->
+    <div style="background:#f8fafc;border:1px solid #e2e8f0;border-radius:10px;padding:14px 16px;margin-bottom:16px;">
+      <label style="display:block;font-size:13px;font-weight:600;color:#374151;margin-bottom:8px;">
+        <i class="fa-solid fa-clipboard" style="color:#2563eb;margin-right:6px;"></i>붙여넣기 영역
+      </label>
+      <textarea id="ct-paste-area" rows="4"
+        style="width:100%;border:1.5px solid #cbd5e1;border-radius:8px;padding:10px 12px;font-size:13px;
+               font-family:'Malgun Gothic',monospace;resize:vertical;outline:none;transition:border-color .15s;
+               box-sizing:border-box;"
+        onfocus="this.style.borderColor='#2563eb'" onblur="this.style.borderColor='#cbd5e1'"
+        onpaste="setTimeout(applyCopyTest, 50)"
+        placeholder="엑셀에서 복사한 데이터를 여기에 Ctrl+V 로 붙여넣으면 자동으로 아래 목록에 추가됩니다."></textarea>
+    </div>
+
+    <!-- 편집 테이블 -->
+    <div style="margin-bottom:16px;">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;">
+        <span style="font-size:13.5px;font-weight:600;color:#374151;">
+          <i class="fa-solid fa-table" style="color:#2563eb;margin-right:6px;"></i>편집 목록
+          <span id="ct-row-count" style="margin-left:8px;font-size:12px;color:#64748b;font-weight:400;">0행</span>
+        </span>
+        <button class="btn btn-secondary" style="font-size:12px;padding:5px 14px;" onclick="addCTRow()">
+          <i class="fa-solid fa-plus"></i> 행 추가
+        </button>
+      </div>
+      <div id="ct-empty-msg" style="text-align:center;color:#94a3b8;font-size:13px;padding:20px 0;
+           border:1.5px dashed #e2e8f0;border-radius:8px;">
+        데이터를 붙여넣어 적용하거나 행 추가 버튼으로 직접 입력하세요.
+      </div>
+      <div style="border:1px solid #e2e8f0;border-radius:10px;overflow:hidden;display:none;" id="ct-table-wrap">
+        <table style="width:100%;border-collapse:collapse;font-size:13px;">
+          <thead>
+            <tr style="background:#f1f5f9;">
+              <th style="padding:9px 10px;text-align:left;color:#374151;font-weight:600;min-width:90px;">성명 <span style="color:#dc2626;">*</span></th>
+              <th style="padding:9px 10px;text-align:left;color:#374151;font-weight:600;">이메일</th>
+              <th style="padding:9px 10px;text-align:left;color:#374151;font-weight:600;min-width:130px;">핸드폰</th>
+              <th style="padding:9px 10px;text-align:left;color:#374151;font-weight:600;min-width:100px;">생년월일</th>
+              <th style="padding:9px 10px;text-align:center;color:#374151;font-weight:600;width:44px;"></th>
+            </tr>
+          </thead>
+          <tbody id="ct-table-body"></tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- 하단 버튼 -->
+    <div style="display:flex;justify-content:flex-end;margin-top:20px;gap:10px;">
+      <button class="btn btn-secondary" onclick="handleNavInstrRequest()">
+        <i class="fa-solid fa-list"></i> 등록요청 목록 보기
+      </button>
+      <button id="ct-save-btn" class="btn btn-success" onclick="saveCopyTest()">
+        <i class="fa-solid fa-floppy-disk"></i> 저장
+      </button>
+    </div>
+  </div>`;
+}
+
+/* ══════════════════════════════════════════════════════════════
+   DB: 개인 벤더 목록
+══════════════════════════════════════════════════════════════ */
+async function loadPersonalVendors() {
+  showSpinner();
+  try {
+    const { data, error } = await db.from('personal_vendors').select('*').order('created_at', { ascending: false });
+    if (error) throw error;
+    showPersonalVendorList(data || []);
+  } catch (err) {
+    showToast('개인 벤더 목록 로드 중 오류: ' + (err.message || ''), 'error');
+    showPersonalVendorList([]);
+  } finally { hideSpinner(); }
+}
+
+function showPersonalVendorList(items) {
+  const rows = items.length > 0
+    ? items.map((v, i) => `
+      <tr ondblclick="openPersonalVendorModal('${v.id}')" style="cursor:pointer;" title="더블클릭 수정">
+        <td>${i + 1}</td>
+        <td>${esc(v.full_name || '—')}</td>
+        <td>${esc(v.email || '—')}</td>
+        <td>${esc(v.birth_date || '—')}</td>
+        <td>${esc(v.vendor || '—')}</td>
+        <td>${esc(v.vendor_status || '—')}</td>
+        <td class="action-cell">
+          <button class="btn-edit btn-sm" onclick="openPersonalVendorModal('${v.id}')">수정</button>
+          <button class="btn-delete btn-sm" onclick="deletePersonalVendor('${v.id}','${esc(v.full_name||'')}')">삭제</button>
+        </td>
+      </tr>`).join('')
+    : `<tr><td colspan="7" class="empty-table">등록된 개인 벤더가 없습니다.</td></tr>`;
+
+  const html = `
+  <div class="content-card">
+    <div class="content-card-header">
+      <h2><i class="fa-solid fa-user-tag" style="margin-right:8px;"></i>개인 벤더</h2>
+    </div>
+    <div class="list-toolbar">
+      <button class="btn btn-primary" onclick="openPersonalVendorModal(null)"><i class="fa-solid fa-plus"></i> 항목 추가</button>
+    </div>
+    <table class="data-table">
+      <thead><tr>
+        <th style="width:44px;">No.</th>
+        <th>성명</th>
+        <th>이메일</th>
+        <th>생년월일</th>
+        <th>Vendor</th>
+        <th>벤더 진행 상태</th>
+        <th style="width:100px;">수정/삭제</th>
+      </tr></thead>
+      <tbody>${rows}</tbody>
+    </table>
+  </div>`;
+  document.getElementById('content-area').innerHTML = html;
+}
+
+/* ══════════════════════════════════════════════════════════════
+   Personal Vendor Modal
+══════════════════════════════════════════════════════════════ */
+async function openPersonalVendorModal(id) {
+  let prefill = {};
+  if (id) {
+    showSpinner();
+    try {
+      const { data } = await db.from('personal_vendors').select('*').eq('id', id).single();
+      if (data) prefill = data;
+    } finally { hideSpinner(); }
+  }
+  const html = `
+  <div class="modal-overlay active" id="pv-modal-overlay" onclick="closePVOnBackdrop(event)">
+    <div class="modal" role="dialog">
+      <div class="modal-header">
+        <h3>${id ? '개인 벤더 수정' : '개인 벤더 추가'}</h3>
+        <button class="modal-close" onclick="closePVModal()">&times;</button>
+      </div>
+      <div class="modal-body">
+        <input type="hidden" id="pv-id" value="${id || ''}">
+        <div class="modal-field"><label>성명<span class="req">*</span></label>
+          <input class="form-input" id="pv-name" maxlength="100" placeholder="성명" value="${esc(prefill.full_name || '')}"></div>
+        <div class="modal-field"><label>이메일</label>
+          <input class="form-input" id="pv-email" maxlength="100" placeholder="example@email.com" value="${esc(prefill.email || '')}"></div>
+        <div class="modal-field"><label>생년월일</label>
+          <input class="form-input" id="pv-birth" maxlength="20" placeholder="YYYYMMDD" value="${esc(prefill.birth_date || '')}"></div>
+        <div class="modal-field"><label>Vendor</label>
+          <input class="form-input" id="pv-vendor" maxlength="20" placeholder="Vendor" value="${esc(prefill.vendor || '')}"></div>
+        <div class="modal-field"><label>벤더 진행 상태</label>
+          <input class="form-input" id="pv-vendor-status" maxlength="20" placeholder="벤더 진행 상태" value="${esc(prefill.vendor_status || '')}"></div>
+      </div>
+      <div class="modal-footer">
+        <button class="btn btn-secondary" onclick="closePVModal()"><i class="fa-solid fa-xmark"></i> 취소</button>
+        <button class="btn btn-success" style="padding:8px 28px;" onclick="savePersonalVendor()"><i class="fa-solid fa-floppy-disk"></i> 저장</button>
+      </div>
+    </div>
+  </div>`;
+  document.body.insertAdjacentHTML('beforeend', html);
+  document.getElementById('pv-name').focus();
+}
+
+function closePVModal() { const el = document.getElementById('pv-modal-overlay'); if (el) el.remove(); }
+function closePVOnBackdrop(e) { if (e.target.id === 'pv-modal-overlay' && _mousedownTarget === e.target) closePVModal(); }
+
+async function savePersonalVendor() {
+  const name = document.getElementById('pv-name').value.trim();
+  if (!name) { showToast('성명은 필수 입력 항목입니다.', 'warning'); return; }
+  const id = document.getElementById('pv-id').value;
+  const data = {
+    full_name:     name,
+    email:         document.getElementById('pv-email').value.trim(),
+    birth_date:    document.getElementById('pv-birth').value.trim(),
+    vendor:        document.getElementById('pv-vendor').value.trim(),
+    vendor_status: document.getElementById('pv-vendor-status').value.trim(),
+  };
+  showSpinner();
+  try {
+    const res = id
+      ? await db.from('personal_vendors').update(data).eq('id', id).select().single()
+      : await db.from('personal_vendors').insert(data).select().single();
+    if (res.error) throw res.error;
+    showToast(id ? '수정되었습니다.' : '추가되었습니다.', 'success');
+    closePVModal();
+    await loadPersonalVendors();
+  } catch (err) { showToast('저장 오류: ' + (err.message || ''), 'error'); }
+  finally { hideSpinner(); }
+}
+
+async function deletePersonalVendor(id, name) {
+  if (!confirm(`"${name}" 개인 벤더를 삭제하시겠습니까?`)) return;
+  showSpinner();
+  try {
+    const { error } = await db.from('personal_vendors').delete().eq('id', id);
+    if (error) throw error;
+    showToast('삭제되었습니다.', 'success');
+    await loadPersonalVendors();
+  } catch (err) { showToast('삭제 오류: ' + (err.message || ''), 'error'); }
+  finally { hideSpinner(); }
+}
+
+/* ══════════════════════════════════════════════════════════════
+   Init
+══════════════════════════════════════════════════════════════ */
+document.addEventListener('mousedown', e => { _mousedownTarget = e.target; });
+
+document.addEventListener('DOMContentLoaded', async () => {
+  // 1회성 URL 토큰 처리
+  const token = new URLSearchParams(window.location.search).get('token');
+  if (token) {
+    try {
+      const { data } = await db.from('instructor_requests')
+        .select('email, temp_password').eq('login_token', token).maybeSingle();
+      if (data) {
+        document.getElementById('login-email').value    = data.email || '';
+        document.getElementById('login-password').value = data.temp_password || '';
+        showToast('임시 계정이 입력되었습니다. 로그인 후 정보를 등록해 주세요.', 'info');
+      }
+    } catch (_) {}
+  }
+});
+</script>
+
+<script type="module">
+import { initAuth } from './auth/auth.js';
+
+const { signOut } = await initAuth({
+  supabaseUrl: 'https://mcshhvttsvfurrkpcbdf.supabase.co',
+  supabaseKey: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im1jc2hodnR0c3ZmdXJya3BjYmRmIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzM5ODI5MDgsImV4cCI6MjA4OTU1ODkwOH0.FRlSXHknfnYoZ4i4-_up8QvppoKHGo50koK9yDkXPUQ',
+  onLogin(user) {
+    window.currentUser = user;
+    document.getElementById('current-user-email').textContent = user.email || '';
+    document.getElementById('app').style.display = 'grid';
+    handleNavRegister();
+  },
+  onLogout() {
+    window.currentUser = null;
+    window.currentInstructorId = null;
+    document.getElementById('app').style.display = 'none';
+  },
+});
+
+window._signOut = signOut;
+</script>
+</body>
+</html>

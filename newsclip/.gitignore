@@ -1,0 +1,35 @@
+# 환경변수 (절대 커밋 금지)
+.env
+.env.local
+.env.*.local
+
+# 빌드 산출물
+.next/
+out/
+dist/
+build/
+
+# 의존성
+node_modules/
+
+# 빌드 캐시
+tsconfig.tsbuildinfo
+*.tsbuildinfo
+
+# Claude Code / 개발 도구
+.claude/
+.playwright-mcp/
+
+# 로그
+*.log
+
+# OS
+.DS_Store
+Thumbs.db
+
+# 개발 메모 (선택)
+기능\ MCP,\ Key\ 설정.txt
+기능\ 개발.txt
+참고\ 자료/
+화면\ 캡처*.png
+2026-*.txt

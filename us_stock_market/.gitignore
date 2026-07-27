@@ -1,0 +1,37 @@
+# 환경 변수 (절대 커밋 금지)
+.env
+.env.local
+.env.*.local
+
+# 의존성
+node_modules/
+
+# 빌드 결과물
+.next/
+dist/
+build/
+out/
+
+# 시스템 파일
+.DS_Store
+Thumbs.db
+
+# IDE
+.vscode/
+.idea/
+
+# 로그
+*.log
+npm-debug.log*
+
+# Claude Code 내부 파일
+.claude/
+
+# Playwright MCP 스냅샷
+.playwright-mcp/
+
+# Claude Code 세션 요약 파일
+*.txt
+*.png
+*.pptx
+tsconfig.tsbuildinfo

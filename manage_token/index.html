@@ -1,0 +1,1839 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Peter-02 관리 도구</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@400;500;600;700&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="auth/auth.css" />
+
+  <style>
+    /* ===================================================
+       CSS Variables & Reset
+    =================================================== */
+    *, *::before, *::after {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    :root {
+      --mint:           #6dd5c2;
+      --mint-light:     #e8faf7;
+      --mint-mid:       #b2ece3;
+      --lavender:       #b8a9e8;
+      --lavender-light: #f0eeff;
+      --lavender-mid:   #d6cff5;
+      --blue-soft:      #7ab8f5;
+      --blue-btn:       #5ba4e8;
+      --green-btn:      #5cc8a0;
+      --coral-btn:      #f07a7a;
+      --text-main:      #3a3a5c;
+      --text-sub:       #7a7a9a;
+      --text-light:     #b0b0cc;
+      --bg-page:        #f6f4ff;
+      --bg-card:        #ffffff;
+      --border:         #e2dff5;
+      --shadow-sm:      0 2px 8px rgba(120,100,200,0.08);
+      --shadow-md:      0 4px 20px rgba(120,100,200,0.15);
+      --radius-sm:      8px;
+      --radius-md:      14px;
+      --radius-lg:      20px;
+      --transition:     0.2s ease;
+    }
+
+    html, body {
+      height: 100%;
+      font-family: 'Noto Sans KR', system-ui, -apple-system, sans-serif;
+      background: var(--bg-page);
+      color: var(--text-main);
+      font-size: 14px;
+      line-height: 1.6;
+    }
+
+    /* ===================================================
+       App Shell
+    =================================================== */
+    #app {
+      display: flex;
+      flex-direction: column;
+      height: 100vh;
+      overflow: hidden;
+    }
+
+    /* ===================================================
+       Tab Bar
+    =================================================== */
+    .tab-bar {
+      display: flex;
+      align-items: flex-end;
+      gap: 4px;
+      padding: 16px 24px 0;
+      background: linear-gradient(135deg, #ede9ff 0%, #e4f9f6 100%);
+      border-bottom: 2px solid var(--border);
+      flex-shrink: 0;
+    }
+
+    .tab-bar-spacer { flex: 1; }
+
+    .btn-logout {
+      display: inline-flex;
+      align-items: center;
+      gap: 5px;
+      margin-bottom: 6px;
+      padding: 7px 16px;
+      border: 1.5px solid var(--border);
+      border-radius: 50px;
+      background: #fff;
+      color: var(--text-sub);
+      font-family: inherit;
+      font-size: 13px;
+      font-weight: 500;
+      cursor: pointer;
+      transition: all var(--transition);
+    }
+
+    .btn-logout:hover {
+      border-color: var(--coral-btn);
+      color: var(--coral-btn);
+      background: #fde8e8;
+    }
+
+    .tab-btn {
+      padding: 10px 28px;
+      border: 2px solid transparent;
+      border-bottom: none;
+      border-radius: var(--radius-sm) var(--radius-sm) 0 0;
+      background: rgba(255,255,255,0.5);
+      color: var(--text-sub);
+      font-size: 14px;
+      font-weight: 500;
+      font-family: inherit;
+      cursor: pointer;
+      transition: all var(--transition);
+      position: relative;
+      bottom: -2px;
+    }
+
+    .tab-btn:hover { background: rgba(255,255,255,0.8); color: var(--text-main); }
+
+    .tab-btn.active {
+      background: var(--bg-card);
+      color: var(--text-main);
+      font-weight: 700;
+      border-color: var(--border);
+      border-bottom-color: var(--bg-card);
+    }
+
+    /* ===================================================
+       Tab Content
+    =================================================== */
+    .tab-content {
+      flex: 1;
+      overflow: hidden;
+      display: flex;
+      flex-direction: column;
+    }
+
+    .tab-panel {
+      display: none;
+      flex: 1;
+      overflow: hidden;
+      flex-direction: column;
+    }
+
+    .tab-panel.active { display: flex; }
+
+    /* ===================================================
+       Main 40/60 Layout
+    =================================================== */
+    .main-layout {
+      flex: 1;
+      display: flex;
+      overflow: hidden;
+    }
+
+    /* ===================================================
+       Left Panel (40%)
+    =================================================== */
+    .left-panel {
+      width: 40%;
+      flex-shrink: 0;
+      display: flex;
+      flex-direction: column;
+      border-right: 2px solid var(--border);
+      overflow: hidden;
+      background: var(--bg-card);
+    }
+
+    .left-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 0 20px;
+      height: 56px;
+      flex-shrink: 0;
+      border-bottom: 1px solid var(--border);
+      background: var(--bg-card);
+    }
+
+    .panel-subtitle {
+      font-size: 15px;
+      font-weight: 700;
+      color: var(--text-main);
+      letter-spacing: -0.01em;
+    }
+
+    .key-list-wrap {
+      flex: 1;
+      overflow-y: auto;
+      padding: 0;
+    }
+
+    .key-list-filters {
+      display: flex;
+      align-items: center;
+      gap: 16px;
+      padding: 10px 20px;
+      flex-shrink: 0;
+      border-bottom: 1px solid var(--border);
+      background: var(--bg-card);
+    }
+
+    .filter-field {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      flex: 1;
+      min-width: 0;
+    }
+
+    .filter-field label {
+      font-size: 11px;
+      font-weight: 700;
+      color: var(--text-sub);
+      white-space: nowrap;
+      flex-shrink: 0;
+    }
+
+    .filter-select {
+      appearance: none;
+      -webkit-appearance: none;
+      flex: 1;
+      min-width: 0;
+      padding: 6px 28px 6px 10px;
+      background: #fff url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23b8a9e8' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpolyline points='6 9 12 15 18 9'%3E%3C/polyline%3E%3C/svg%3E") no-repeat right 8px center / 13px;
+      border: 1.5px solid var(--border);
+      border-radius: var(--radius-sm);
+      font-size: 12.5px;
+      font-family: inherit;
+      color: var(--text-main);
+      cursor: pointer;
+      outline: none;
+      transition: border-color var(--transition);
+    }
+
+    .filter-select:focus { border-color: var(--mint); box-shadow: 0 0 0 3px rgba(109,213,194,0.18); }
+
+    /* ===================================================
+       Key List Table
+    =================================================== */
+    .key-list-table {
+      width: 100%;
+      border-collapse: collapse;
+      background: var(--bg-card);
+    }
+
+    .key-list-table thead {
+      background: linear-gradient(135deg, var(--lavender-light), var(--mint-light));
+      position: sticky;
+      top: 0;
+      z-index: 1;
+    }
+
+    .key-list-table thead th {
+      padding: 11px 14px;
+      font-size: 11px;
+      font-weight: 700;
+      color: var(--text-sub);
+      text-align: left;
+      white-space: nowrap;
+      border-bottom: 2px solid var(--border);
+      letter-spacing: 0.03em;
+    }
+
+    .key-list-table tbody tr {
+      border-bottom: 1px solid var(--border);
+      transition: background var(--transition);
+      cursor: pointer;
+    }
+
+    .key-list-table tbody tr:nth-child(even) { background: #fbfaff; }
+    .key-list-table tbody tr:last-child { border-bottom: none; }
+    .key-list-table tbody tr:hover { background: var(--mint-light); }
+
+    .key-list-table tbody tr.selected {
+      background: var(--lavender-light) !important;
+      box-shadow: inset 3px 0 0 var(--lavender);
+    }
+
+    .key-list-table tbody td {
+      padding: 10px 14px;
+      vertical-align: middle;
+      color: var(--text-main);
+      font-size: 13px;
+    }
+
+    .td-account { color: var(--text-sub); }
+    .td-key-name { }
+    .td-url-cell {
+      color: var(--blue-btn);
+      font-size: 12px;
+      word-break: break-all;
+    }
+
+    /* Loading / empty state inside list */
+    .list-state td {
+      text-align: center;
+      padding: 40px 16px;
+      color: var(--text-light);
+      font-size: 13px;
+    }
+
+    .spinner {
+      display: inline-block;
+      width: 20px;
+      height: 20px;
+      border: 2px solid var(--border);
+      border-top-color: var(--mint);
+      border-radius: 50%;
+      animation: spin 0.8s linear infinite;
+      vertical-align: middle;
+      margin-right: 6px;
+    }
+
+    @keyframes spin { to { transform: rotate(360deg); } }
+
+    /* ===================================================
+       Right Panel (60%)
+    =================================================== */
+    .right-panel {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+      background: var(--bg-page);
+    }
+
+    .right-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 0 24px;
+      height: 56px;
+      flex-shrink: 0;
+      border-bottom: 1px solid var(--border);
+      background: var(--bg-card);
+    }
+
+    .right-actions {
+      display: flex;
+      gap: 8px;
+      align-items: center;
+    }
+
+    .right-body {
+      flex: 1;
+      overflow-y: auto;
+      padding: 24px;
+    }
+
+    .right-empty {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      min-height: 200px;
+      color: var(--text-light);
+      font-size: 14px;
+      text-align: center;
+    }
+
+    /* ===================================================
+       Detail Form
+    =================================================== */
+    .detail-form {
+      display: flex;
+      flex-direction: column;
+      gap: 0;
+    }
+
+    .form-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 20px 20px;
+    }
+
+    .span-full { grid-column: 1 / -1; }
+
+    .detail-field {
+      display: flex;
+      flex-direction: column;
+      gap: 5px;
+    }
+
+    .detail-label {
+      font-size: 10.5px;
+      font-weight: 700;
+      color: var(--lavender);
+      letter-spacing: 0.07em;
+      text-transform: uppercase;
+      padding-bottom: 3px;
+      border-bottom: 1.5px solid var(--lavender-mid);
+      margin-bottom: 1px;
+    }
+
+    .detail-label .required {
+      color: var(--coral-btn);
+      margin-left: 2px;
+    }
+
+    .detail-label-row {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 8px;
+      padding-bottom: 3px;
+      border-bottom: 1.5px solid var(--lavender-mid);
+      margin-bottom: 1px;
+    }
+
+    .detail-label-row .detail-label {
+      border-bottom: none;
+      padding-bottom: 0;
+      margin-bottom: 0;
+    }
+
+    .copy-btn {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      width: 20px;
+      height: 20px;
+      padding: 0;
+      flex-shrink: 0;
+      border: none;
+      background: transparent;
+      color: var(--lavender);
+      cursor: pointer;
+      border-radius: 4px;
+      line-height: 1;
+      transition: background var(--transition), color var(--transition);
+    }
+
+    .copy-btn svg {
+      width: 14px;
+      height: 14px;
+      pointer-events: none;
+    }
+
+    .copy-btn:hover {
+      background: var(--lavender-mid);
+      color: var(--text-main);
+    }
+
+    .copy-btn:active {
+      transform: scale(0.9);
+    }
+
+    select.detail-input {
+      appearance: none;
+      -webkit-appearance: none;
+      padding-right: 32px;
+    }
+
+    /* .detail-input:not([readonly]) sets a `background` shorthand at equal
+       specificity to a plain select rule, which would wipe the arrow image —
+       so the arrow rule below matches at higher specificity to win reliably. */
+    select.detail-input:not(:disabled) {
+      cursor: pointer;
+      border-color: var(--lavender-mid);
+      background: #fff url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23b8a9e8' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpolyline points='6 9 12 15 18 9'%3E%3C/polyline%3E%3C/svg%3E") no-repeat right 10px center / 14px;
+    }
+
+    select.detail-input:disabled {
+      opacity: 1;
+      -webkit-text-fill-color: var(--text-main);
+      color: var(--text-main);
+      border-color: var(--lavender-mid);
+      cursor: default;
+      padding-right: 12px;
+      background: #ffffff;
+    }
+
+    .detail-input {
+      padding: 8px 12px;
+      background: var(--bg-card);
+      border: 1.5px solid var(--border);
+      border-radius: var(--radius-sm);
+      font-size: 13px;
+      color: var(--text-main);
+      font-family: inherit;
+      width: 100%;
+      outline: none;
+      resize: none;
+      min-height: 36px;
+      line-height: 1.55;
+      transition: border-color var(--transition), background var(--transition), box-shadow var(--transition);
+    }
+
+    /* readonly: 흰색 배경 + 연한 라벤더 테두리로 패널 배경(#f6f4ff)과 명확히 구분 */
+    .detail-input[readonly] {
+      background: #ffffff;
+      border-color: var(--lavender-mid);
+      color: var(--text-main);
+      cursor: default;
+    }
+
+    .detail-input[readonly]:hover {
+      border-color: var(--lavender);
+      box-shadow: 0 1px 4px rgba(184,169,232,0.18);
+    }
+
+    .detail-input:not([readonly]) {
+      background: #fff;
+      border-color: var(--lavender-mid);
+      cursor: text;
+    }
+
+    .detail-input:not([readonly]):focus {
+      border-color: var(--mint);
+      box-shadow: 0 0 0 3px rgba(109,213,194,0.18);
+    }
+
+    .detail-input-url[readonly] {
+      color: var(--blue-btn);
+      cursor: pointer;
+    }
+
+    .detail-input-multiline {
+      min-height: 72px;
+      white-space: pre-wrap;
+      word-break: break-word;
+      overflow: hidden;
+    }
+
+    #d-key-creation {
+      min-height: 97px;  /* 4행 */
+    }
+
+    #d-mcp-registration {
+      min-height: 97px;  /* 4행 */
+    }
+
+    /* 설명 — contenteditable rich text */
+    .detail-input-rich {
+      min-height: 72px;
+      overflow-y: auto;
+      word-break: break-word;
+      cursor: default;
+    }
+
+    .detail-input-rich[contenteditable="true"] {
+      cursor: text;
+      border-color: var(--lavender-mid);
+      background: #fff;
+    }
+
+    .detail-input-rich[contenteditable="true"]:focus {
+      border-color: var(--mint);
+      box-shadow: 0 0 0 3px rgba(109,213,194,0.18);
+      outline: none;
+    }
+
+    /* 붙여넣은 웹 콘텐츠 내부 스타일 */
+    .detail-input-rich p            { margin: 0 0 6px; }
+    .detail-input-rich p:last-child { margin-bottom: 0; }
+    .detail-input-rich ul,
+    .detail-input-rich ol           { margin: 0 0 6px 1.5em; padding: 0; }
+    .detail-input-rich li           { margin-bottom: 2px; }
+    .detail-input-rich a            { color: var(--blue-btn); }
+    .detail-input-rich strong,
+    .detail-input-rich b            { font-weight: 700; }
+    .detail-input-rich code         { font-family: monospace; font-size: 12px;
+                                      background: var(--mint-light); padding: 1px 4px;
+                                      border-radius: 3px; }
+
+    .detail-input-key {
+      font-family: monospace;
+      font-size: 12px;
+      background: var(--mint-light);
+      border-color: var(--mint-mid);
+      word-break: break-all;
+      white-space: pre-wrap;
+      overflow: hidden;
+      min-height: 60px;
+    }
+
+    /* Key 필드 readonly: mint-light 유지 (mint-mid 테두리로 배경과 구분) */
+    .detail-input-key[readonly] {
+      background: var(--mint-light);
+      border-color: var(--mint-mid);
+    }
+
+    .detail-input-key:not([readonly]) {
+      background: #f0fff9;
+      border-color: var(--mint);
+    }
+
+    /* ===================================================
+       Buttons
+    =================================================== */
+    .btn {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      padding: 8px 18px;
+      border: none;
+      border-radius: 50px;
+      font-family: inherit;
+      font-size: 13px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: all var(--transition);
+    }
+
+    .btn:focus-visible {
+      outline: 3px solid var(--lavender);
+      outline-offset: 2px;
+    }
+
+    .btn:disabled {
+      opacity: 0.6;
+      cursor: not-allowed;
+      transform: none !important;
+    }
+
+    .btn-sm { padding: 6px 14px; font-size: 12px; }
+
+    .btn-primary {
+      background: linear-gradient(135deg, var(--blue-btn), var(--mint));
+      color: #fff;
+      box-shadow: 0 2px 10px rgba(91,164,232,0.3);
+    }
+
+    .btn-primary:hover:not(:disabled) {
+      transform: translateY(-1px);
+      box-shadow: 0 4px 14px rgba(91,164,232,0.4);
+    }
+
+    .btn-edit {
+      background: #e8f9f3;
+      color: var(--green-btn);
+      border: 1.5px solid #b8edd9;
+    }
+
+    .btn-edit:hover:not(:disabled) {
+      background: var(--green-btn);
+      color: #fff;
+    }
+
+    .btn-delete {
+      background: #fde8e8;
+      color: var(--coral-btn);
+      border: 1.5px solid #f5c8c8;
+    }
+
+    .btn-delete:hover:not(:disabled) {
+      background: var(--coral-btn);
+      color: #fff;
+    }
+
+    .btn-cancel {
+      background: #f0eeff;
+      color: var(--text-sub);
+      border: 1.5px solid var(--lavender-mid);
+    }
+
+    .btn-cancel:hover:not(:disabled) {
+      background: var(--lavender-mid);
+      color: var(--text-main);
+    }
+
+    .btn-save {
+      background: linear-gradient(135deg, var(--blue-btn), var(--mint));
+      color: #fff;
+      box-shadow: 0 2px 10px rgba(91,164,232,0.3);
+    }
+
+    .btn-save:hover:not(:disabled) {
+      transform: translateY(-1px);
+      box-shadow: 0 4px 14px rgba(91,164,232,0.4);
+    }
+
+    .btn-danger {
+      background: linear-gradient(135deg, #f07a7a, #e05555);
+      color: #fff;
+      box-shadow: 0 2px 10px rgba(240,122,122,0.35);
+    }
+
+    .btn-danger:hover:not(:disabled) {
+      transform: translateY(-1px);
+      box-shadow: 0 4px 14px rgba(240,122,122,0.45);
+    }
+
+    /* ===================================================
+       Toast
+    =================================================== */
+    #toast {
+      position: fixed;
+      bottom: 30px;
+      left: 50%;
+      transform: translateX(-50%) translateY(20px);
+      background: var(--text-main);
+      color: #fff;
+      padding: 10px 24px;
+      border-radius: 50px;
+      font-size: 13px;
+      font-weight: 500;
+      opacity: 0;
+      pointer-events: none;
+      transition: all 0.3s ease;
+      z-index: 9999;
+      white-space: nowrap;
+    }
+
+    #toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
+    #toast.success { background: var(--green-btn); }
+    #toast.error   { background: var(--coral-btn); }
+
+    /* ===================================================
+       Confirm Dialog
+    =================================================== */
+    .confirm-overlay {
+      display: none;
+      position: fixed;
+      inset: 0;
+      background: rgba(60,50,110,0.4);
+      backdrop-filter: blur(2px);
+      z-index: 1100;
+      align-items: center;
+      justify-content: center;
+      padding: 20px;
+    }
+
+    .confirm-overlay.open {
+      display: flex;
+      animation: fadeIn 0.15s ease;
+    }
+
+    @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+
+    .confirm-box {
+      background: var(--bg-card);
+      border-radius: var(--radius-md);
+      box-shadow: var(--shadow-md);
+      width: 100%;
+      max-width: 360px;
+      padding: 28px 24px 22px;
+      text-align: center;
+      animation: slideUp 0.2s ease;
+    }
+
+    @keyframes slideUp {
+      from { transform: translateY(20px); opacity: 0; }
+      to   { transform: translateY(0);    opacity: 1; }
+    }
+
+    .confirm-icon  { font-size: 36px; margin-bottom: 12px; display: block; }
+    .confirm-title { font-size: 16px; font-weight: 700; color: var(--text-main); margin-bottom: 8px; }
+    .confirm-msg   { font-size: 13px; color: var(--text-sub); margin-bottom: 22px; line-height: 1.7; }
+
+    .confirm-actions {
+      display: flex;
+      gap: 10px;
+      justify-content: center;
+    }
+
+    .confirm-actions .btn { min-width: 100px; justify-content: center; }
+
+    /* ===================================================
+       Scrollbar
+    =================================================== */
+    ::-webkit-scrollbar       { width: 6px; height: 6px; }
+    ::-webkit-scrollbar-track { background: transparent; }
+    ::-webkit-scrollbar-thumb { background: var(--border); border-radius: 10px; }
+    ::-webkit-scrollbar-thumb:hover { background: var(--lavender-mid); }
+
+    /* ===================================================
+       Key 명칭 선택 팝업
+    =================================================== */
+    .key-select-overlay {
+      display: none;
+      position: fixed;
+      inset: 0;
+      background: rgba(60,50,110,0.4);
+      backdrop-filter: blur(2px);
+      z-index: 1200;
+      align-items: center;
+      justify-content: center;
+      padding: 20px;
+    }
+    .key-select-overlay.open { display: flex; animation: fadeIn 0.15s ease; }
+
+    .key-select-box {
+      background: var(--bg-card);
+      border-radius: var(--radius-md);
+      box-shadow: var(--shadow-md);
+      width: 100%;
+      max-width: 440px;
+      max-height: 70vh;
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+      animation: slideUp 0.2s ease;
+    }
+
+    .key-select-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 16px 20px;
+      border-bottom: 1px solid var(--border);
+      flex-shrink: 0;
+    }
+    .key-select-title { font-size: 15px; font-weight: 700; color: var(--text-main); }
+    .key-select-close {
+      background: none; border: none; cursor: pointer;
+      font-size: 18px; color: var(--text-sub); line-height: 1;
+      padding: 2px 6px; border-radius: 4px;
+    }
+    .key-select-close:hover { background: var(--border); color: var(--text-main); }
+
+    .key-select-search-wrap { padding: 12px 16px 8px; flex-shrink: 0; }
+    .key-select-search {
+      width: 100%;
+      padding: 8px 12px;
+      border: 1.5px solid var(--border);
+      border-radius: var(--radius-sm);
+      font-size: 13px;
+      font-family: inherit;
+      outline: none;
+      color: var(--text-main);
+    }
+    .key-select-search:focus { border-color: var(--mint); box-shadow: 0 0 0 3px rgba(109,213,194,0.18); }
+
+    .key-select-list { flex: 1; overflow-y: auto; padding: 4px 8px 8px; }
+
+    .key-select-item {
+      display: flex;
+      flex-direction: column;
+      gap: 2px;
+      padding: 10px 12px;
+      border-radius: var(--radius-sm);
+      cursor: pointer;
+      transition: background var(--transition);
+      border-bottom: 1px solid var(--border);
+    }
+    .key-select-item:last-child { border-bottom: none; }
+    .key-select-item:hover { background: var(--mint-light); }
+    .key-select-item-name { font-size: 13px; font-weight: 600; color: var(--text-main); }
+    .key-select-item-account { font-size: 11px; color: var(--text-sub); }
+    .key-select-empty { padding: 30px 16px; text-align: center; color: var(--text-light); font-size: 13px; }
+
+    .key-select-footer {
+      padding: 12px 16px;
+      border-top: 1px solid var(--border);
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      flex-shrink: 0;
+    }
+    .key-select-footer-hint { font-size: 12px; color: var(--text-light); }
+
+    /* 만료일 + 갱신일 나란히 */
+    .date-pair-cell {
+      display: flex;
+      gap: 12px;
+    }
+    .date-pair-cell .detail-field {
+      flex: 1;
+    }
+
+    /* ===================================================
+       Responsive (mobile stacked)
+    =================================================== */
+    @media (max-width: 768px) {
+      .main-layout { flex-direction: column; }
+      .left-panel { width: 100%; border-right: none; border-bottom: 2px solid var(--border); max-height: 45vh; }
+      .right-panel { flex: 1; }
+      .form-grid { grid-template-columns: 1fr; }
+      .span-full { grid-column: 1; }
+    }
+  </style>
+</head>
+
+<body>
+<div id="app" role="application" style="display:none">
+
+  <!-- Tab Bar -->
+  <nav class="tab-bar" role="tablist" aria-label="메인 탭">
+    <button
+      class="tab-btn active"
+      role="tab"
+      aria-selected="true"
+      aria-controls="panel-tokens"
+      id="tab-tokens"
+      data-tab="tokens"
+    >Key 관리</button>
+    <span class="tab-bar-spacer"></span>
+    <button class="btn-logout" id="btn-logout">⏻ 로그아웃</button>
+  </nav>
+
+  <!-- Tab Content -->
+  <div class="tab-content">
+
+    <!-- Key 관리 패널 -->
+    <section
+      class="tab-panel active"
+      id="panel-tokens"
+      role="tabpanel"
+      aria-labelledby="tab-tokens"
+    >
+      <div class="main-layout">
+
+        <!-- ====== Left: Key 목록 (40%) ====== -->
+        <div class="left-panel">
+          <div class="left-header">
+            <span class="panel-subtitle">Key 목록</span>
+            <button class="btn btn-primary btn-sm" id="btn-new">＋ 신규등록</button>
+          </div>
+          <div class="key-list-filters">
+            <div class="filter-field">
+              <label for="filter-account">계정</label>
+              <select class="filter-select" id="filter-account">
+                <option value="">전체</option>
+              </select>
+            </div>
+            <div class="filter-field">
+              <label for="filter-key-type">KEY 유형</label>
+              <select class="filter-select" id="filter-key-type">
+                <option value="">전체</option>
+                <option value="API">API</option>
+                <option value="MCP">MCP</option>
+                <option value="DB">DB</option>
+                <option value="Cron">Cron</option>
+                <option value="Deploy">Deploy</option>
+              </select>
+            </div>
+          </div>
+          <div class="key-list-wrap">
+            <table class="key-list-table" id="key-list-table" aria-label="Key 목록">
+              <colgroup>
+                <col style="width:25%" />
+                <col style="width:35%" />
+                <col style="width:40%" />
+              </colgroup>
+              <thead>
+                <tr>
+                  <th scope="col">사용 계정</th>
+                  <th scope="col">Key 명칭</th>
+                  <th scope="col">URL</th>
+                </tr>
+              </thead>
+              <tbody id="key-list-tbody"></tbody>
+            </table>
+          </div>
+        </div>
+
+        <!-- ====== Right: Key 상세정보 (60%) ====== -->
+        <div class="right-panel">
+          <div class="right-header">
+            <span class="panel-subtitle">Key 상세정보</span>
+            <div class="right-actions" id="right-actions">
+              <button class="btn btn-edit btn-sm"   id="btn-detail-edit"   style="display:none">✏ 수정</button>
+              <button class="btn btn-delete btn-sm" id="btn-detail-delete" style="display:none">🗑 삭제</button>
+              <button class="btn btn-cancel btn-sm" id="btn-detail-cancel" style="display:none">취소</button>
+              <button class="btn btn-save btn-sm"   id="btn-detail-save"   style="display:none">저장</button>
+            </div>
+          </div>
+
+          <div class="right-body" id="right-body">
+            <!-- 미선택 상태 -->
+            <div class="right-empty" id="right-empty">
+              목록에서 항목을 선택하거나 신규등록 버튼을 클릭하세요.
+            </div>
+
+            <!-- 상세 폼 -->
+            <div class="detail-form" id="detail-form" style="display:none">
+              <div class="form-grid">
+
+                <!-- Row 1: Key 명칭 | 사용 계정 -->
+                <div class="detail-field">
+                  <span class="detail-label">Key 명칭 <span class="required">*</span></span>
+                  <input class="detail-input" id="d-key-name" type="text" maxlength="100" readonly />
+                </div>
+                <div class="detail-field">
+                  <span class="detail-label-row">
+                    <span class="detail-label">사용 계정 <span class="required">*</span></span>
+                    <button type="button" class="copy-btn" data-copy-target="d-account" title="복사" aria-label="사용 계정 복사"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect width="14" height="14" x="8" y="8" rx="2" ry="2"></rect><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"></path></svg></button>
+                  </span>
+                  <input class="detail-input" id="d-account" type="text" maxlength="100" readonly />
+                </div>
+
+                <!-- Row 2: KEY 유형 | URL -->
+                <div class="detail-field">
+                  <span class="detail-label">KEY 유형</span>
+                  <select class="detail-input" id="d-key-type" disabled>
+                    <option value="">선택 안 함</option>
+                    <option value="API">API</option>
+                    <option value="MCP">MCP</option>
+                    <option value="DB">DB</option>
+                    <option value="Cron">Cron</option>
+                    <option value="Deploy">Deploy</option>
+                  </select>
+                </div>
+                <div class="detail-field">
+                  <span class="detail-label-row">
+                    <span class="detail-label">URL <span class="required">*</span></span>
+                    <button type="button" class="copy-btn" data-copy-target="d-url" title="복사" aria-label="URL 복사"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect width="14" height="14" x="8" y="8" rx="2" ry="2"></rect><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"></path></svg></button>
+                  </span>
+                  <input class="detail-input detail-input-url" id="d-url" type="text" maxlength="200" readonly />
+                </div>
+
+                <!-- Row 3: 프로젝트명 | 프로젝트 URL -->
+                <div class="detail-field">
+                  <span class="detail-label">프로젝트명</span>
+                  <input class="detail-input" id="d-project-name" type="text" maxlength="100" readonly />
+                </div>
+                <div class="detail-field">
+                  <span class="detail-label-row">
+                    <span class="detail-label">프로젝트 URL</span>
+                    <button type="button" class="copy-btn" data-copy-target="d-project-url" title="복사" aria-label="프로젝트 URL 복사"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect width="14" height="14" x="8" y="8" rx="2" ry="2"></rect><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"></path></svg></button>
+                  </span>
+                  <input class="detail-input detail-input-url" id="d-project-url" type="text" maxlength="200" readonly />
+                </div>
+
+                <!-- Row 4: Key (전체) -->
+                <div class="detail-field span-full">
+                  <span class="detail-label-row">
+                    <span class="detail-label">Key</span>
+                    <button type="button" class="copy-btn" data-copy-target="d-key-value" title="복사" aria-label="Key 복사"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect width="14" height="14" x="8" y="8" rx="2" ry="2"></rect><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"></path></svg></button>
+                  </span>
+                  <textarea class="detail-input detail-input-key" id="d-key-value" maxlength="1000" readonly></textarea>
+                </div>
+
+                <!-- Row 5: MCP 등록 방법 (전체) -->
+                <div class="detail-field span-full">
+                  <span class="detail-label-row">
+                    <span class="detail-label">MCP 등록 방법</span>
+                    <button type="button" class="copy-btn" data-copy-target="d-mcp-registration" title="복사" aria-label="MCP 등록 방법 복사"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect width="14" height="14" x="8" y="8" rx="2" ry="2"></rect><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"></path></svg></button>
+                  </span>
+                  <textarea class="detail-input detail-input-multiline" id="d-mcp-registration" maxlength="2000" readonly></textarea>
+                </div>
+
+                <!-- Row 6: Key 생성 방법 (전체) -->
+                <div class="detail-field span-full">
+                  <span class="detail-label">Key 생성 방법</span>
+                  <textarea class="detail-input detail-input-multiline" id="d-key-creation" maxlength="2000" readonly></textarea>
+                </div>
+
+                <!-- Row 7: 사용기한 | 만료일 + 갱신일 -->
+                <div class="detail-field">
+                  <span class="detail-label">사용기한</span>
+                  <select class="detail-input" id="d-usage-period" disabled>
+                    <option value="">선택 안 함</option>
+                    <option value="1시간">1시간</option>
+                    <option value="1일">1일</option>
+                    <option value="7일">7일</option>
+                    <option value="30일">30일</option>
+                    <option value="90일">90일</option>
+                    <option value="180일">180일</option>
+                    <option value="1년">1년</option>
+                    <option value="No expiration">No expiration</option>
+                  </select>
+                </div>
+                <div class="date-pair-cell">
+                  <div class="detail-field">
+                    <span class="detail-label">만료일</span>
+                    <input class="detail-input" id="d-expiry-date" type="date" readonly />
+                  </div>
+                  <div class="detail-field">
+                    <span class="detail-label">갱신일</span>
+                    <input class="detail-input" id="d-renewal-date" type="date" readonly />
+                  </div>
+                </div>
+
+                <!-- Row 8: 설명 (전체) — rich text contenteditable -->
+                <div class="detail-field span-full">
+                  <span class="detail-label">설명</span>
+                  <div class="detail-input detail-input-rich" id="d-description" contenteditable="false"></div>
+                </div>
+
+              </div>
+            </div>
+          </div><!-- /right-body -->
+        </div><!-- /right-panel -->
+
+      </div><!-- /main-layout -->
+    </section>
+
+  </div><!-- /tab-content -->
+</div><!-- /app -->
+
+<!-- =====================================================
+     Key 명칭 선택 팝업
+===================================================== -->
+<div class="key-select-overlay" id="key-select-overlay" role="dialog" aria-modal="true" aria-labelledby="key-select-title">
+  <div class="key-select-box">
+    <div class="key-select-header">
+      <span class="key-select-title" id="key-select-title">참고할 Key 명칭 선택</span>
+      <button class="key-select-close" id="key-select-close" aria-label="닫기">✕</button>
+    </div>
+    <div class="key-select-search-wrap">
+      <input class="key-select-search" id="key-select-search" type="text" placeholder="Key 명칭 또는 계정 검색..." />
+    </div>
+    <div class="key-select-list" id="key-select-list"></div>
+    <div class="key-select-footer">
+      <span class="key-select-footer-hint">선택하면 해당 정보가 자동 입력됩니다.</span>
+      <button class="btn btn-cancel btn-sm" id="key-select-skip">건너뛰기</button>
+    </div>
+  </div>
+</div>
+
+<!-- =====================================================
+     Confirm Delete Dialog
+===================================================== -->
+<div
+  class="confirm-overlay"
+  id="confirm-overlay"
+  role="alertdialog"
+  aria-modal="true"
+  aria-labelledby="confirm-title"
+  aria-describedby="confirm-msg"
+>
+  <div class="confirm-box">
+    <span class="confirm-icon" aria-hidden="true">🗑️</span>
+    <p class="confirm-title" id="confirm-title">삭제할까요?</p>
+    <p class="confirm-msg" id="confirm-msg">이 작업은 되돌릴 수 없습니다.<br>정말 삭제하시겠습니까?</p>
+    <div class="confirm-actions">
+      <button class="btn btn-cancel" id="confirm-cancel">취소</button>
+      <button class="btn btn-danger" id="confirm-ok">삭제</button>
+    </div>
+  </div>
+</div>
+
+<!-- Toast -->
+<div id="toast" role="status" aria-live="polite" aria-atomic="true"></div>
+
+<!-- =====================================================
+     Supabase CDN
+===================================================== -->
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
+
+<script>
+/*
+ * DB Schema (tokens table - new):
+ *   id                  uuid PK
+ *   key_name            varchar(100)  NOT NULL
+ *   account             varchar(100)  NOT NULL
+ *   key_type            varchar(20)   API | MCP | DB | Cron | Deploy
+ *   url                 varchar(200)  NOT NULL
+ *   project_name        varchar(100)
+ *   project_url         varchar(200)
+ *   key_value           varchar(1000) NOT NULL
+ *   usage_period        varchar(100)
+ *   expiry_date         date
+ *   key_creation_method varchar(2000)
+ *   mcp_registration    varchar(2000)
+ *   inserted_at         timestamptz DEFAULT now()
+ */
+
+'use strict';
+
+window.onerror = function(msg, src, line) {
+  const tbody = document.getElementById('key-list-tbody');
+  if (tbody) {
+    tbody.innerHTML = `<tr class="list-state"><td colspan="3">⚠️ JS 오류 (${line}행): ${msg}</td></tr>`;
+  }
+};
+
+// --------------------------------------------------
+// Supabase init
+// --------------------------------------------------
+const SUPABASE_URL      = 'https://trduvbgyfbzdkopdcana.supabase.co';
+const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InRyZHV2Ymd5ZmJ6ZGtvcGRjYW5hIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzYyNjI3MjksImV4cCI6MjA5MTgzODcyOX0.b9P15zvzWbJw4KVS_Iz4ipoLttMlHXmj5I-kGrIm-A0';
+
+let sbClient;
+try {
+  if (!window.supabase) throw new Error('Supabase CDN 스크립트 로드 실패');
+  sbClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+} catch (initErr) {
+  document.getElementById('key-list-tbody').innerHTML =
+    `<tr class="list-state"><td colspan="3">⚠️ Supabase 초기화 오류: ${initErr.message}</td></tr>`;
+}
+
+// --------------------------------------------------
+// State
+// --------------------------------------------------
+let panelMode          = 'empty';   // 'empty' | 'view' | 'new' | 'edit'
+let selectedRowId      = null;
+let currentDetailRecord = null;
+let tokensCache        = [];
+let pendingDeleteId    = null;
+
+// Detail field IDs → DB column names
+const FIELD_MAP = {
+  'd-key-name':        'key_name',
+  'd-account':         'account',
+  'd-key-type':        'key_type',
+  'd-url':             'url',
+  'd-project-name':    'project_name',
+  'd-project-url':     'project_url',
+  'd-key-value':       'key_value',
+  'd-usage-period':    'usage_period',
+  'd-expiry-date':     'expiry_date',
+  'd-key-creation':    'key_creation_method',
+  'd-mcp-registration':'mcp_registration',
+  'd-description':     'description',
+  'd-renewal-date':    'renewal_date',
+};
+
+const ALL_FIELD_IDS    = Object.keys(FIELD_MAP);
+const AUTO_RESIZE_IDS  = ['d-key-value', 'd-key-creation', 'd-mcp-registration'];
+const REQUIRED_IDS     = ['d-key-name', 'd-account', 'd-url', 'd-key-value'];
+const URL_FIELD_IDS    = ['d-url', 'd-project-url'];
+
+// --------------------------------------------------
+// DOM refs
+// --------------------------------------------------
+const keyListTbody   = document.getElementById('key-list-tbody');
+const rightEmpty     = document.getElementById('right-empty');
+const detailForm     = document.getElementById('detail-form');
+const btnNew         = document.getElementById('btn-new');
+const btnDetailEdit  = document.getElementById('btn-detail-edit');
+const btnDetailDelete= document.getElementById('btn-detail-delete');
+const btnDetailCancel= document.getElementById('btn-detail-cancel');
+const btnDetailSave  = document.getElementById('btn-detail-save');
+const confirmOverlay = document.getElementById('confirm-overlay');
+const confirmCancel  = document.getElementById('confirm-cancel');
+const confirmOk      = document.getElementById('confirm-ok');
+const toastEl        = document.getElementById('toast');
+
+// --------------------------------------------------
+// Toast
+// --------------------------------------------------
+let toastTimer = null;
+function showToast(msg, type = '') {
+  toastEl.textContent = msg;
+  toastEl.className = 'show' + (type ? ' ' + type : '');
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => { toastEl.className = ''; }, 2800);
+}
+
+// --------------------------------------------------
+// Escape HTML
+// --------------------------------------------------
+function todayStr() {
+  return new Date().toISOString().slice(0, 10);
+}
+
+function escHtml(str) {
+  if (!str) return '';
+  return str.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+
+function truncate(str, max) {
+  if (!str) return '';
+  return str.length > max ? str.slice(0, max) + '…' : str;
+}
+
+// --------------------------------------------------
+// Auto-resize textareas
+// --------------------------------------------------
+function autoResizeTA(el) {
+  el.style.height = 'auto';
+  el.style.height = el.scrollHeight + 'px';
+}
+
+function autoResizeAll() {
+  AUTO_RESIZE_IDS.forEach(id => {
+    const el = document.getElementById(id);
+    if (el) autoResizeTA(el);
+  });
+}
+
+// --------------------------------------------------
+// Load & render key list
+// --------------------------------------------------
+async function loadTokens() {
+  if (!sbClient) return;
+
+  const isEditing = (panelMode === 'new' || panelMode === 'edit');
+
+  if (!isEditing) {
+    keyListTbody.innerHTML =
+      `<tr class="list-state"><td colspan="3"><span class="spinner" aria-hidden="true"></span>불러오는 중...</td></tr>`;
+  }
+
+  const timeout = new Promise((_, reject) =>
+    setTimeout(() => reject(new Error('요청 시간 초과. 네트워크를 확인하세요.')), 10000)
+  );
+
+  let data, error;
+  try {
+    ({ data, error } = await Promise.race([
+      sbClient.from('tokens').select('*'),
+      timeout
+    ]));
+  } catch (e) {
+    if (!isEditing) {
+      keyListTbody.innerHTML =
+        `<tr class="list-state"><td colspan="3">⚠️ ${escHtml(e.message)}</td></tr>`;
+    }
+    return;
+  }
+
+  if (error) {
+    if (!isEditing) {
+      keyListTbody.innerHTML =
+        `<tr class="list-state"><td colspan="3">⚠️ ${escHtml(error.message)}</td></tr>`;
+    }
+    return;
+  }
+
+  if (!data || data.length === 0) {
+    tokensCache = [];
+    if (!isEditing) {
+      setPanelMode('empty');
+      keyListTbody.innerHTML =
+        `<tr class="list-state"><td colspan="3">등록된 항목이 없습니다.</td></tr>`;
+    }
+    return;
+  }
+
+  data.sort((a, b) => {
+    const ac = (a.account  || '').localeCompare(b.account  || '', 'ko');
+    if (ac !== 0) return ac;
+    return (a.key_name || '').localeCompare(b.key_name || '', 'ko');
+  });
+
+  tokensCache = data;
+
+  // 선택된 항목이 더 이상 존재하지 않으면(삭제 등) 초기화
+  if (selectedRowId && !tokensCache.some(r => r.id === selectedRowId)) {
+    selectedRowId = null;
+    if (panelMode === 'view') setPanelMode('empty');
+  }
+
+  populateAccountFilterOptions();
+  applyFilters();
+}
+
+// --------------------------------------------------
+// Filters (계정 / KEY 유형)
+// --------------------------------------------------
+const filterAccountEl = document.getElementById('filter-account');
+const filterKeyTypeEl = document.getElementById('filter-key-type');
+
+function populateAccountFilterOptions() {
+  const current = filterAccountEl.value;
+  const accounts = Array.from(new Set(tokensCache.map(r => r.account).filter(Boolean)))
+    .sort((a, b) => a.localeCompare(b, 'ko'));
+
+  filterAccountEl.innerHTML = '<option value="">전체</option>' +
+    accounts.map(a => `<option value="${escHtml(a)}">${escHtml(a)}</option>`).join('');
+
+  filterAccountEl.value = accounts.includes(current) ? current : '';
+}
+
+function getFilteredTokens() {
+  const account = filterAccountEl.value;
+  const keyType = filterKeyTypeEl.value;
+  return tokensCache.filter(r =>
+    (!account || r.account === account) &&
+    (!keyType || r.key_type === keyType)
+  );
+}
+
+function applyFilters() {
+  const list = getFilteredTokens();
+
+  if (list.length === 0) {
+    keyListTbody.innerHTML =
+      `<tr class="list-state"><td colspan="3">검색 결과가 없습니다.</td></tr>`;
+    return;
+  }
+
+  keyListTbody.innerHTML = list.map(row => `
+    <tr data-id="${escHtml(row.id)}">
+      <td class="td-account">${escHtml(row.account)}</td>
+      <td class="td-key-name">${escHtml(row.key_name)}</td>
+      <td class="td-url-cell">${escHtml(row.url)}</td>
+    </tr>
+  `).join('');
+
+  if (selectedRowId) {
+    const row = keyListTbody.querySelector(`tr[data-id="${selectedRowId}"]`);
+    if (row) row.classList.add('selected');
+  }
+}
+
+filterAccountEl.addEventListener('change', applyFilters);
+filterKeyTypeEl.addEventListener('change', applyFilters);
+
+// --------------------------------------------------
+// Key list click delegation
+// --------------------------------------------------
+keyListTbody.addEventListener('click', (e) => {
+  const row = e.target.closest('tr[data-id]');
+  if (!row) return;
+
+  const id = row.dataset.id;
+  const record = tokensCache.find(r => r.id === id);
+  if (!record) return;
+
+  keyListTbody.querySelectorAll('tr.selected').forEach(r => r.classList.remove('selected'));
+  row.classList.add('selected');
+  selectedRowId = id;
+
+  showDetail(record);
+});
+
+// --------------------------------------------------
+// Panel mode management
+// --------------------------------------------------
+function setPanelMode(mode) {
+  panelMode = mode;
+
+  const isEmpty = (mode === 'empty');
+  rightEmpty.style.display  = isEmpty ? '' : 'none';
+  detailForm.style.display  = isEmpty ? 'none' : '';
+
+  btnDetailEdit.style.display   = (mode === 'view') ? '' : 'none';
+  btnDetailDelete.style.display = (mode === 'view') ? '' : 'none';
+  btnDetailCancel.style.display = (mode === 'new' || mode === 'edit') ? '' : 'none';
+  btnDetailSave.style.display   = (mode === 'new' || mode === 'edit') ? '' : 'none';
+
+  setDetailReadonly(mode === 'view');
+}
+
+function setDetailReadonly(readonly) {
+  ALL_FIELD_IDS.forEach(id => {
+    const el = document.getElementById(id);
+    if (!el) return;
+    if (el.hasAttribute('contenteditable')) {
+      el.setAttribute('contenteditable', readonly ? 'false' : 'true');
+    } else if (el.tagName === 'SELECT') {
+      el.disabled = readonly;
+    } else {
+      if (readonly) el.setAttribute('readonly', '');
+      else          el.removeAttribute('readonly');
+    }
+  });
+}
+
+// --------------------------------------------------
+// Show detail (view mode)
+// --------------------------------------------------
+function showDetail(rec) {
+  currentDetailRecord = rec;
+
+  document.getElementById('d-key-name').value        = rec.key_name            || '';
+  document.getElementById('d-account').value         = rec.account             || '';
+  document.getElementById('d-key-type').value        = rec.key_type            || '';
+  document.getElementById('d-url').value             = rec.url                 || '';
+  document.getElementById('d-project-name').value    = rec.project_name        || '';
+  document.getElementById('d-project-url').value     = rec.project_url         || '';
+  document.getElementById('d-key-value').value       = rec.key_value           || '';
+  document.getElementById('d-usage-period').value    = rec.usage_period        || '';
+  document.getElementById('d-expiry-date').value     = rec.expiry_date ? rec.expiry_date.slice(0, 10) : '';
+  document.getElementById('d-renewal-date').value    = rec.renewal_date ? rec.renewal_date.slice(0, 10) : '';
+  document.getElementById('d-key-creation').value    = rec.key_creation_method || '';
+  document.getElementById('d-mcp-registration').value= rec.mcp_registration    || '';
+  document.getElementById('d-description').innerHTML = rec.description         || '';
+
+  setPanelMode('view');
+  autoResizeAll();
+
+  // URL 필드: readonly 시 클릭으로 브라우저 열기
+  URL_FIELD_IDS.forEach(id => {
+    const el = document.getElementById(id);
+    el.onclick = () => {
+      if (el.readOnly && el.value) window.open(el.value, '_blank', 'noopener');
+    };
+  });
+}
+
+// --------------------------------------------------
+// Clear form
+// --------------------------------------------------
+function clearForm() {
+  ALL_FIELD_IDS.forEach(id => {
+    const el = document.getElementById(id);
+    if (!el) return;
+    if (el.hasAttribute('contenteditable')) el.innerHTML = '';
+    else el.value = '';
+  });
+  AUTO_RESIZE_IDS.forEach(id => {
+    const el = document.getElementById(id);
+    if (el) { el.style.height = 'auto'; }
+  });
+  // URL onclick 초기화
+  URL_FIELD_IDS.forEach(id => {
+    const el = document.getElementById(id);
+    if (el) el.onclick = null;
+  });
+}
+
+// --------------------------------------------------
+// Key 명칭 선택 팝업
+// --------------------------------------------------
+function openKeySelectPopup() {
+  document.getElementById('key-select-search').value = '';
+  renderKeySelectList('');
+  document.getElementById('key-select-overlay').classList.add('open');
+  setTimeout(() => document.getElementById('key-select-search').focus(), 80);
+}
+
+function closeKeySelectPopup() {
+  document.getElementById('key-select-overlay').classList.remove('open');
+}
+
+function renderKeySelectList(filter) {
+  const list = document.getElementById('key-select-list');
+  const q = filter.trim().toLowerCase();
+  const filtered = tokensCache.filter(r =>
+    !q ||
+    (r.key_name || '').toLowerCase().includes(q) ||
+    (r.account  || '').toLowerCase().includes(q)
+  );
+  if (filtered.length === 0) {
+    list.innerHTML = '<div class="key-select-empty">검색 결과가 없습니다.</div>';
+    return;
+  }
+  list.innerHTML = filtered.map(r => `
+    <div class="key-select-item" data-id="${escHtml(r.id)}">
+      <span class="key-select-item-name">${escHtml(r.key_name)}</span>
+      <span class="key-select-item-account">${escHtml(r.account)}</span>
+    </div>
+  `).join('');
+}
+
+function startNewFromTemplate(rec) {
+  closeKeySelectPopup();
+  clearForm();
+  document.getElementById('d-key-name').value         = rec.key_name            || '';
+  document.getElementById('d-account').value          = rec.account             || '';
+  document.getElementById('d-key-type').value         = rec.key_type            || '';
+  document.getElementById('d-url').value              = rec.url                 || '';
+  document.getElementById('d-project-name').value     = rec.project_name        || '';
+  document.getElementById('d-project-url').value      = rec.project_url         || '';
+  document.getElementById('d-key-value').value        = rec.key_value           || '';
+  document.getElementById('d-usage-period').value     = rec.usage_period        || '';
+  document.getElementById('d-expiry-date').value      = rec.expiry_date ? rec.expiry_date.slice(0, 10) : '';
+  document.getElementById('d-key-creation').value     = rec.key_creation_method || '';
+  document.getElementById('d-mcp-registration').value = rec.mcp_registration    || '';
+  document.getElementById('d-description').innerHTML  = rec.description         || '';
+  document.getElementById('d-renewal-date').value     = todayStr();
+  setPanelMode('new');
+  autoResizeAll();
+  document.getElementById('d-key-name').focus();
+}
+
+function startNewEmpty() {
+  closeKeySelectPopup();
+  clearForm();
+  if (tokensCache.length > 0) {
+    const latest = tokensCache.reduce((a, b) =>
+      new Date(a.inserted_at) > new Date(b.inserted_at) ? a : b
+    );
+    document.getElementById('d-account').value = latest.account || '';
+  }
+  document.getElementById('d-renewal-date').value = todayStr();
+  setPanelMode('new');
+  document.getElementById('d-key-name').focus();
+}
+
+// --------------------------------------------------
+// Enter new mode
+// --------------------------------------------------
+function enterNewMode() {
+  selectedRowId = null;
+  currentDetailRecord = null;
+  keyListTbody.querySelectorAll('tr.selected').forEach(r => r.classList.remove('selected'));
+  if (tokensCache.length > 0) {
+    openKeySelectPopup();
+  } else {
+    startNewEmpty();
+  }
+}
+
+// --------------------------------------------------
+// Enter edit mode
+// --------------------------------------------------
+function enterEditMode() {
+  setPanelMode('edit');
+
+  // 실시간 textarea 높이 조절
+  AUTO_RESIZE_IDS.forEach(id => {
+    const el = document.getElementById(id);
+    if (el) {
+      el.oninput = () => autoResizeTA(el);
+      autoResizeTA(el);
+    }
+  });
+
+  document.getElementById('d-key-name').focus();
+}
+
+// --------------------------------------------------
+// Cancel
+// --------------------------------------------------
+function cancelEdit() {
+  if (panelMode === 'new') {
+    if (tokensCache.length > 0) {
+      // 첫 번째 레코드 표시
+      const first = tokensCache[0];
+      selectedRowId = first.id;
+      keyListTbody.querySelectorAll('tr.selected').forEach(r => r.classList.remove('selected'));
+      const row = keyListTbody.querySelector(`tr[data-id="${first.id}"]`);
+      if (row) row.classList.add('selected');
+      showDetail(first);
+    } else {
+      setPanelMode('empty');
+    }
+  } else if (panelMode === 'edit') {
+    if (currentDetailRecord) showDetail(currentDetailRecord);
+    else setPanelMode('empty');
+  }
+
+  // textarea input 핸들러 제거
+  AUTO_RESIZE_IDS.forEach(id => {
+    const el = document.getElementById(id);
+    if (el) el.oninput = null;
+  });
+}
+
+// --------------------------------------------------
+// Save (insert or update)
+// --------------------------------------------------
+async function handleSave() {
+  const keyName  = document.getElementById('d-key-name').value.trim();
+  const account  = document.getElementById('d-account').value.trim();
+  const url      = document.getElementById('d-url').value.trim();
+  const keyValue = document.getElementById('d-key-value').value.trim();
+
+  if (!keyName)  { document.getElementById('d-key-name').focus();  showToast('Key 명칭은 필수입니다.', 'error'); return; }
+  if (!account)  { document.getElementById('d-account').focus();   showToast('사용 계정은 필수입니다.', 'error'); return; }
+  if (!url)      { document.getElementById('d-url').focus();       showToast('URL은 필수입니다.', 'error'); return; }
+
+  const payload = {
+    key_name:            keyName,
+    account,
+    key_type:            document.getElementById('d-key-type').value.trim()      || null,
+    url,
+    project_name:        document.getElementById('d-project-name').value.trim()      || null,
+    project_url:         document.getElementById('d-project-url').value.trim()       || null,
+    key_value:           keyValue,
+    usage_period:        document.getElementById('d-usage-period').value.trim()      || null,
+    expiry_date:         document.getElementById('d-expiry-date').value              || null,
+    renewal_date:        todayStr(),
+    key_creation_method: document.getElementById('d-key-creation').value.trim()      || null,
+    mcp_registration:    document.getElementById('d-mcp-registration').value.trim()  || null,
+    description:         (s => s === '' || s === '<br>' ? null : s)(document.getElementById('d-description').innerHTML.trim()),
+  };
+
+  btnDetailSave.disabled = true;
+  btnDetailSave.textContent = '저장 중...';
+
+  let error, insertedId;
+  if (panelMode === 'edit' && selectedRowId) {
+    ({ error } = await sbClient.from('tokens').update(payload).eq('id', selectedRowId));
+    insertedId = selectedRowId;
+  } else {
+    const res = await sbClient.from('tokens').insert([payload]).select('id').single();
+    error = res.error;
+    insertedId = res.data?.id;
+  }
+
+  btnDetailSave.disabled = false;
+  btnDetailSave.textContent = '저장';
+
+  if (error) { showToast('저장 실패: ' + error.message, 'error'); return; }
+
+  showToast('저장되었습니다.', 'success');
+
+  // textarea input 핸들러 제거
+  AUTO_RESIZE_IDS.forEach(id => {
+    const el = document.getElementById(id);
+    if (el) el.oninput = null;
+  });
+
+  selectedRowId = insertedId || null;
+  await loadTokens();
+
+  if (selectedRowId) {
+    const rec = tokensCache.find(r => r.id === selectedRowId);
+    if (rec) {
+      const row = keyListTbody.querySelector(`tr[data-id="${selectedRowId}"]`);
+      if (row) row.classList.add('selected');
+      showDetail(rec);
+    }
+  }
+}
+
+// --------------------------------------------------
+// Delete
+// --------------------------------------------------
+function openConfirmDelete() {
+  if (!selectedRowId) return;
+  pendingDeleteId = selectedRowId;
+  confirmOverlay.classList.add('open');
+  confirmOk.focus();
+}
+
+function closeConfirm() {
+  confirmOverlay.classList.remove('open');
+  pendingDeleteId = null;
+}
+
+confirmCancel.addEventListener('click', closeConfirm);
+confirmOverlay.addEventListener('click', e => { if (e.target === confirmOverlay) closeConfirm(); });
+
+confirmOk.addEventListener('click', async () => {
+  if (!pendingDeleteId) return;
+  confirmOk.disabled = true;
+  confirmOk.textContent = '삭제 중...';
+
+  const { error } = await sbClient.from('tokens').delete().eq('id', pendingDeleteId);
+
+  confirmOk.disabled = false;
+  confirmOk.textContent = '삭제';
+
+  if (error) { showToast('삭제 실패: ' + error.message, 'error'); closeConfirm(); return; }
+
+  showToast('삭제되었습니다.', 'success');
+  closeConfirm();
+
+  selectedRowId = null;
+  currentDetailRecord = null;
+  await loadTokens();
+
+  if (tokensCache.length > 0) {
+    const first = tokensCache[0];
+    selectedRowId = first.id;
+    const row = keyListTbody.querySelector(`tr[data-id="${first.id}"]`);
+    if (row) row.classList.add('selected');
+    showDetail(first);
+  } else {
+    setPanelMode('empty');
+  }
+});
+
+// --------------------------------------------------
+// Copy to clipboard
+// --------------------------------------------------
+document.querySelectorAll('.copy-btn').forEach(btn => {
+  btn.addEventListener('click', async () => {
+    const target = document.getElementById(btn.dataset.copyTarget);
+    if (!target) return;
+    const text = target.value || '';
+    if (!text.trim()) { showToast('복사할 내용이 없습니다.', 'error'); return; }
+    try {
+      await navigator.clipboard.writeText(text);
+      showToast('복사되었습니다.', 'success');
+    } catch (e) {
+      showToast('복사 실패: ' + e.message, 'error');
+    }
+  });
+});
+
+// --------------------------------------------------
+// Button wiring
+// --------------------------------------------------
+btnNew.addEventListener('click', enterNewMode);
+btnDetailEdit.addEventListener('click', enterEditMode);
+btnDetailDelete.addEventListener('click', openConfirmDelete);
+btnDetailCancel.addEventListener('click', cancelEdit);
+btnDetailSave.addEventListener('click', handleSave);
+
+// Key 선택 팝업 이벤트
+document.getElementById('key-select-search').addEventListener('input', e => {
+  renderKeySelectList(e.target.value);
+});
+
+document.getElementById('key-select-list').addEventListener('click', e => {
+  const item = e.target.closest('.key-select-item[data-id]');
+  if (!item) return;
+  const rec = tokensCache.find(r => r.id === item.dataset.id);
+  if (rec) startNewFromTemplate(rec);
+});
+
+document.getElementById('key-select-skip').addEventListener('click', startNewEmpty);
+document.getElementById('key-select-close').addEventListener('click', startNewEmpty);
+
+// Escape key
+document.addEventListener('keydown', e => {
+  if (e.key === 'Escape') {
+    if (document.getElementById('key-select-overlay').classList.contains('open')) startNewEmpty();
+    else if (confirmOverlay.classList.contains('open')) closeConfirm();
+    else if (panelMode === 'new' || panelMode === 'edit') cancelEdit();
+  }
+});
+
+// --------------------------------------------------
+// Tab switching
+// --------------------------------------------------
+document.querySelectorAll('.tab-btn').forEach(btn => {
+  btn.addEventListener('click', () => {
+    const target = btn.dataset.tab;
+    document.querySelectorAll('.tab-btn').forEach(b => {
+      b.classList.remove('active');
+      b.setAttribute('aria-selected', 'false');
+    });
+    document.querySelectorAll('.tab-panel').forEach(p => p.classList.remove('active'));
+    btn.classList.add('active');
+    btn.setAttribute('aria-selected', 'true');
+    document.getElementById('panel-' + target).classList.add('active');
+  });
+});
+
+// loadTokens는 auth 모듈의 onLogin 콜백에서 호출됨
+</script>
+
+<!-- Auth 모듈 초기화 -->
+<script src="auth/auth-ui.js"></script>
+<script src="auth/auth.js"></script>
+<script>
+  (async () => {
+    const { signOut } = await window.initAuth({
+      supabaseUrl: SUPABASE_URL,
+      supabaseKey: SUPABASE_ANON_KEY,
+      onLogin: () => {
+        const app = document.getElementById('app');
+        if (app) { app.style.display = 'flex'; app.style.flexDirection = 'column'; }
+        if (typeof loadTokens === 'function') loadTokens();
+      },
+      onLogout: () => {
+        const app = document.getElementById('app');
+        if (app) app.style.display = 'none';
+      },
+    });
+
+    const btnLogout = document.getElementById('btn-logout');
+    if (btnLogout) {
+      btnLogout.addEventListener('click', async () => {
+        btnLogout.disabled = true;
+        btnLogout.textContent = '로그아웃 중...';
+        await signOut();
+        btnLogout.disabled = false;
+        btnLogout.textContent = '⏻ 로그아웃';
+      });
+    }
+  })();
+</script>
+
+</body>
+</html>

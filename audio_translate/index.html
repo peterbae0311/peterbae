@@ -1,0 +1,1810 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>AudioAI — 오디오 텍스트 변환</title>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --primary:       #6366f1;
+      --primary-dark:  #4f46e5;
+      --primary-light: #eef2ff;
+      --primary-ring:  rgba(99,102,241,.25);
+      --success:       #10b981;
+      --success-dark:  #059669;
+      --success-light: #ecfdf5;
+      --danger:        #ef4444;
+      --danger-light:  #fef2f2;
+      --warning:       #f59e0b;
+      --warning-light: #fffbeb;
+      --bg:            #f1f5f9;
+      --surface:       #ffffff;
+      --surface-2:     #f8fafc;
+      --border:        #e2e8f0;
+      --border-2:      #cbd5e1;
+      --text:          #0f172a;
+      --text-2:        #475569;
+      --text-3:        #94a3b8;
+      --shadow-xs: 0 1px 2px rgba(0,0,0,.06);
+      --shadow-sm: 0 1px 3px rgba(0,0,0,.08),0 1px 2px rgba(0,0,0,.06);
+      --shadow:    0 4px 6px -1px rgba(0,0,0,.08),0 2px 4px -2px rgba(0,0,0,.06);
+      --shadow-lg: 0 10px 15px -3px rgba(0,0,0,.08),0 4px 6px -4px rgba(0,0,0,.05);
+      --shadow-xl: 0 20px 25px -5px rgba(0,0,0,.10),0 8px 10px -6px rgba(0,0,0,.06);
+      --r:    12px;
+      --r-sm:  8px;
+      --r-xs:  6px;
+      --r-full: 9999px;
+    }
+    *,*::before,*::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      -webkit-font-smoothing: antialiased;
+      font-size: 14px;
+    }
+
+    /* ── HEADER ─────────────────────────── */
+    .header {
+      height: 60px;
+      background: var(--surface);
+      border-bottom: 1px solid var(--border);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 0 20px;
+      position: sticky; top: 0; z-index: 100;
+      box-shadow: var(--shadow-xs);
+    }
+    .header-brand { display:flex; align-items:center; gap:10px; }
+    .brand-icon {
+      width:36px; height:36px;
+      background: linear-gradient(135deg,#6366f1 0%,#8b5cf6 100%);
+      border-radius:10px;
+      display:flex; align-items:center; justify-content:center;
+      font-size:18px; box-shadow: 0 2px 8px rgba(99,102,241,.35);
+    }
+    .brand-name  { font-size:17px; font-weight:800; letter-spacing:-0.4px; color:var(--text); }
+    .brand-sub   { font-size:11px; color:var(--text-3); font-weight:400; margin-top:1px; }
+    .header-actions { display:flex; gap:8px; align-items:center; }
+
+    /* ── LAYOUT ─────────────────────────── */
+    .workspace {
+      flex:1;
+      display:flex;
+      padding:16px;
+      gap:16px;
+      height: calc(100vh - 60px);
+      overflow: hidden;
+    }
+    .panel-left  { width:30%; min-width:260px; display:flex; flex-direction:column; overflow:hidden; background:var(--surface); border-radius:var(--r); box-shadow:var(--shadow); }
+    .panel-right { flex:1; display:flex; flex-direction:column; overflow:hidden; }
+
+    /* ── PANEL HEADER ────────────────────── */
+    .ph {
+      padding:16px 16px 14px;
+      border-bottom:1px solid var(--border);
+      display:flex; align-items:center; justify-content:space-between;
+      flex-shrink:0;
+    }
+    .ph-title  { font-size:14px; font-weight:700; color:var(--text); }
+    .ph-count  { font-size:11px; color:var(--text-3); margin-top:2px; font-weight:500; }
+
+    /* ── MODEL STATUS BAR ────────────────── */
+    .model-bar {
+      padding:8px 16px;
+      background:linear-gradient(90deg,var(--primary-light),#f5f3ff);
+      border-bottom:1px solid #c7d2fe;
+      display:none; align-items:center; gap:8px;
+      font-size:12px; color:var(--primary); font-weight:500;
+      flex-shrink:0;
+    }
+    .model-bar.on { display:flex; }
+    .spinner {
+      width:14px; height:14px; border-radius:50%;
+      border:2px solid #c7d2fe; border-top-color:var(--primary);
+      animation:spin .7s linear infinite; flex-shrink:0;
+    }
+    .spinner-lg {
+      width:28px; height:28px; border-radius:50%;
+      border:3px solid var(--border); border-top-color:var(--primary);
+      animation:spin .8s linear infinite;
+    }
+
+    /* ── FILE LIST ───────────────────────── */
+    .file-list {
+      flex:1; overflow-y:auto; padding:10px;
+    }
+    .file-list::-webkit-scrollbar { width:5px; }
+    .file-list::-webkit-scrollbar-thumb { background:var(--border); border-radius:3px; }
+
+    .file-empty {
+      text-align:center; padding:36px 16px; color:var(--text-3);
+    }
+    .file-empty-icon { font-size:36px; margin-bottom:8px; opacity:.5; }
+    .file-empty-text { font-size:13px; font-weight:500; }
+    .file-empty-hint { font-size:11px; margin-top:4px; }
+
+    .file-card {
+      border:1.5px solid var(--border);
+      border-radius:var(--r-sm);
+      padding:12px 14px;
+      margin-bottom:8px;
+      cursor:pointer;
+      transition:all .18s;
+      position:relative;
+      background:var(--surface);
+    }
+    .file-card:last-child { margin-bottom:0; }
+    .file-card:hover { border-color:#a5b4fc; box-shadow:0 0 0 3px var(--primary-ring); }
+    .file-card.active { border-color:var(--primary); background:#fdfdff; box-shadow:0 0 0 3px var(--primary-ring); }
+    .file-card.status-done  { border-color:#6ee7b7; }
+    .file-card.status-processing { border-color:var(--warning); background:var(--warning-light); }
+    .file-card.status-error { border-color:#fca5a5; background:var(--danger-light); }
+
+    .fc-top { display:flex; align-items:center; gap:8px; margin-bottom:5px; }
+    .fc-name { font-size:13px; font-weight:600; color:var(--text); flex:1; min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+    .fc-path { font-size:11px; color:var(--text-3); margin-bottom:9px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; font-family:monospace; }
+    .fc-actions { display:flex; align-items:center; gap:6px; }
+
+    /* ── BADGES ──────────────────────────── */
+    .badge {
+      font-size:10px; font-weight:700; padding:2px 8px;
+      border-radius:var(--r-full); white-space:nowrap; flex-shrink:0;
+    }
+    .badge-idle    { background:#f1f5f9; color:var(--text-3); }
+    .badge-busy    { background:var(--warning-light); color:#92400e; }
+    .badge-ok      { background:var(--success-light); color:#065f46; }
+    .badge-err     { background:var(--danger-light); color:#991b1b; }
+
+    /* ── BUTTONS ─────────────────────────── */
+    .btn {
+      display:inline-flex; align-items:center; gap:5px;
+      padding:7px 14px; border-radius:var(--r-xs);
+      font-size:13px; font-weight:500; font-family:inherit;
+      border:none; cursor:pointer; transition:all .15s; text-decoration:none;
+    }
+    .btn:active:not(:disabled) { transform:scale(.97); }
+    .btn:disabled { opacity:.55; cursor:not-allowed; transform:none!important; }
+
+    .btn-primary    { background:var(--primary); color:#fff; }
+    .btn-primary:hover:not(:disabled)  { background:var(--primary-dark); }
+    .btn-success    { background:var(--success); color:#fff; }
+    .btn-success:hover:not(:disabled)  { background:var(--success-dark); }
+    .btn-ghost      { background:transparent; color:var(--text-2); border:1.5px solid var(--border); }
+    .btn-ghost:hover:not(:disabled)    { background:var(--surface-2); }
+    .btn-danger     { background:var(--danger); color:#fff; }
+    .btn-danger:hover:not(:disabled)   { background:#dc2626; }
+    .btn-danger-ghost { background:transparent; color:var(--danger); border:1.5px solid #fca5a5; }
+    .btn-danger-ghost:hover:not(:disabled) { background:var(--danger-light); }
+    .btn-sm  { padding:5px 10px; font-size:12px; }
+    .btn-xs  { padding:4px 8px;  font-size:11px; }
+
+    .icon-btn {
+      width:30px; height:30px; padding:0;
+      display:inline-flex; align-items:center; justify-content:center;
+      border-radius:var(--r-xs); border:1.5px solid var(--border);
+      background:transparent; color:var(--text-2);
+      cursor:pointer; transition:all .15s; font-size:13px;
+    }
+    .icon-btn:hover { background:var(--surface-2); }
+    .icon-btn.del:hover { background:var(--danger-light); color:var(--danger); border-color:#fca5a5; }
+    .icon-btn:disabled { opacity:.45; cursor:not-allowed; }
+
+    .btn-settings {
+      width:36px; height:36px; padding:0;
+      display:flex; align-items:center; justify-content:center;
+      border-radius:var(--r-sm); border:1.5px solid var(--border);
+      background:transparent; color:var(--text-2);
+      cursor:pointer; transition:all .15s; font-size:16px;
+    }
+    .btn-settings:hover { background:var(--surface-2); }
+
+    /* ── RESULTS VIEW (fills panel-right) ── */
+    #resultsView {
+      flex:1; display:flex; flex-direction:column;
+      gap:10px; min-height:0;
+      padding-right:2px; overflow:hidden;
+    }
+
+    /* ── RESULT CARDS ────────────────────── */
+    .result-card {
+      background:var(--surface); border-radius:var(--r);
+      box-shadow:var(--shadow); overflow:hidden;
+      border-top:3px solid transparent;
+      display:flex; flex-direction:column; min-height:0;
+    }
+
+    /* Section flex proportions: 40% / 30% / 20% */
+    .result-card.card-blue   { flex:4 1 0; }
+    .result-card.card-violet { flex:3 1 0; }
+    .result-card.card-green  { flex:2 1 0; }
+
+    /* Section accent colors */
+    .result-card.card-blue   { border-top-color:#3b82f6; }
+    .result-card.card-violet { border-top-color:#8b5cf6; }
+    .result-card.card-green  { border-top-color:#10b981; }
+
+    .rc-header {
+      padding:10px 16px;
+      border-bottom:1px solid var(--border);
+      display:flex; align-items:center; justify-content:space-between;
+      flex-shrink:0;
+    }
+
+    /* Header gradient backgrounds per section */
+    .card-blue   .rc-header { background:linear-gradient(135deg, #eff6ff 0%, #eef2ff 100%); }
+    .card-violet .rc-header { background:linear-gradient(135deg, #f5f3ff 0%, #faf5ff 100%); }
+    .card-green  .rc-header { background:linear-gradient(135deg, #f0fdf4 0%, #ecfdf5 100%); }
+
+    .rc-title {
+      font-size:13px; font-weight:700; color:var(--text);
+      display:flex; align-items:center; gap:8px;
+    }
+    .rc-actions { display:flex; align-items:center; gap:6px; }
+
+    .rc-icon {
+      width:26px; height:26px; border-radius:var(--r-xs);
+      display:flex; align-items:center; justify-content:center; font-size:12px;
+      flex-shrink:0;
+    }
+    .ic-blue   { background:#dbeafe; color:#1e40af; }
+    .ic-violet { background:#ede9fe; color:#5b21b6; }
+    .ic-green  { background:#d1fae5; color:#065f46; }
+
+    /* Step number badge */
+    .rc-step {
+      font-size:10px; font-weight:800; letter-spacing:0.5px;
+      padding:2px 7px; border-radius:var(--r-full);
+      line-height:1.4; flex-shrink:0;
+    }
+    .card-blue   .rc-step { background:#dbeafe; color:#1d4ed8; border:1px solid #bfdbfe; }
+    .card-violet .rc-step { background:#ede9fe; color:#6d28d9; border:1px solid #ddd6fe; }
+    .card-green  .rc-step { background:#d1fae5; color:#065f46; border:1px solid #a7f3d0; }
+
+    /* rc-body scrolls internally */
+    .rc-body {
+      padding:14px 16px;
+      flex:1; overflow-y:auto; min-height:0;
+    }
+    .rc-body::-webkit-scrollbar { width:4px; }
+    .rc-body::-webkit-scrollbar-thumb { background:var(--border); border-radius:2px; }
+
+    .result-text {
+      font-size:13.5px; line-height:2; color:var(--text);
+      white-space:pre-wrap; word-break:break-word;
+    }
+    .result-text br + br { display:block; content:''; margin-top:4px; }
+    .result-placeholder {
+      font-size:13px; color:var(--text-3); font-style:italic;
+      text-align:center; padding:16px 0;
+    }
+    .result-meta {
+      margin-top:8px; padding-top:8px; border-top:1px solid var(--border);
+      display:flex; justify-content:space-between; align-items:center;
+      flex-wrap:wrap; gap:6px; flex-shrink:0;
+    }
+    .meta-model { font-size:11px; color:var(--text-3); }
+    .meta-chars { font-size:11px; color:var(--text-3); font-weight:500; }
+
+    /* rc-body in edit mode */
+    .rc-body.editing {
+      display:flex; flex-direction:column; overflow:hidden;
+    }
+
+    /* Inline edit textarea — fills remaining height via flex:1 */
+    .edit-textarea {
+      flex:1; min-height:0; width:100%;
+      padding:10px 12px;
+      border:1.5px solid var(--primary); border-radius:var(--r-xs);
+      font-size:13.5px; line-height:1.8; font-family:inherit; color:var(--text);
+      background:var(--surface); resize:none; outline:none;
+      box-shadow:0 0 0 3px var(--primary-ring);
+    }
+    .edit-footer {
+      display:flex; gap:6px; justify-content:flex-end;
+      padding-top:8px; flex-shrink:0;
+    }
+
+    /* Model name in file list */
+    .fc-model-info {
+      font-size:10px; color:var(--primary); margin-bottom:8px;
+      display:flex; align-items:center; gap:4px; font-weight:500;
+    }
+
+    /* ── DOWNLOAD ROW (4개 1행, 스크롤 없음) ── */
+    .dl-grid {
+      display:flex; gap:8px; height:100%;
+    }
+    .dl-card {
+      flex:1;
+      border:1.5px solid var(--border); border-radius:var(--r-sm);
+      padding:0 10px;
+      cursor:pointer; transition:all .18s;
+      display:flex; flex-direction:row;
+      align-items:center; justify-content:center; gap:8px;
+      background:transparent; font-family:inherit;
+      white-space:nowrap; min-width:0;
+    }
+    .dl-card:hover { border-color:var(--primary); background:var(--primary-light); }
+    .dl-card:active { transform:scale(.97); }
+    .dl-card:disabled { opacity:.45; cursor:not-allowed; transform:none; }
+    .dl-icon  { font-size:20px; flex-shrink:0; }
+    .dl-label { font-size:12px; font-weight:600; color:var(--text); }
+    .dl-desc  { display:none; } /* 1행 레이아웃에선 설명 숨김 */
+
+    /* 다운로드 영역 rc-body: 스크롤 없이 고정 */
+    .card-green .rc-body {
+      overflow:hidden;
+      display:flex; flex-direction:column; justify-content:center;
+    }
+
+    /* ── EMPTY STATE ─────────────────────── */
+    .empty-state {
+      flex:1; display:flex; flex-direction:column;
+      align-items:center; justify-content:center; gap:10px;
+      background:var(--surface); border-radius:var(--r); box-shadow:var(--shadow);
+      padding:40px; text-align:center; min-height:0;
+    }
+    .es-icon  { font-size:48px; opacity:.25; }
+    .es-title { font-size:15px; font-weight:700; color:var(--text-2); }
+    .es-desc  { font-size:12px; color:var(--text-3); max-width:260px; line-height:1.6; }
+
+    /* ── MODAL ───────────────────────────── */
+    .overlay {
+      position:fixed; inset:0;
+      background:rgba(15,23,42,.55);
+      display:flex; align-items:center; justify-content:center;
+      z-index:500; padding:16px;
+      backdrop-filter:blur(4px);
+      animation:fadeIn .15s;
+    }
+    .modal {
+      background:var(--surface); border-radius:var(--r);
+      box-shadow:var(--shadow-xl);
+      width:100%; max-width:480px;
+      animation:slideUp .2s cubic-bezier(.16,1,.3,1);
+    }
+    .modal-lg { max-width:560px; }
+    .modal-header {
+      padding:20px 22px 0;
+      display:flex; align-items:center; justify-content:space-between;
+    }
+    .modal-title { font-size:16px; font-weight:700; color:var(--text); }
+    .modal-close {
+      width:32px; height:32px; border-radius:var(--r-xs);
+      border:none; background:transparent; color:var(--text-3);
+      cursor:pointer; display:flex; align-items:center; justify-content:center;
+      font-size:16px; transition:all .15s;
+    }
+    .modal-close:hover { background:var(--surface-2); color:var(--text); }
+    .modal-body   { padding:18px 22px; }
+    .modal-footer { padding:0 22px 20px; display:flex; gap:8px; justify-content:flex-end; }
+
+    /* ── FORM ────────────────────────────── */
+    .form-group   { margin-bottom:14px; }
+    .form-label   { display:block; font-size:12px; font-weight:600; color:var(--text); margin-bottom:5px; }
+    .form-label em { color:var(--danger); font-style:normal; margin-left:2px; }
+    .form-input {
+      width:100%; padding:9px 12px;
+      border:1.5px solid var(--border); border-radius:var(--r-xs);
+      font-size:13.5px; font-family:inherit; color:var(--text);
+      background:var(--surface); outline:none; transition:border-color .15s;
+    }
+    .form-input:focus { border-color:var(--primary); box-shadow:0 0 0 3px var(--primary-ring); }
+    .form-hint { font-size:11px; color:var(--text-3); margin-top:3px; }
+
+    .upload-zone {
+      border:2px dashed var(--border-2); border-radius:var(--r-sm);
+      padding:24px 16px; text-align:center;
+      cursor:pointer; transition:all .2s; position:relative;
+      overflow:hidden;
+    }
+    .upload-zone:hover,.upload-zone.drag { border-color:var(--primary); background:var(--primary-light); }
+    .upload-zone input[type="file"] { position:absolute; inset:0; opacity:0; cursor:pointer; width:100%; height:100%; }
+    .uz-icon { font-size:28px; margin-bottom:6px; }
+    .uz-text { font-size:13px; font-weight:500; color:var(--text-2); }
+    .uz-hint { font-size:11px; color:var(--text-3); margin-top:3px; }
+    .uz-file { font-size:12px; color:var(--primary); font-weight:600; margin-top:6px; }
+
+    /* ── ALERT BOX ───────────────────────── */
+    .alert {
+      padding:10px 12px; border-radius:var(--r-xs);
+      font-size:12px; line-height:1.55;
+      margin-bottom:14px;
+    }
+    .alert-warn { background:var(--warning-light); border:1px solid #fcd34d; color:#92400e; }
+    .alert-info { background:var(--primary-light);  border:1px solid #a5b4fc; color:#3730a3; }
+
+    /* ── MODELS PANEL (inside left panel) ── */
+    .models-section {
+      border-top:1px solid var(--border);
+      padding:10px 12px 12px;
+      flex-shrink:0;
+    }
+    .ms-header {
+      font-size:11px; font-weight:600; color:var(--text-3);
+      text-transform:uppercase; letter-spacing:.5px;
+      margin-bottom:6px; display:flex; align-items:center; justify-content:space-between;
+    }
+    .ms-count { font-size:11px; color:var(--primary); font-weight:700; }
+    .ms-pills { display:flex; flex-wrap:wrap; gap:4px; max-height:120px; overflow-y:auto; padding-right:2px; }
+    .ms-pills::-webkit-scrollbar { width:4px; }
+    .ms-pills::-webkit-scrollbar-track { background:transparent; }
+    .ms-pills::-webkit-scrollbar-thumb { background:#c7d2fe; border-radius:4px; }
+    .ms-pill {
+      font-size:10px; padding:2px 7px;
+      border-radius:var(--r-full);
+      background:var(--primary-light); color:var(--primary);
+      font-weight:500; border:1px solid #c7d2fe;
+    }
+    .ms-pill.used { background:#d1fae5; color:#065f46; border-color:#6ee7b7; }
+    .ms-more { font-size:10px; color:var(--text-3); align-self:center; }
+
+    /* ── TOAST ───────────────────────────── */
+    .toast-wrap {
+      position:fixed; bottom:18px; right:18px;
+      display:flex; flex-direction:column; gap:6px; z-index:9999;
+    }
+    .toast {
+      padding:10px 15px; border-radius:var(--r-sm);
+      font-size:13px; font-weight:500;
+      box-shadow:var(--shadow-lg);
+      display:flex; align-items:center; gap:8px;
+      animation:toastIn .25s cubic-bezier(.16,1,.3,1);
+      max-width:320px; color:#fff;
+    }
+    .toast-ok   { background:#065f46; }
+    .toast-err  { background:#991b1b; }
+    .toast-info { background:var(--primary-dark); }
+
+    /* ── ANIMATIONS ──────────────────────── */
+    @keyframes spin    { to { transform:rotate(360deg); } }
+    @keyframes fadeIn  { from { opacity:0; } to { opacity:1; } }
+    @keyframes slideUp { from { opacity:0; transform:translateY(10px) scale(.97); } to { opacity:1; transform:none; } }
+    @keyframes toastIn { from { opacity:0; transform:translateX(16px); } to { opacity:1; transform:none; } }
+    @keyframes pulse   { 0%,100% { opacity:1; } 50% { opacity:.4; } }
+
+    .dots span { display:inline-block; width:4px; height:4px; border-radius:50%; background:currentColor; animation:dot .9s infinite; margin:0 1px; }
+    .dots span:nth-child(2) { animation-delay:.15s; }
+    .dots span:nth-child(3) { animation-delay:.3s; }
+    @keyframes dot { 0%,60%,100% { transform:translateY(0); } 30% { transform:translateY(-4px); } }
+
+    .processing-anim { animation:pulse 1.4s infinite; }
+  </style>
+</head>
+<body>
+
+<!-- ══ HEADER ══════════════════════════════════════════════════ -->
+<header class="header">
+  <div class="header-brand">
+    <div class="brand-icon">🎙</div>
+    <div>
+      <div class="brand-name">AudioAI</div>
+      <div class="brand-sub">오디오 텍스트 변환 &amp; 요약</div>
+    </div>
+  </div>
+  <div class="header-actions">
+    <button class="btn-settings" onclick="openSettings()" title="API 키 설정">⚙️</button>
+  </div>
+</header>
+
+<!-- ══ WORKSPACE ════════════════════════════════════════════════ -->
+<div class="workspace">
+
+  <!-- ── LEFT PANEL ─────────────────────── -->
+  <div class="panel-left">
+    <div class="ph">
+      <div>
+        <div class="ph-title">오디오 파일 관리</div>
+        <div class="ph-count" id="fileCount">0개 파일</div>
+      </div>
+      <button class="btn btn-primary btn-sm" onclick="openAdd()">＋ 추가</button>
+    </div>
+
+    <!-- model status -->
+    <div class="model-bar" id="modelBar">
+      <div class="spinner"></div>
+      <span id="modelBarText">…</span>
+    </div>
+
+    <!-- file list -->
+    <div class="file-list" id="fileList"></div>
+
+    <!-- free-models summary -->
+    <div class="models-section" id="modelsSection" style="display:none">
+      <div class="ms-header">
+        <span>무료 AI 모델</span>
+        <span class="ms-count" id="msFreeCount">0개</span>
+      </div>
+      <div class="ms-pills" id="msPills"></div>
+    </div>
+  </div>
+
+  <!-- ── RIGHT PANEL ────────────────────── -->
+  <div class="panel-right" id="panelRight">
+
+    <!-- empty state -->
+    <div class="empty-state" id="emptyState">
+      <div class="es-icon">🎧</div>
+      <div class="es-title">파일을 선택하거나 추가해 주세요</div>
+      <div class="es-desc">오디오 파일을 등록하고 <strong>변환 요청</strong>을 눌러<br>AI 텍스트 변환을 시작하세요.</div>
+    </div>
+
+    <!-- results view (hidden until record selected) -->
+    <div id="resultsView" style="display:none">
+
+      <!-- Section 1: 텍스트 변환 (flex:4 = 40%) -->
+      <div class="result-card card-blue">
+        <div class="rc-header">
+          <div class="rc-title">
+            <span class="rc-step">01</span>
+            <div class="rc-icon ic-blue">📄</div>
+            텍스트 변환
+          </div>
+          <div class="rc-actions">
+            <button class="btn btn-ghost btn-xs" id="btnCopyContent" onclick="copyEl('contentText')" style="display:none">📋 복사</button>
+            <button class="btn btn-ghost btn-xs" id="btnEditContent" onclick="editSection('content')" style="display:none">✏️ 수정</button>
+          </div>
+        </div>
+        <div class="rc-body" id="rcBodyContent">
+          <div id="contentText"><div class="result-placeholder">변환된 텍스트가 여기에 표시됩니다.</div></div>
+          <div class="result-meta" id="contentMeta" style="display:none">
+            <div class="meta-model" id="contentModel"></div>
+            <div class="meta-chars" id="contentChars"></div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Section 2: 내용 요약 (flex:3 = 30%) -->
+      <div class="result-card card-violet">
+        <div class="rc-header">
+          <div class="rc-title">
+            <span class="rc-step">02</span>
+            <div class="rc-icon ic-violet">✨</div>
+            내용 요약
+          </div>
+          <div class="rc-actions">
+            <button class="btn btn-ghost btn-xs" id="btnCopySummary" onclick="copyEl('summaryText')" style="display:none">📋 복사</button>
+            <button class="btn btn-ghost btn-xs" id="btnEditSummary" onclick="editSection('summary')" style="display:none">✏️ 수정</button>
+          </div>
+        </div>
+        <div class="rc-body" id="rcBodySummary">
+          <div id="summaryText"><div class="result-placeholder">요약된 내용이 여기에 표시됩니다.</div></div>
+          <div class="result-meta" id="summaryMeta" style="display:none">
+            <div class="meta-model" id="summaryModel"></div>
+            <div class="meta-chars" id="summaryChars"></div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Section 3: 파일 다운로드 (flex:2 = 20%) -->
+      <div class="result-card card-green">
+        <div class="rc-header">
+          <div class="rc-title">
+            <span class="rc-step">03</span>
+            <div class="rc-icon ic-green">⬇️</div>
+            파일 다운로드
+          </div>
+        </div>
+        <div class="rc-body">
+          <div class="dl-grid">
+            <button class="dl-card" onclick="dlFile('full')" title="변환 + 요약 통합 TXT">
+              <div class="dl-icon">📄</div>
+              <div class="dl-label">전체 TXT</div>
+            </button>
+            <button class="dl-card" onclick="dlFile('content')" title="텍스트 변환 내용만">
+              <div class="dl-icon">📝</div>
+              <div class="dl-label">변환 TXT</div>
+            </button>
+            <button class="dl-card" onclick="dlFile('summary')" title="요약문만">
+              <div class="dl-icon">📋</div>
+              <div class="dl-label">요약 TXT</div>
+            </button>
+            <button class="dl-card" onclick="dlFile('md')" title="구조화된 마크다운 파일">
+              <div class="dl-icon">🗂️</div>
+              <div class="dl-label">마크다운 MD</div>
+            </button>
+          </div>
+        </div>
+      </div>
+
+    </div><!-- /resultsView -->
+  </div><!-- /panel-right -->
+</div><!-- /workspace -->
+
+<!-- ══ MODALS ═══════════════════════════════════════════════════ -->
+
+<!-- Add / Edit -->
+<div class="overlay" id="modalAdd" style="display:none">
+  <div class="modal">
+    <div class="modal-header">
+      <div class="modal-title" id="modalAddTitle">오디오 파일 추가</div>
+      <button class="modal-close" onclick="closeAdd()">✕</button>
+    </div>
+    <div class="modal-body">
+      <div class="form-group">
+        <label class="form-label">명칭 <em>*</em></label>
+        <input class="form-input" id="iName" type="text" maxlength="100" placeholder="파일 명칭을 입력해 주세요">
+        <div class="form-hint">최대 100자</div>
+      </div>
+      <div class="form-group">
+        <label class="form-label">오디오 파일 <em id="fileReq">*</em></label>
+        <div class="upload-zone" id="uploadZone">
+          <input type="file" id="iFile" accept="audio/*,.mp3,.wav,.m4a,.ogg,.flac,.aac,.wma,.opus" onchange="onFileChg(event)">
+          <div class="uz-icon">🎵</div>
+          <div class="uz-text">클릭하거나 파일을 드래그하세요</div>
+          <div class="uz-hint">MP3, WAV, M4A, OGG, FLAC, AAC 지원</div>
+          <div class="uz-file" id="uzFileName" style="display:none"></div>
+        </div>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-ghost" onclick="closeAdd()">취소</button>
+      <button class="btn btn-primary" id="btnSave" onclick="saveRecord()">저장</button>
+    </div>
+  </div>
+</div>
+
+<!-- Delete confirm -->
+<div class="overlay" id="modalDel" style="display:none">
+  <div class="modal" style="max-width:380px">
+    <div class="modal-header">
+      <div class="modal-title">삭제 확인</div>
+      <button class="modal-close" onclick="closeDel()">✕</button>
+    </div>
+    <div class="modal-body">
+      <p style="font-size:13.5px; color:var(--text-2); line-height:1.65">
+        <strong id="delName"></strong>을(를) 삭제하시겠습니까?<br>
+        <span style="color:var(--danger); font-size:12px">삭제된 데이터는 복구할 수 없습니다.</span>
+      </p>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-ghost" onclick="closeDel()">취소</button>
+      <button class="btn btn-danger" onclick="doDelete()">삭제</button>
+    </div>
+  </div>
+</div>
+
+<!-- Settings -->
+<div class="overlay" id="modalSettings" style="display:none">
+  <div class="modal">
+    <div class="modal-header">
+      <div class="modal-title">⚙️ API 키 설정</div>
+      <button class="modal-close" onclick="closeSettings()">✕</button>
+    </div>
+    <div class="modal-body">
+      <div class="alert alert-warn">
+        ⚠️ API 키는 브라우저 로컬 스토리지에 저장됩니다. 공용 PC 사용 시 주의하세요.
+      </div>
+      <div class="form-group">
+        <label class="form-label">OpenRouter API Key</label>
+        <input class="form-input" id="sOrKey" type="password" placeholder="sk-or-v1-…">
+        <div class="form-hint">① 무료 AI 모델 텍스트 변환 · 요약 (1순위)</div>
+      </div>
+      <div class="form-group">
+        <label class="form-label">Hugging Face Token</label>
+        <input class="form-input" id="sHfKey" type="password" placeholder="hf_…">
+        <div class="form-hint">② Whisper · LLM 무료 모델 (2순위 폴백)</div>
+      </div>
+      <div class="form-group">
+        <label class="form-label">Groq API Key</label>
+        <input class="form-input" id="sGroqKey" type="password" placeholder="gsk_…">
+        <div class="form-hint">③ Whisper · llama-3.3-70b (3순위 폴백)</div>
+      </div>
+      <div class="form-group">
+        <label class="form-label">Gladia API Key</label>
+        <input class="form-input" id="sGladiaKey" type="password" placeholder="your-gladia-api-key">
+        <div class="form-hint">④ Whisper STT 10시간/월 무료 · 신용카드 불필요 — <a href="https://app.gladia.io/auth/signin" target="_blank" style="color:var(--primary)">발급받기</a></div>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-ghost" onclick="closeSettings()">취소</button>
+      <button class="btn btn-primary" onclick="saveSettings()">저장</button>
+    </div>
+  </div>
+</div>
+
+<!-- Toast container -->
+<div class="toast-wrap" id="toasts"></div>
+
+<!-- ══ SCRIPT ════════════════════════════════════════════════════ -->
+<script>
+'use strict';
+
+/* ─── CONFIG ─────────────────────────────────────────────── */
+const CFG = {
+  get orKey()     { return localStorage.getItem('OR_KEY')     || ''; },
+  get groqKey()   { return localStorage.getItem('GROQ_KEY')   || ''; },
+  get hfKey()     { return localStorage.getItem('HF_KEY')     || ''; },
+  get gladiaKey() { return localStorage.getItem('GLADIA_KEY') || ''; },
+  OR:     'https://openrouter.ai/api/v1',
+  GROQ:   'https://api.groq.com/openai/v1',
+  HF:     'https://router.huggingface.co',
+  GLADIA: 'https://api.gladia.io/v2',
+};
+
+/* HF 음성→텍스트 모델 (순서대로 시도) */
+const HF_WHISPER_MODELS = [
+  'openai/whisper-large-v3-turbo',
+  'openai/whisper-large-v3',
+  'openai/whisper-medium',
+];
+
+/* HF 텍스트 요약 모델 (순서대로 시도) */
+const HF_LLM_MODELS = [
+  'Qwen/Qwen2.5-72B-Instruct',
+  'mistralai/Mistral-7B-Instruct-v0.3',
+  'HuggingFaceH4/zephyr-7b-beta',
+];
+
+/* ─── INDEXED-DB ─────────────────────────────────────────── */
+let IDB;
+const DB_NAME = 'AudioAI_v1', STORE = 'files';
+
+function openDB() {
+  return new Promise((res, rej) => {
+    const r = indexedDB.open(DB_NAME, 1);
+    r.onerror = () => rej(r.error);
+    r.onsuccess = () => { IDB = r.result; res(); };
+    r.onupgradeneeded = e => {
+      const db = e.target.result;
+      if (!db.objectStoreNames.contains(STORE)) {
+        const s = db.createObjectStore(STORE, { keyPath:'id', autoIncrement:true });
+        s.createIndex('createdAt','createdAt');
+      }
+    };
+  });
+}
+
+function tx(mode, fn) {
+  return new Promise((res, rej) => {
+    const t = IDB.transaction(STORE, mode);
+    const s = t.objectStore(STORE);
+    const r = fn(s);
+    r.onsuccess = () => res(r.result);
+    r.onerror   = () => rej(r.error);
+  });
+}
+
+const DB = {
+  all:    ()        => tx('readonly',  s => s.getAll()),
+  get:    id        => tx('readonly',  s => s.get(id)),
+  add:    d         => tx('readwrite', s => s.add({ ...d, createdAt: Date.now() })),
+  del:    id        => tx('readwrite', s => s.delete(id)),
+  patch:  (id, p)   => new Promise((res, rej) => {
+    const t = IDB.transaction(STORE, 'readwrite');
+    const s = t.objectStore(STORE);
+    const r = s.get(id);
+    r.onsuccess = () => {
+      if (!r.result) { rej(new Error(`Record ${id} not found`)); return; }
+      const rec = { ...r.result, ...p };
+      const u = s.put(rec);
+      u.onsuccess = () => res(rec);
+      u.onerror   = () => rej(u.error);
+    };
+    r.onerror = () => rej(r.error);
+  }),
+};
+
+/* ─── STATE ──────────────────────────────────────────────── */
+let S = {
+  records:     [],
+  selectedId:  null,
+  editingId:   null,
+  delTargetId: null,
+  pickedFile:  null,      // File object
+  freeModels:  [],
+};
+
+/* ─── RENDER FILE LIST ───────────────────────────────────── */
+function renderList() {
+  const el = document.getElementById('fileList');
+  const cnt = document.getElementById('fileCount');
+  cnt.textContent = `${S.records.length}개 파일`;
+
+  if (!S.records.length) {
+    el.innerHTML = `<div class="file-empty">
+      <div class="file-empty-icon">🎵</div>
+      <div class="file-empty-text">등록된 파일이 없습니다</div>
+      <div class="file-empty-hint">'추가' 버튼으로 오디오 파일을 등록하세요</div>
+    </div>`;
+    return;
+  }
+
+  el.innerHTML = S.records.map(r => {
+    const busy = r.status === 'transcribing' || r.status === 'summarizing';
+    const statusMap = {
+      pending:      `<span class="badge badge-idle">대기</span>`,
+      transcribing: `<span class="badge badge-busy">변환 중 <span class="dots"><span></span><span></span><span></span></span></span>`,
+      summarizing:  `<span class="badge badge-busy">요약 중 <span class="dots"><span></span><span></span><span></span></span></span>`,
+      done:         `<span class="badge badge-ok">✓ 완료</span>`,
+      error:        `<span class="badge badge-err">오류</span>`,
+    };
+    const badge = statusMap[r.status] || statusMap.pending;
+    const isActive = S.selectedId === r.id;
+    const cls = [
+      'file-card',
+      isActive ? 'active' : '',
+      busy ? 'status-processing' : '',
+      r.status === 'done' ? 'status-done' : '',
+      r.status === 'error' ? 'status-error' : '',
+    ].filter(Boolean).join(' ');
+
+    // shorten path
+    const parts = (r.filePath || r.fileName || '').replace(/\\/g, '/').split('/');
+    const pathDisplay = parts.length > 2 ? `…/${parts.slice(-2).join('/')}` : parts.join('/');
+
+    // model name display when done
+    const txShort  = r.txModel  ? r.txModel.split('/').pop().replace(':free','')  : '';
+    const sumShort = r.sumModel ? r.sumModel.split('/').pop().replace(':free','') : '';
+    const modelLine = r.status === 'done' && (txShort || sumShort)
+      ? `<div class="fc-model-info">🤖 ${esc(txShort)}${sumShort && sumShort !== txShort ? ` · ${esc(sumShort)}` : ''}</div>`
+      : '';
+
+    return `<div class="${cls}" onclick="selectRecord(${r.id})">
+      <div class="fc-top">
+        <span class="fc-name" title="${esc(r.name)}">${esc(r.name)}</span>
+        ${badge}
+      </div>
+      <div class="fc-path" title="${esc(r.filePath||r.fileName||'')}">📁 ${esc(pathDisplay||'—')}</div>
+      ${modelLine}
+      <div class="fc-actions">
+        <button class="btn btn-success btn-sm" onclick="event.stopPropagation();reqConvert(${r.id})"
+          ${busy?'disabled':''}>
+          ${busy ? `<span class="spinner" style="width:12px;height:12px;border-width:2px"></span> 처리 중…` : '🔄 변환 요청'}
+        </button>
+        <button class="icon-btn" onclick="event.stopPropagation();openEdit(${r.id})" title="수정" ${busy?'disabled':''}>✏️</button>
+        <button class="icon-btn del" onclick="event.stopPropagation();openDel(${r.id})" title="삭제" ${busy?'disabled':''}>🗑️</button>
+      </div>
+    </div>`;
+  }).join('');
+}
+
+/* ─── SELECT / SHOW RESULTS ──────────────────────────────── */
+function selectRecord(id) {
+  S.selectedId = id;
+  renderList();
+  const r = S.records.find(x => x.id === id);
+  if (r) showResults(r);
+}
+
+function showResults(r) {
+  document.getElementById('emptyState').style.display = 'none';
+  // display:flex is set via CSS #resultsView rule; just remove none
+  document.getElementById('resultsView').style.display = '';
+  renderSection('content', r);
+  renderSection('summary', r);
+}
+
+function renderSection(type, r) {
+  const isContent = type === 'content';
+  const text   = isContent ? r.content  : r.summary;
+  const status = r.status;
+  const busy   = isContent ? status === 'transcribing' : status === 'summarizing';
+  const model  = isContent ? r.txModel : r.sumModel;
+
+  const textEl  = document.getElementById(`${type}Text`);
+  const metaEl  = document.getElementById(`${type}Meta`);
+  const modelEl = document.getElementById(`${type}Model`);
+  const charsEl = document.getElementById(`${type}Chars`);
+  const copyBtn = document.getElementById(isContent ? 'btnCopyContent' : 'btnCopySummary');
+  const editBtn = document.getElementById(isContent ? 'btnEditContent' : 'btnEditSummary');
+
+  if (text) {
+    const display = formatTranscription(text);
+    textEl.innerHTML = `<div class="result-text">${esc(display).replace(/\n/g,'<br>')}</div>`;
+    charsEl.textContent = `${text.length.toLocaleString()} 자`;
+    modelEl.textContent = model ? `모델: ${model.replace(':free','')}` : '';
+    metaEl.style.display = 'flex';
+    copyBtn.style.display = 'inline-flex';
+    editBtn.style.display = 'inline-flex';
+  } else if (busy) {
+    const label = isContent ? '텍스트 변환 중' : '요약 생성 중';
+    textEl.innerHTML = `<div style="display:flex;align-items:center;gap:8px;color:var(--primary);font-size:13px">
+      <div class="spinner"></div>${label}…
+    </div>`;
+    metaEl.style.display = 'none';
+    copyBtn.style.display = 'none';
+    editBtn.style.display = 'none';
+  } else {
+    const placeholder = isContent ? '변환된 텍스트가 여기에 표시됩니다.' : '요약된 내용이 여기에 표시됩니다.';
+    textEl.innerHTML = `<div class="result-placeholder">${placeholder}</div>`;
+    metaEl.style.display = 'none';
+    copyBtn.style.display = 'none';
+    editBtn.style.display = 'none';
+  }
+}
+
+/* ─── INLINE SECTION EDIT ────────────────────────────────── */
+function editSection(type) {
+  const r = S.records.find(x => x.id === S.selectedId);
+  if (!r) return;
+  const isContent = type === 'content';
+  const text   = isContent ? (r.content || '') : (r.summary || '');
+  const maxLen = isContent ? 5000 : 1000;
+  const bodyId = isContent ? 'rcBodyContent' : 'rcBodySummary';
+  const copyBtn = document.getElementById(isContent ? 'btnCopyContent' : 'btnCopySummary');
+  const editBtn = document.getElementById(isContent ? 'btnEditContent' : 'btnEditSummary');
+  const body    = document.getElementById(bodyId);
+
+  // Switch body to flex-column so textarea can stretch to fill remaining height
+  body.classList.add('editing');
+
+  // Replace entire body content: textarea fills flex:1, footer pinned at bottom
+  body.innerHTML = `
+    <textarea id="${type}EditArea" class="edit-textarea" maxlength="${maxLen}">${esc(text)}</textarea>
+    <div class="edit-footer">
+      <button class="btn btn-ghost btn-xs" onclick="cancelEdit('${type}')">취소</button>
+      <button class="btn btn-primary btn-xs" onclick="saveEdit('${type}')">💾 저장</button>
+    </div>`;
+
+  copyBtn.style.display = 'none';
+  editBtn.style.display = 'none';
+
+  document.getElementById(`${type}EditArea`)?.focus();
+}
+
+function _restoreBody(type, id) {
+  const isContent = type === 'content';
+  const bodyId    = isContent ? 'rcBodyContent' : 'rcBodySummary';
+  const body      = document.getElementById(bodyId);
+  // Remove editing class (reverts to normal rc-body overflow:auto)
+  body.classList.remove('editing');
+  // Rebuild the original DOM structure
+  body.innerHTML = `
+    <div id="${type}Text"></div>
+    <div class="result-meta" id="${type}Meta" style="display:none">
+      <div class="meta-model" id="${type}Model"></div>
+      <div class="meta-chars" id="${type}Chars"></div>
+    </div>`;
+  const r = S.records.find(x => x.id === id);
+  if (r) renderSection(type, r);
+}
+
+async function saveEdit(type) {
+  const id   = S.selectedId;
+  if (!id) return;
+  const area = document.getElementById(`${type}EditArea`);
+  if (!area) return;
+  const newText = area.value;
+  const patch   = type === 'content' ? { content: newText } : { summary: newText };
+  await DB.patch(id, patch);
+  await loadRecords();
+  _restoreBody(type, id);
+  toast('저장되었습니다.', 'ok');
+}
+
+function cancelEdit(type) {
+  _restoreBody(type, S.selectedId);
+}
+
+/* ─── ADD / EDIT MODAL ───────────────────────────────────── */
+function openAdd() {
+  S.editingId = null; S.pickedFile = null;
+  document.getElementById('modalAddTitle').textContent = '오디오 파일 추가';
+  document.getElementById('iName').value = '';
+  document.getElementById('iFile').value = '';
+  document.getElementById('uzFileName').style.display = 'none';
+  document.getElementById('fileReq').textContent = '*';
+  document.getElementById('modalAdd').style.display = 'flex';
+}
+
+function openEdit(id) {
+  const r = S.records.find(x => x.id === id);
+  if (!r) return;
+  S.editingId = id; S.pickedFile = null;
+  document.getElementById('modalAddTitle').textContent = '오디오 파일 수정';
+  document.getElementById('iName').value = r.name;
+  document.getElementById('iFile').value = '';
+  document.getElementById('fileReq').textContent = '';
+  const fn = document.getElementById('uzFileName');
+  if (r.fileName) { fn.textContent = `현재: ${r.fileName}`; fn.style.display = 'block'; }
+  else fn.style.display = 'none';
+  document.getElementById('modalAdd').style.display = 'flex';
+}
+
+function closeAdd() {
+  document.getElementById('modalAdd').style.display = 'none';
+}
+
+function onFileChg(e) {
+  const f = e.target.files[0];
+  if (!f) return;
+  S.pickedFile = f;
+  const el = document.getElementById('uzFileName');
+  el.textContent = `✓ ${f.name}  (${fmtSize(f.size)})`;
+  el.style.display = 'block';
+}
+
+async function saveRecord() {
+  const name = document.getElementById('iName').value.trim();
+  if (!name) { toast('명칭을 입력해 주세요.', 'err'); return; }
+
+  const btn = document.getElementById('btnSave');
+  btn.disabled = true; btn.textContent = '저장 중…';
+
+  try {
+    if (S.editingId) {
+      const p = { name };
+      if (S.pickedFile) {
+        p.fileData = await readBuf(S.pickedFile);
+        p.fileName = S.pickedFile.name;
+        p.filePath = S.pickedFile.name;
+        p.fileType = S.pickedFile.type || 'audio/mpeg';
+        p.status   = 'pending';
+        p.content  = ''; p.summary = '';
+        p.txModel  = ''; p.sumModel = '';
+      }
+      await DB.patch(S.editingId, p);
+      toast('수정되었습니다.', 'ok');
+    } else {
+      if (!S.pickedFile) { toast('오디오 파일을 선택해 주세요.', 'err'); return; }
+      const fileData = await readBuf(S.pickedFile);
+      await DB.add({
+        name,
+        fileData,
+        fileName: S.pickedFile.name,
+        filePath: S.pickedFile.name,
+        fileType: S.pickedFile.type || 'audio/mpeg',
+        content: '', summary: '',
+        status: 'pending',
+        txModel: '', sumModel: '',
+      });
+      toast('추가되었습니다.', 'ok');
+    }
+    await loadRecords();
+    closeAdd();
+  } catch (err) {
+    toast('저장 중 오류가 발생했습니다.', 'err');
+    console.error(err);
+  } finally {
+    btn.disabled = false; btn.textContent = '저장';
+  }
+}
+
+/* ─── DELETE ─────────────────────────────────────────────── */
+function openDel(id) {
+  const r = S.records.find(x => x.id === id);
+  if (!r) return;
+  S.delTargetId = id;
+  document.getElementById('delName').textContent = r.name;
+  document.getElementById('modalDel').style.display = 'flex';
+}
+function closeDel() { document.getElementById('modalDel').style.display = 'none'; }
+
+async function doDelete() {
+  if (!S.delTargetId) return;
+  await DB.del(S.delTargetId);
+  if (S.selectedId === S.delTargetId) {
+    S.selectedId = null;
+    document.getElementById('emptyState').style.display = 'flex';
+    document.getElementById('resultsView').style.display = 'none';
+  }
+  toast('삭제되었습니다.', 'ok');
+  await loadRecords();
+  closeDel();
+}
+
+/* ─── SETTINGS ───────────────────────────────────────────── */
+function openSettings() {
+  document.getElementById('sOrKey').value     = CFG.orKey;
+  document.getElementById('sHfKey').value     = CFG.hfKey;
+  document.getElementById('sGroqKey').value   = CFG.groqKey;
+  document.getElementById('sGladiaKey').value = CFG.gladiaKey;
+  document.getElementById('modalSettings').style.display = 'flex';
+}
+function closeSettings() { document.getElementById('modalSettings').style.display = 'none'; }
+function saveSettings() {
+  const or     = document.getElementById('sOrKey').value.trim();
+  const hf     = document.getElementById('sHfKey').value.trim();
+  const gr     = document.getElementById('sGroqKey').value.trim();
+  const gladia = document.getElementById('sGladiaKey').value.trim();
+  or     ? localStorage.setItem('OR_KEY',     or)     : localStorage.removeItem('OR_KEY');
+  hf     ? localStorage.setItem('HF_KEY',     hf)     : localStorage.removeItem('HF_KEY');
+  gr     ? localStorage.setItem('GROQ_KEY',   gr)     : localStorage.removeItem('GROQ_KEY');
+  gladia ? localStorage.setItem('GLADIA_KEY', gladia) : localStorage.removeItem('GLADIA_KEY');
+  closeSettings();
+  toast('API 키가 저장되었습니다.', 'ok');
+}
+
+/* file:// 프로토콜일 때 HTTP-Referer 가 "null" 되는 문제 방지 */
+function orReferer() {
+  return (location.protocol === 'file:' || location.origin === 'null')
+    ? 'http://localhost'
+    : location.origin;
+}
+
+/* ─── OPENROUTER — FETCH FREE MODELS ────────────────────── */
+async function fetchFreeModels() {
+  if (!CFG.orKey) return [];
+  try {
+    modelBar('무료 AI 모델 목록 가져오는 중…');
+    const r = await fetch(`${CFG.OR}/models`, {
+      headers: {
+        Authorization: `Bearer ${CFG.orKey}`,
+        'HTTP-Referer': orReferer(),
+      }
+    });
+    if (r.status === 401) {
+      toast('OpenRouter API 키 인증 실패. ⚙️ 설정에서 키를 확인해 주세요.', 'err');
+      setTimeout(openSettings, 800);
+      return [];
+    }
+    if (!r.ok) return [];
+    const d = await r.json();
+    const free = (d.data || []).filter(m => {
+      const p = parseFloat(m.pricing?.prompt ?? '1');
+      const c = parseFloat(m.pricing?.completion ?? '1');
+      return p === 0 && c === 0;
+    });
+    S.freeModels = free;
+    showModelsPanel(free);
+    return free;
+  } catch { return []; }
+}
+
+function showModelsPanel(models) {
+  const sec   = document.getElementById('modelsSection');
+  const cnt   = document.getElementById('msFreeCount');
+  const pills = document.getElementById('msPills');
+  sec.style.display = 'block';
+  cnt.textContent   = `${models.length}개`;
+  pills.innerHTML = models.map(m =>
+    `<span class="ms-pill" title="${esc(m.id)}">${esc(m.id.split('/').pop().replace(':free',''))}</span>`
+  ).join('');
+}
+
+/* ─── OPENROUTER — TRY BATCH FOR SUMMARIZATION ──────────── */
+async function tryBatchSum(models, text) {
+  for (const m of models) {
+    try {
+      const r = await fetch(`${CFG.OR}/chat/completions`, {
+        method: 'POST',
+        headers: {
+          Authorization:  `Bearer ${CFG.orKey}`,
+          'Content-Type': 'application/json',
+          'HTTP-Referer': orReferer(),
+          'X-Title':      'AudioAI',
+        },
+        body: JSON.stringify({
+          model: m.id,
+          messages: [
+            { role:'system', content:'당신은 한국어 텍스트 요약 전문가입니다. 반드시 원문보다 훨씬 짧게 핵심만 압축하여 요약문을 작성하세요. 원문을 그대로 반복하거나 타임스탬프를 포함하지 마세요.' },
+            { role:'user',   content:`다음 텍스트를 한국어로 500자 이내의 간결한 요약문으로 작성해주세요. 요약문만 출력하세요.\n\n${text}` }
+          ],
+          max_tokens: 700,
+        }),
+        signal: AbortSignal.timeout(20000),
+      });
+      // 401 = key invalid → stop trying OR models
+      if (r.status === 401) {
+        toast('OpenRouter API 키 인증 실패. ⚙️ 설정에서 키를 갱신해 주세요.', 'err');
+        setTimeout(openSettings, 800);
+        return 'AUTH_FAIL';
+      }
+      if (r.status === 429) continue;
+      if (!r.ok) continue;
+      const d = await r.json();
+      const t = d.choices?.[0]?.message?.content?.trim();
+      if (t?.length > 20 && !isEcho(t, text)) return { text: t, model: m.id };
+    } catch { continue; }
+  }
+  return null;
+}
+
+/* ─── OPENROUTER — TRY BATCH FOR TRANSCRIPTION ──────────── */
+async function tryBatchTx(models, buf, fileName, fileType) {
+  // Filter models that may support audio (Gemini, etc.)
+  const audioCaps = models.filter(m => {
+    const id  = m.id.toLowerCase();
+    const mod = (m.architecture?.modality || '').toLowerCase();
+    const inp = (m.architecture?.input_modalities || []).map(x => x.toLowerCase());
+    return inp.includes('audio') || mod.includes('audio') ||
+           id.includes('gemini') || id.includes('flash');
+  });
+  if (!audioCaps.length) return null;
+
+  const b64  = buf2b64(buf);
+  const mime = fileType || 'audio/mpeg';
+
+  for (const m of audioCaps.slice(0, 10)) {
+    try {
+      const r = await fetch(`${CFG.OR}/chat/completions`, {
+        method: 'POST',
+        headers: {
+          Authorization:  `Bearer ${CFG.orKey}`,
+          'Content-Type': 'application/json',
+          'HTTP-Referer': orReferer(),
+          'X-Title':      'AudioAI',
+        },
+        body: JSON.stringify({
+          model: m.id,
+          messages: [{ role:'user', content:[
+            { type:'text', text:'이 오디오 파일의 내용을 한국어로 정확하게 전사해주세요. 텍스트만 출력하세요.' },
+            { type:'image_url', image_url:{ url:`data:${mime};base64,${b64}` } }
+          ]}],
+          max_tokens: 4096,
+        }),
+        signal: AbortSignal.timeout(60000),
+      });
+      // 401 = key invalid → stop trying OR models
+      if (r.status === 401) {
+        toast('OpenRouter API 키 인증 실패. ⚙️ 설정에서 키를 갱신해 주세요.', 'err');
+        setTimeout(openSettings, 800);
+        return 'AUTH_FAIL';
+      }
+      if (r.status === 429) continue;
+      if (!r.ok) continue;
+      const d = await r.json();
+      const t = d.choices?.[0]?.message?.content?.trim();
+      if (t?.length > 10) return { text: t, model: m.id };
+    } catch { continue; }
+  }
+  return null;
+}
+
+/* ─── HUGGING FACE — WHISPER TRANSCRIPTION ──────────────── */
+async function hfWhisper(buf, fileName, fileType) {
+  if (!CFG.hfKey) return null;
+  const mime = fileType || 'audio/mpeg';
+  const blob = new Blob([buf], { type: mime });
+
+  for (const model of HF_WHISPER_MODELS) {
+    try {
+      const shortName = model.split('/').pop();
+      modelBar(`HuggingFace ${shortName} 변환 중… (최대 30초)`);
+      const r = await fetch(`${CFG.HF}/hf-inference/models/${model}`, {
+        method:  'POST',
+        headers: {
+          Authorization:  `Bearer ${CFG.hfKey}`,
+          'Content-Type': mime,
+          'x-wait-for-model': 'true',   // 모델 로딩 대기 (cold start 처리)
+        },
+        body:   blob,
+        signal: AbortSignal.timeout(30000),  // 30s (120s → 30s)
+      });
+      if (r.status === 401) {
+        toast('HuggingFace 토큰 인증 실패. ⚙️ 설정에서 HF Token을 확인해 주세요.', 'err');
+        setTimeout(openSettings, 800);
+        return null;
+      }
+      if (r.status === 402) {
+        toast('HuggingFace 무료 크레딧 소진. Groq으로 전환합니다.', 'info');
+        return null;
+      }
+      if (r.status === 429 || r.status === 503) {
+        console.log(`HF ${model}: ${r.status} skip`); continue;
+      }
+      if (!r.ok) { console.log(`HF ${model}: ${r.status}`); continue; }
+      const d    = await r.json();
+      const text = (Array.isArray(d) ? d[0]?.text : d.text || '').trim();
+      if (text.length > 10) return { text, model: `hf/${shortName}` };
+    } catch (e) { console.log(`HF ${model}:`, e.message); continue; }
+  }
+  return null;
+}
+
+/* ─── HUGGING FACE — LLM SUMMARIZATION ──────────────────── */
+async function hfSummarize(text) {
+  if (!CFG.hfKey) return null;
+  const prompt = `다음 텍스트를 한국어로 500자 이내의 간결한 요약문으로 작성해주세요. 원문을 반복하지 말고 핵심 내용만 압축하세요. 요약문만 출력하세요.\n\n${text}`;
+
+  for (const model of HF_LLM_MODELS) {
+    try {
+      const shortName = model.split('/').pop();
+      modelBar(`HuggingFace ${shortName} 요약 중…`);
+      const r = await fetch(`${CFG.HF}/v1/chat/completions`, {
+        method:  'POST',
+        headers: {
+          Authorization:  `Bearer ${CFG.hfKey}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          model,
+          messages:   [{ role: 'user', content: prompt }],
+          max_tokens: 900,
+        }),
+        signal: AbortSignal.timeout(30000),  // 30s
+      });
+      if (r.status === 401) {
+        toast('HuggingFace 토큰 인증 실패. ⚙️ 설정에서 HF Token을 확인해 주세요.', 'err');
+        setTimeout(openSettings, 800);
+        return null;
+      }
+      if (r.status === 402) {
+        toast('HuggingFace 무료 크레딧 소진. Groq으로 전환합니다.', 'info');
+        return null;
+      }
+      if (r.status === 429 || r.status === 503) {
+        console.log(`HF LLM ${model}: ${r.status} skip`); continue;
+      }
+      if (!r.ok) { console.log(`HF LLM ${model}: ${r.status}`); continue; }
+      const d = await r.json();
+      const t = d.choices?.[0]?.message?.content?.trim();
+      if (t?.length > 20 && !isEcho(t, text)) return { text: t, model: `hf/${shortName}` };
+    } catch (e) { console.log(`HF LLM ${model}:`, e.message); continue; }
+  }
+  return null;
+}
+
+/* ─── GROQ — WHISPER TRANSCRIPTION ──────────────────────── */
+async function groqWhisper(buf, fileName, fileType) {
+  const GROQ_LIMIT = 25 * 1024 * 1024; // 25MB
+  if (buf.byteLength > GROQ_LIMIT) {
+    const mb = (buf.byteLength / 1024 / 1024).toFixed(1);
+    toast(`파일 ${mb}MB — Groq 25MB 초과, Gladia로 전환합니다.`, 'info');
+    return null;
+  }
+  const MODELS = ['whisper-large-v3-turbo', 'whisper-large-v3'];
+  for (const model of MODELS) {
+    try {
+      const blob = new Blob([buf], { type: fileType || 'audio/mpeg' });
+      const fd   = new FormData();
+      fd.append('file',            blob, fileName);
+      fd.append('model',           model);
+      fd.append('response_format', 'text');
+      modelBar(`Groq ${model} 음성 인식 중…`);
+      const r = await fetch(`${CFG.GROQ}/audio/transcriptions`, {
+        method:  'POST',
+        headers: { Authorization: `Bearer ${CFG.groqKey}` },
+        body:    fd,
+        signal:  AbortSignal.timeout(300000),
+      });
+      if (r.status === 401) {
+        toast('Groq API 키 인증 실패. ⚙️ 설정에서 키를 확인해 주세요.', 'err');
+        setTimeout(openSettings, 800);
+        return null;
+      }
+      if (r.status === 413) { toast(`파일이 너무 큽니다 (Groq 25MB 제한). Gladia로 전환합니다.`, 'info'); return null; }
+      if (r.status === 429) { console.log(`Groq ${model}: rate limit`); continue; }
+      if (!r.ok) { console.log(`Groq ${model}: ${r.status}`); continue; }
+      const text = (await r.text()).trim();
+      if (text.length > 5) return text;
+    } catch (e) { console.log(`Groq ${model}:`, e.message); continue; }
+  }
+  return null;
+}
+
+/* ─── GLADIA — WHISPER STT (10h/월 무료) ────────────────── */
+async function gladiaWhisper(buf, fileName, fileType) {
+  if (!CFG.gladiaKey) return null;
+  try {
+    // Step 1: 파일 업로드
+    modelBar('Gladia STT 파일 업로드 중…');
+    const blob = new Blob([buf], { type: fileType || 'audio/mpeg' });
+    const fd   = new FormData();
+    fd.append('audio', blob, fileName);
+    const upRes = await fetch(`${CFG.GLADIA}/upload`, {
+      method:  'POST',
+      headers: { 'x-gladia-key': CFG.gladiaKey },
+      body:    fd,
+      signal:  AbortSignal.timeout(120000),
+    });
+    if (upRes.status === 401) {
+      toast('Gladia API 키 인증 실패. ⚙️ 설정에서 확인해 주세요.', 'err');
+      setTimeout(openSettings, 800);
+      return null;
+    }
+    if (!upRes.ok) { console.log('Gladia upload:', upRes.status); return null; }
+    const { audio_url } = await upRes.json();
+
+    // Step 2: 변환 작업 요청
+    modelBar('Gladia STT 변환 요청 중…');
+    const jobRes = await fetch(`${CFG.GLADIA}/pre-recorded`, {
+      method:  'POST',
+      headers: { 'x-gladia-key': CFG.gladiaKey, 'Content-Type': 'application/json' },
+      body:    JSON.stringify({ audio_url, detect_language: true, language: 'ko' }),
+      signal:  AbortSignal.timeout(30000),
+    });
+    if (!jobRes.ok) { console.log('Gladia job:', jobRes.status); return null; }
+    const { id } = await jobRes.json();
+
+    // Step 3: 결과 폴링 (최대 10분)
+    for (let i = 0; i < 120; i++) {
+      await new Promise(r => setTimeout(r, 5000));
+      modelBar(`Gladia STT 처리 중… (${Math.round((i+1)*5/60)}분 경과)`);
+      const poll = await fetch(`${CFG.GLADIA}/pre-recorded/${id}`, {
+        headers: { 'x-gladia-key': CFG.gladiaKey },
+        signal:  AbortSignal.timeout(10000),
+      });
+      if (!poll.ok) continue;
+      const data = await poll.json();
+      if (data.status === 'done') {
+        const text = data.result?.transcription?.full_transcript?.trim() || '';
+        if (text.length > 5) return { text, model: 'gladia/whisper' };
+        return null;
+      }
+      if (data.status === 'error') { console.log('Gladia error:', data); return null; }
+    }
+    return null;
+  } catch (e) { console.log('Gladia:', e.message); return null; }
+}
+
+/* ─── GROQ — LLM SUMMARY FALLBACK ───────────────────────── */
+async function groqSummarize(text) {
+  const r = await fetch(`${CFG.GROQ}/chat/completions`, {
+    method: 'POST',
+    headers: {
+      Authorization:  `Bearer ${CFG.groqKey}`,
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({
+      model: 'llama-3.3-70b-versatile',
+      messages: [
+        { role:'system', content:'당신은 한국어 텍스트 요약 전문가입니다. 원문보다 훨씬 짧게 핵심만 압축하여 요약문을 작성하세요. 타임스탬프나 원문을 그대로 반복하지 마세요.' },
+        { role:'user',   content:`다음 텍스트를 한국어로 500자 이내의 간결한 요약문으로 작성해주세요. 요약문만 출력하세요.\n\n${text}` }
+      ],
+      max_tokens: 700,
+    }),
+    signal: AbortSignal.timeout(30000),
+  });
+  if (r.status === 401) {
+    toast('Groq API 키 인증 실패. ⚙️ 설정에서 키를 확인해 주세요.', 'err');
+    setTimeout(openSettings, 800);
+    return null;
+  }
+  if (!r.ok) return null;
+  const d = await r.json();
+  const t = d.choices?.[0]?.message?.content?.trim() || '';
+  return isEcho(t, text) ? null : t;
+}
+
+/* ─── MAIN CONVERSION WORKFLOW ───────────────────────────── */
+const _converting = new Set();
+async function reqConvert(id) {
+  if (_converting.has(id)) return;
+  _converting.add(id);
+  try { await _doConvert(id); } finally { _converting.delete(id); }
+}
+async function _doConvert(id) {
+  if (!CFG.orKey && !CFG.hfKey && !CFG.groqKey) {
+    toast('API 키를 먼저 설정해 주세요. (⚙️ 우측 상단)', 'err');
+    openSettings();
+    return;
+  }
+
+  const rec = await DB.get(id);
+  if (!rec) return;
+  if (!rec.fileData) { toast('파일 데이터가 없습니다.', 'err'); return; }
+
+  try {
+    /* ── Step 1: fetch free models ── */
+    const freeModels = await fetchFreeModels();
+
+    /* ── Step 2: transcription ── */
+    await DB.patch(id, { status:'transcribing', content:'', summary:'' });
+    await loadRecords();
+    if (S.selectedId === id) showResults(await DB.get(id));
+
+    modelBar('텍스트 변환 중…');
+
+    let txText  = null;
+    let txModel = '';
+    let orAuthFailed = false;
+
+    // 2a) Groq Whisper (turbo → v3, 300s timeout)
+    if (!txText && CFG.groqKey) {
+      const groqTx = await groqWhisper(rec.fileData, rec.fileName, rec.fileType);
+      if (groqTx) { txText = groqTx; txModel = 'groq/whisper'; }
+    }
+
+    // 2b) Gladia STT (10시간/월 무료)
+    if (!txText && CFG.gladiaKey) {
+      const res = await gladiaWhisper(rec.fileData, rec.fileName, rec.fileType);
+      if (res) { txText = res.text; txModel = res.model; }
+    }
+
+    // 2c) Hugging Face Whisper (크레딧 있을 때)
+    if (!txText && CFG.hfKey) {
+      const res = await hfWhisper(rec.fileData, rec.fileName, rec.fileType);
+      if (res) { txText = res.text; txModel = res.model; }
+    }
+
+    if (!txText) {
+      const missing = [];
+      if (!CFG.groqKey)   missing.push('Groq');
+      if (!CFG.gladiaKey) missing.push('Gladia');
+      if (!CFG.hfKey)     missing.push('HuggingFace');
+      const hint = missing.length ? `(미설정: ${missing.join(', ')})` : '';
+      toast(`텍스트 변환 실패 ${hint}. ⚙️ 설정에서 API 키를 확인해 주세요.`, 'err');
+      setTimeout(openSettings, 800);
+      throw new Error('텍스트 변환에 실패했습니다.');
+    }
+
+    await DB.patch(id, { content: txText, txModel, status: 'summarizing' });
+    await loadRecords();
+    if (S.selectedId === id) showResults(await DB.get(id));
+
+    /* ── Step 3: summarization ── */
+    let sumText  = null;
+    let sumModel = '';
+    const cleanTx = cleanForSummary(txText);  // 타임스탬프·Caption 제거 후 요약 입력
+
+    // 3a) Try OpenRouter free text models in batches of 10
+    if (CFG.orKey && freeModels.length) {
+      const textModels = freeModels
+        .filter(m => {
+          const modality = (m.architecture?.modality || '').toLowerCase();
+          return modality.includes('text') || modality === '';
+        })
+        .sort((a,b) => (b.context_length||0) - (a.context_length||0));
+
+      for (let i = 0; i < textModels.length; i += 10) {
+        const batch = textModels.slice(i, i + 10);
+        modelBar(`요약 생성 중… (모델 ${i+1}~${Math.min(i+10, textModels.length)} / ${textModels.length}개 시도)`);
+        const res = await tryBatchSum(batch, cleanTx);
+        if (res === 'AUTH_FAIL') { orAuthFailed = true; break; }
+        if (res) { sumText = res.text; sumModel = res.model; break; }
+      }
+    }
+
+    // 3b) Fallback: Hugging Face LLM
+    if (!sumText && CFG.hfKey) {
+      const res = await hfSummarize(cleanTx);
+      if (res) { sumText = res.text; sumModel = res.model; }
+    }
+
+    // 3c) Final fallback: Groq LLM
+    if (!sumText && CFG.groqKey) {
+      modelBar('Groq AI로 요약 생성 중…');
+      const groqSum = await groqSummarize(cleanTx);
+      if (groqSum) { sumText = groqSum; sumModel = 'groq/llama-3.3-70b'; }
+    }
+
+    if (!sumText) {
+      if (!orAuthFailed) {
+        const missing = [];
+        if (!CFG.hfKey)   missing.push('HuggingFace');
+        if (!CFG.groqKey) missing.push('Groq');
+        const hint = missing.length ? `(미설정: ${missing.join(', ')})` : '';
+        toast(`요약 생성 실패 ${hint}. ⚙️ 설정에서 API 키를 확인해 주세요.`, 'err');
+        setTimeout(openSettings, 800);
+      }
+      throw new Error('요약 생성에 실패했습니다.');
+    }
+
+    await DB.patch(id, { summary: sumText, sumModel, status:'done' });
+    await loadRecords();
+    if (S.selectedId === id) showResults(await DB.get(id));
+
+    // Highlight used models in panel
+    ['ms-pill'].forEach(cls => {
+      document.querySelectorAll(`.${cls}`).forEach(el => {
+        const txt = el.textContent.trim();
+        if (txModel.includes(txt) || sumModel.includes(txt)) el.classList.add('used');
+      });
+    });
+
+    modelBarHide();
+    toast(`변환 완료! (${txModel.split('/').pop()})`, 'ok');
+
+  } catch (err) {
+    console.error(err);
+    await DB.patch(id, { status:'error' });
+    await loadRecords();
+    modelBarHide();
+    // Only show toast if it wasn't already shown above (auth failures already toast+open settings)
+    const alreadyHandled = err.message === '텍스트 변환에 실패했습니다.' ||
+                           err.message === '요약 생성에 실패했습니다.';
+    if (!alreadyHandled) toast(`오류: ${err.message}`, 'err');
+  }
+}
+
+/* ─── DOWNLOAD ───────────────────────────────────────────── */
+function dlFile(type) {
+  const r = S.records.find(x => x.id === S.selectedId);
+  if (!r) { toast('파일을 먼저 선택해 주세요.', 'err'); return; }
+  const name    = r.name || '변환결과';
+  const content = formatTranscription(r.content || '');
+  const summary = formatTranscription(r.summary || '');
+  const now     = new Date().toLocaleString('ko-KR');
+  const line    = '─'.repeat(50);
+
+  let txt = '', fname = '', mime = 'text/plain;charset=utf-8';
+
+  switch (type) {
+    case 'full':
+      txt   = `[AudioAI 변환 결과]\n파일명: ${name}\n생성일: ${now}\n\n${line}\n▶ 변환 내용\n${line}\n${content}\n\n${line}\n▶ 요약 내용\n${line}\n${summary}`;
+      fname = `${name}_전체.txt`; break;
+    case 'content':
+      txt   = content;
+      fname = `${name}_변환내용.txt`; break;
+    case 'summary':
+      txt   = summary;
+      fname = `${name}_요약.txt`; break;
+    case 'md':
+      txt   = `# ${name}\n\n> 생성일: ${now}\n\n## 변환 내용\n\n${content}\n\n## 요약\n\n${summary}\n`;
+      fname = `${name}.md`;
+      mime  = 'text/markdown;charset=utf-8'; break;
+  }
+
+  if (!txt.trim()) { toast('다운로드할 내용이 없습니다.', 'err'); return; }
+
+  const blob = new Blob(['\uFEFF' + txt], { type: mime });
+  const url  = URL.createObjectURL(blob);
+  const a    = Object.assign(document.createElement('a'), { href: url, download: fname });
+  a.click();
+  URL.revokeObjectURL(url);
+  toast(`${fname} 다운로드 시작`, 'info');
+}
+
+/* ─── HELPERS ────────────────────────────────────────────── */
+async function loadRecords() {
+  S.records = (await DB.all()).sort((a,b) => b.createdAt - a.createdAt);
+  renderList();
+}
+
+function readBuf(file) {
+  return new Promise((res,rej) => {
+    const fr = new FileReader();
+    fr.onload  = () => res(fr.result);
+    fr.onerror = () => rej(fr.error);
+    fr.readAsArrayBuffer(file);
+  });
+}
+
+function buf2b64(buf) {
+  const bytes = new Uint8Array(buf);
+  const CHUNK = 8192;
+  let s = '';
+  for (let i = 0; i < bytes.length; i += CHUNK) {
+    s += String.fromCharCode(...bytes.subarray(i, i + CHUNK));
+  }
+  return btoa(s);
+}
+
+function fmtSize(b) {
+  if (b < 1024)       return b + ' B';
+  if (b < 1048576)    return (b/1024).toFixed(1) + ' KB';
+  return (b/1048576).toFixed(1) + ' MB';
+}
+
+function esc(s) {
+  return String(s ?? '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+
+/* ─── 변환 텍스트 정제 (요약 입력 전처리) ────────────────── */
+/* 텍스트 변환 결과 표시용 줄바꿈 포맷 */
+function formatTranscription(text) {
+  if (!text) return text;
+  return text
+    // 문장 부호 뒤 공백 → 줄바꿈
+    .replace(/([.?!。？！])\s+/g, '$1\n')
+    // 쉼표 없는 긴 문장 사이 자연스러운 연결어 뒤 줄바꿈 (그래서, 그리고, 그런데 등)
+    .replace(/\s+(그래서|그리고|그런데|근데|그러면|그러니까|그래도|그래가지고|그러다가)\s+/g, '\n$1 ')
+    // 3줄 이상 연속 빈 줄 → 2줄로 정리
+    .replace(/\n{3,}/g, '\n\n')
+    .trim();
+}
+
+function cleanForSummary(text) {
+  return text
+    .replace(/\[\d+\.?\d*:?\]/g, '')              // [0.0:] [4.8:] 타임스탬프 제거
+    .replace(/\[[\d:. ]+-->[\d:. ]+\]/g, '')       // VTT 스타일 타임스탬프 제거
+    .replace(/Caption:[\s\S]*/i, '')               // Caption: 이후 메타데이터 제거
+    .replace(/[ \t]+/g, ' ')
+    .replace(/\n{3,}/g, '\n\n')
+    .trim();
+}
+
+/* 요약이 입력 텍스트를 80% 이상 반복하면 에코로 간주 */
+function isEcho(summary, original) {
+  if (!summary || !original) return false;
+  const ratio = summary.length / original.length;
+  if (ratio > 0.8) return true;
+  // 앞부분 100자 일치 여부도 체크
+  const s = summary.replace(/\s/g,'').slice(0, 100);
+  const o = original.replace(/\s/g,'').slice(0, 100);
+  return s === o;
+}
+
+function copyEl(id) {
+  const el = document.getElementById(id);
+  navigator.clipboard.writeText(el.innerText)
+    .then(() => toast('클립보드에 복사되었습니다.', 'ok'))
+    .catch(() => toast('복사 실패 (브라우저 권한 확인)', 'err'));
+}
+
+function modelBar(txt) {
+  document.getElementById('modelBarText').textContent = txt;
+  document.getElementById('modelBar').classList.add('on');
+}
+function modelBarHide() { document.getElementById('modelBar').classList.remove('on'); }
+
+function toast(msg, type='info') {
+  const wrap = document.getElementById('toasts');
+  const el   = document.createElement('div');
+  const cls  = { ok:'toast-ok', err:'toast-err', info:'toast-info' }[type] || 'toast-info';
+  const icon = { ok:'✓', err:'✕', info:'ℹ' }[type] || 'ℹ';
+  el.className = `toast ${cls}`;
+  el.innerHTML = `<span>${icon}</span> ${esc(msg)}`;
+  wrap.appendChild(el);
+  setTimeout(() => {
+    el.style.transition = 'opacity .25s';
+    el.style.opacity    = '0';
+    setTimeout(() => el.remove(), 260);
+  }, 3200);
+}
+
+/* ─── DRAG-AND-DROP on upload zone ──────────────────────── */
+document.addEventListener('DOMContentLoaded', () => {
+  const zone = document.getElementById('uploadZone');
+  zone.addEventListener('dragover',  e => { e.preventDefault(); zone.classList.add('drag'); });
+  zone.addEventListener('dragleave', () => zone.classList.remove('drag'));
+  zone.addEventListener('drop', e => {
+    e.preventDefault(); zone.classList.remove('drag');
+    const f = e.dataTransfer?.files?.[0];
+    if (!f) return;
+    const allowed = /^audio\/|\.mp3$|\.wav$|\.m4a$|\.ogg$|\.flac$|\.aac$|\.webm$/i;
+    if (!allowed.test(f.type) && !allowed.test(f.name)) {
+      toast('오디오 파일만 업로드할 수 있습니다.', 'err'); return;
+    }
+    S.pickedFile = f;
+    const el = document.getElementById('uzFileName');
+    el.textContent = `✓ ${f.name}  (${fmtSize(f.size)})`; el.style.display = 'block';
+  });
+
+  // close modal on overlay click
+  ['modalAdd','modalDel','modalSettings'].forEach(id => {
+    document.getElementById(id).addEventListener('click', e => {
+      if (e.target === e.currentTarget) document.getElementById(id).style.display = 'none';
+    });
+  });
+
+  // Enter to save in add modal
+  document.getElementById('iName').addEventListener('keydown', e => {
+    if (e.key === 'Enter') saveRecord();
+  });
+});
+
+/* ─── INIT ───────────────────────────────────────────────── */
+async function init() {
+  // file:// 프로토콜 감지 → CORS 오류 사전 차단
+  if (location.protocol === 'file:') {
+    document.body.innerHTML = `
+      <div style="display:flex;flex-direction:column;align-items:center;justify-content:center;
+                  height:100vh;gap:20px;font-family:sans-serif;background:#0f172a;color:#e2e8f0;padding:40px;text-align:center">
+        <div style="font-size:48px">⚠️</div>
+        <div style="font-size:22px;font-weight:700;color:#f87171">file:// 로 열면 API 호출이 차단됩니다</div>
+        <div style="font-size:14px;color:#94a3b8;line-height:1.8;max-width:500px">
+          브라우저 보안 정책(CORS)으로 인해<br>
+          <code style="background:#1e293b;padding:2px 6px;border-radius:4px">file://</code> 프로토콜에서는 외부 API 호출이 불가능합니다.
+        </div>
+        <div style="background:#1e293b;border:1px solid #334155;border-radius:12px;padding:24px 32px;text-align:left;max-width:480px;width:100%">
+          <div style="font-size:13px;color:#64748b;margin-bottom:12px">로컬 서버로 실행하세요</div>
+          <div style="font-family:monospace;font-size:14px;color:#38bdf8;line-height:2">
+            cd C:\\00.Prototype-06<br>
+            node serve.js
+          </div>
+          <div style="margin-top:16px;font-size:13px;color:#94a3b8">
+            서버 실행 후 브라우저에서:
+            <a href="http://localhost:3000" style="color:#34d399;text-decoration:none;font-weight:600">
+              http://localhost:3000
+            </a>
+          </div>
+        </div>
+      </div>`;
+    return;
+  }
+
+  await openDB();
+  await loadRecords();
+
+  if (!CFG.orKey && !CFG.hfKey && !CFG.groqKey) {
+    setTimeout(() => {
+      toast('API 키를 설정해 주세요. (우측 상단 ⚙️)', 'info');
+      openSettings();
+    }, 600);
+  }
+}
+
+init();
+</script>
+</body>
+</html>
