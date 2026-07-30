@@ -37,9 +37,12 @@ jobs:
       - name: Build
         working-directory: career
         run: npm run build
+      - name: Prune dev dependencies
+        working-directory: career
+        run: npm prune --omit=dev
       - name: Package artifact
         working-directory: career
-        run: tar -czf ../career.tar.gz .next public package.json package-lock.json next.config.ts
+        run: tar -czf ../career.tar.gz .next public package.json package-lock.json next.config.ts node_modules
       - name: Deploy
         run: |
           mkdir -p ~/.ssh
@@ -68,9 +71,12 @@ jobs:
       - name: Build
         working-directory: lottery
         run: npm run build
+      - name: Prune dev dependencies
+        working-directory: lottery
+        run: npm prune --omit=dev
       - name: Package artifact
         working-directory: lottery
-        run: tar -czf ../lottery.tar.gz .next public package.json package-lock.json next.config.ts
+        run: tar -czf ../lottery.tar.gz .next public package.json package-lock.json next.config.ts node_modules
       - name: Deploy
         run: |
           mkdir -p ~/.ssh
@@ -99,9 +105,12 @@ jobs:
       - name: Build
         working-directory: newsclip
         run: npm run build
+      - name: Prune dev dependencies
+        working-directory: newsclip
+        run: npm prune --omit=dev
       - name: Package artifact
         working-directory: newsclip
-        run: tar -czf ../newsclip.tar.gz .next public package.json package-lock.json next.config.ts
+        run: tar -czf ../newsclip.tar.gz .next public package.json package-lock.json next.config.ts node_modules
       - name: Deploy
         run: |
           mkdir -p ~/.ssh
@@ -130,9 +139,12 @@ jobs:
       - name: Build
         working-directory: us_stock_market
         run: npm run build
+      - name: Prune dev dependencies
+        working-directory: us_stock_market
+        run: npm prune --omit=dev
       - name: Package artifact
         working-directory: us_stock_market
-        run: tar -czf ../us_stock_market.tar.gz .next public package.json package-lock.json next.config.ts
+        run: tar -czf ../us_stock_market.tar.gz .next public package.json package-lock.json next.config.ts node_modules
       - name: Deploy
         run: |
           mkdir -p ~/.ssh
@@ -161,9 +173,12 @@ jobs:
       - name: Build
         working-directory: expo/web
         run: npm run build
+      - name: Prune dev dependencies
+        working-directory: expo/web
+        run: npm prune --omit=dev
       - name: Package artifact
         working-directory: expo/web
-        run: tar -czf ../../expo.tar.gz .next public package.json package-lock.json next.config.ts
+        run: tar -czf ../../expo.tar.gz .next public package.json package-lock.json next.config.ts node_modules
       - name: Deploy
         run: |
           mkdir -p ~/.ssh
@@ -192,9 +207,12 @@ jobs:
       - name: Build
         working-directory: hub
         run: npm run build
+      - name: Prune dev dependencies
+        working-directory: hub
+        run: npm prune --omit=dev
       - name: Package artifact
         working-directory: hub
-        run: tar -czf ../hub.tar.gz .next public package.json package-lock.json next.config.ts
+        run: tar -czf ../hub.tar.gz .next public package.json package-lock.json next.config.ts node_modules
       - name: Deploy
         run: |
           mkdir -p ~/.ssh
@@ -204,3 +222,31 @@ jobs:
           scp -o StrictHostKeyChecking=no -i ~/.ssh/deploy_key deploy/remote-swap.sh "$DEPLOY_USER@$DEPLOY_HOST:~/deploy/remote-swap.sh"
           scp -o StrictHostKeyChecking=no -i ~/.ssh/deploy_key hub.tar.gz "$DEPLOY_USER@$DEPLOY_HOST:/tmp/hub.tar.gz"
           ssh -o StrictHostKeyChecking=no -i ~/.ssh/deploy_key "$DEPLOY_USER@$DEPLOY_HOST" "bash ~/deploy/remote-swap.sh hub /tmp/hub.tar.gz"
+
+  # 빌드가 필요 없는 정적 HTML 사이트 9개 — nginx 문서 루트로 직접 rsync.
+  # /usr/share/nginx/html은 root 소유라 원격에서 sudo rsync로 실행.
+  static-sites:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        site:
+          - image_slideshow
+          - image_studio
+          - My-Claude
+          - audio_translate
+          - course_planning
+          - manage_instructor
+          - outside_instructor
+          - shopping-listapp
+          - manage_token
+    steps:
+      - uses: actions/checkout@v4
+      - name: Deploy static site
+        run: |
+          mkdir -p ~/.ssh
+          echo "${{ secrets.DEPLOY_SSH_KEY }}" > ~/.ssh/deploy_key
+          chmod 600 ~/.ssh/deploy_key
+          rsync -az --delete \
+            -e "ssh -o StrictHostKeyChecking=no -i ~/.ssh/deploy_key" \
+            --rsync-path="sudo rsync" \
+            "${{ matrix.site }}/" "$DEPLOY_USER@$DEPLOY_HOST:/usr/share/nginx/html/${{ matrix.site }}/"

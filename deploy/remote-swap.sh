@@ -10,6 +10,9 @@
 # 준비가 100% 끝난 뒤에만 mv로 통째로 교체한다. mv는 원자적이라 교체 순간에
 # "반쯤 된 상태"가 존재하지 않고, 기존에 돌던 프로세스는 이미 열어둔 파일
 # 핸들로 계속 안전하게 실행되다가 pm2 reload 시점에만 새 디렉토리를 읽는다.
+#
+# node_modules는 CI 아티팩트에 이미 포함되어 있어 서버에서 npm ci를 돌리지 않는다
+# (RAM 500MB 서버에서 6개 앱이 동시에 npm ci를 돌리다 SSH 연결이 끊기는 문제가 있었음).
 
 set -euo pipefail
 
@@ -26,9 +29,6 @@ tar -xzf "$ARCHIVE" -C "${APP}-new"
 if [ -f "${APP}/.env" ]; then
   cp "${APP}/.env" "${APP}-new/.env"
 fi
-
-cd "${APP}-new"
-npm ci --omit=dev
 
 cd "$APPS_DIR"
 rm -rf "${APP}-old"
