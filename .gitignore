@@ -1,2 +1,12 @@
 config.local.js
 **/config.local.js
+.claude/settings.local.json
+
+# Claude Code conversation exports / debug artifacts — must never be committed (may contain secrets)
+# /export names files inconsistently (conversation-*.txt, YYYY-MM-DD-HHMMSS-*.txt), so match both.
+conversation-*.txt
+**/conversation-*.txt
+[0-9][0-9][0-9][0-9]-[0-9][0-9]-[0-9][0-9]-*.txt
+**/[0-9][0-9][0-9][0-9]-[0-9][0-9]-[0-9][0-9]-*.txt
+.playwright-mcp/
+**/.playwright-mcp/
