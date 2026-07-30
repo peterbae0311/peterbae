@@ -42,7 +42,7 @@ jobs:
         run: npm prune --omit=dev
       - name: Package artifact
         working-directory: career
-        run: tar -czf ../career.tar.gz .next public package.json package-lock.json next.config.ts node_modules
+        run: tar -czf ../career.tar.gz .next package.json package-lock.json next.config.ts node_modules $( [ -d public ] && echo public )
       - name: Deploy
         run: |
           mkdir -p ~/.ssh
@@ -76,7 +76,7 @@ jobs:
         run: npm prune --omit=dev
       - name: Package artifact
         working-directory: lottery
-        run: tar -czf ../lottery.tar.gz .next public package.json package-lock.json next.config.ts node_modules
+        run: tar -czf ../lottery.tar.gz .next package.json package-lock.json next.config.ts node_modules $( [ -d public ] && echo public )
       - name: Deploy
         run: |
           mkdir -p ~/.ssh
@@ -110,7 +110,7 @@ jobs:
         run: npm prune --omit=dev
       - name: Package artifact
         working-directory: newsclip
-        run: tar -czf ../newsclip.tar.gz .next public package.json package-lock.json next.config.ts node_modules
+        run: tar -czf ../newsclip.tar.gz .next package.json package-lock.json next.config.ts node_modules $( [ -d public ] && echo public )
       - name: Deploy
         run: |
           mkdir -p ~/.ssh
@@ -144,7 +144,7 @@ jobs:
         run: npm prune --omit=dev
       - name: Package artifact
         working-directory: us_stock_market
-        run: tar -czf ../us_stock_market.tar.gz .next public package.json package-lock.json next.config.ts node_modules
+        run: tar -czf ../us_stock_market.tar.gz .next package.json package-lock.json next.config.ts node_modules $( [ -d public ] && echo public )
       - name: Deploy
         run: |
           mkdir -p ~/.ssh
@@ -178,7 +178,7 @@ jobs:
         run: npm prune --omit=dev
       - name: Package artifact
         working-directory: expo/web
-        run: tar -czf ../../expo.tar.gz .next public package.json package-lock.json next.config.ts node_modules
+        run: tar -czf ../../expo.tar.gz .next package.json package-lock.json next.config.ts node_modules $( [ -d public ] && echo public )
       - name: Deploy
         run: |
           mkdir -p ~/.ssh
@@ -212,7 +212,7 @@ jobs:
         run: npm prune --omit=dev
       - name: Package artifact
         working-directory: hub
-        run: tar -czf ../hub.tar.gz .next public package.json package-lock.json next.config.ts node_modules
+        run: tar -czf ../hub.tar.gz .next package.json package-lock.json next.config.ts node_modules $( [ -d public ] && echo public )
       - name: Deploy
         run: |
           mkdir -p ~/.ssh
