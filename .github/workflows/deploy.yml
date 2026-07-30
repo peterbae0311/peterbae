@@ -1,0 +1,206 @@
+name: Build and deploy
+
+# 왜 GitHub Actions에서 빌드하는가: Oracle 서버가 물리 RAM 500MB짜리 무료
+# 인스턴스라 `next build`(특히 TypeScript 타입체킹 단계)를 서버에서 직접 돌리면
+# V8 힙 한도에 걸려 OOM으로 크래시한 적이 있다. 빌드는 메모리가 넉넉한
+# GitHub 호스팅 러너에서 하고, 성공한 빌드 산출물만 서버로 옮긴다.
+
+on:
+  # TODO: 6개 앱 env 시크릿(CAREER_ENV, LOTTERY_ENV, NEWSCLIP_ENV, US_STOCK_MARKET_ENV,
+  # EXPO_ENV, HUB_ENV)을 채우고 수동 실행(workflow_dispatch)으로 한 번 검증한 뒤,
+  # 아래 push 트리거의 주석을 해제할 것. 시크릿이 비어있는 상태로 push 트리거가
+  # 켜지면 build가 빈 .env로 진행되어 운영 중인 배포를 깨진 버전으로 덮어쓴다.
+  # push:
+  #   branches: [main]
+  workflow_dispatch: {}
+
+env:
+  DEPLOY_HOST: peterbae.duckdns.org
+  DEPLOY_USER: opc
+
+jobs:
+  career:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: 'npm'
+          cache-dependency-path: career/package-lock.json
+      - name: Install
+        working-directory: career
+        run: npm ci
+      - name: Write build-time env
+        working-directory: career
+        run: echo "${{ secrets.CAREER_ENV }}" > .env
+      - name: Build
+        working-directory: career
+        run: npm run build
+      - name: Package artifact
+        working-directory: career
+        run: tar -czf ../career.tar.gz .next public package.json package-lock.json next.config.ts
+      - name: Deploy
+        run: |
+          mkdir -p ~/.ssh
+          echo "${{ secrets.DEPLOY_SSH_KEY }}" > ~/.ssh/deploy_key
+          chmod 600 ~/.ssh/deploy_key
+          ssh -o StrictHostKeyChecking=no -i ~/.ssh/deploy_key "$DEPLOY_USER@$DEPLOY_HOST" "mkdir -p ~/deploy"
+          scp -o StrictHostKeyChecking=no -i ~/.ssh/deploy_key deploy/remote-swap.sh "$DEPLOY_USER@$DEPLOY_HOST:~/deploy/remote-swap.sh"
+          scp -o StrictHostKeyChecking=no -i ~/.ssh/deploy_key career.tar.gz "$DEPLOY_USER@$DEPLOY_HOST:/tmp/career.tar.gz"
+          ssh -o StrictHostKeyChecking=no -i ~/.ssh/deploy_key "$DEPLOY_USER@$DEPLOY_HOST" "bash ~/deploy/remote-swap.sh career /tmp/career.tar.gz"
+
+  lottery:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: 'npm'
+          cache-dependency-path: lottery/package-lock.json
+      - name: Install
+        working-directory: lottery
+        run: npm ci
+      - name: Write build-time env
+        working-directory: lottery
+        run: echo "${{ secrets.LOTTERY_ENV }}" > .env
+      - name: Build
+        working-directory: lottery
+        run: npm run build
+      - name: Package artifact
+        working-directory: lottery
+        run: tar -czf ../lottery.tar.gz .next public package.json package-lock.json next.config.ts
+      - name: Deploy
+        run: |
+          mkdir -p ~/.ssh
+          echo "${{ secrets.DEPLOY_SSH_KEY }}" > ~/.ssh/deploy_key
+          chmod 600 ~/.ssh/deploy_key
+          ssh -o StrictHostKeyChecking=no -i ~/.ssh/deploy_key "$DEPLOY_USER@$DEPLOY_HOST" "mkdir -p ~/deploy"
+          scp -o StrictHostKeyChecking=no -i ~/.ssh/deploy_key deploy/remote-swap.sh "$DEPLOY_USER@$DEPLOY_HOST:~/deploy/remote-swap.sh"
+          scp -o StrictHostKeyChecking=no -i ~/.ssh/deploy_key lottery.tar.gz "$DEPLOY_USER@$DEPLOY_HOST:/tmp/lottery.tar.gz"
+          ssh -o StrictHostKeyChecking=no -i ~/.ssh/deploy_key "$DEPLOY_USER@$DEPLOY_HOST" "bash ~/deploy/remote-swap.sh lottery /tmp/lottery.tar.gz"
+
+  newsclip:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: 'npm'
+          cache-dependency-path: newsclip/package-lock.json
+      - name: Install
+        working-directory: newsclip
+        run: npm ci
+      - name: Write build-time env
+        working-directory: newsclip
+        run: echo "${{ secrets.NEWSCLIP_ENV }}" > .env
+      - name: Build
+        working-directory: newsclip
+        run: npm run build
+      - name: Package artifact
+        working-directory: newsclip
+        run: tar -czf ../newsclip.tar.gz .next public package.json package-lock.json next.config.ts
+      - name: Deploy
+        run: |
+          mkdir -p ~/.ssh
+          echo "${{ secrets.DEPLOY_SSH_KEY }}" > ~/.ssh/deploy_key
+          chmod 600 ~/.ssh/deploy_key
+          ssh -o StrictHostKeyChecking=no -i ~/.ssh/deploy_key "$DEPLOY_USER@$DEPLOY_HOST" "mkdir -p ~/deploy"
+          scp -o StrictHostKeyChecking=no -i ~/.ssh/deploy_key deploy/remote-swap.sh "$DEPLOY_USER@$DEPLOY_HOST:~/deploy/remote-swap.sh"
+          scp -o StrictHostKeyChecking=no -i ~/.ssh/deploy_key newsclip.tar.gz "$DEPLOY_USER@$DEPLOY_HOST:/tmp/newsclip.tar.gz"
+          ssh -o StrictHostKeyChecking=no -i ~/.ssh/deploy_key "$DEPLOY_USER@$DEPLOY_HOST" "bash ~/deploy/remote-swap.sh newsclip /tmp/newsclip.tar.gz"
+
+  us_stock_market:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: 'npm'
+          cache-dependency-path: us_stock_market/package-lock.json
+      - name: Install
+        working-directory: us_stock_market
+        run: npm ci
+      - name: Write build-time env
+        working-directory: us_stock_market
+        run: echo "${{ secrets.US_STOCK_MARKET_ENV }}" > .env
+      - name: Build
+        working-directory: us_stock_market
+        run: npm run build
+      - name: Package artifact
+        working-directory: us_stock_market
+        run: tar -czf ../us_stock_market.tar.gz .next public package.json package-lock.json next.config.ts
+      - name: Deploy
+        run: |
+          mkdir -p ~/.ssh
+          echo "${{ secrets.DEPLOY_SSH_KEY }}" > ~/.ssh/deploy_key
+          chmod 600 ~/.ssh/deploy_key
+          ssh -o StrictHostKeyChecking=no -i ~/.ssh/deploy_key "$DEPLOY_USER@$DEPLOY_HOST" "mkdir -p ~/deploy"
+          scp -o StrictHostKeyChecking=no -i ~/.ssh/deploy_key deploy/remote-swap.sh "$DEPLOY_USER@$DEPLOY_HOST:~/deploy/remote-swap.sh"
+          scp -o StrictHostKeyChecking=no -i ~/.ssh/deploy_key us_stock_market.tar.gz "$DEPLOY_USER@$DEPLOY_HOST:/tmp/us_stock_market.tar.gz"
+          ssh -o StrictHostKeyChecking=no -i ~/.ssh/deploy_key "$DEPLOY_USER@$DEPLOY_HOST" "bash ~/deploy/remote-swap.sh us_stock_market /tmp/us_stock_market.tar.gz"
+
+  expo:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: 'npm'
+          cache-dependency-path: expo/web/package-lock.json
+      - name: Install
+        working-directory: expo/web
+        run: npm ci
+      - name: Write build-time env
+        working-directory: expo/web
+        run: echo "${{ secrets.EXPO_ENV }}" > .env
+      - name: Build
+        working-directory: expo/web
+        run: npm run build
+      - name: Package artifact
+        working-directory: expo/web
+        run: tar -czf ../../expo.tar.gz .next public package.json package-lock.json next.config.ts
+      - name: Deploy
+        run: |
+          mkdir -p ~/.ssh
+          echo "${{ secrets.DEPLOY_SSH_KEY }}" > ~/.ssh/deploy_key
+          chmod 600 ~/.ssh/deploy_key
+          ssh -o StrictHostKeyChecking=no -i ~/.ssh/deploy_key "$DEPLOY_USER@$DEPLOY_HOST" "mkdir -p ~/deploy"
+          scp -o StrictHostKeyChecking=no -i ~/.ssh/deploy_key deploy/remote-swap.sh "$DEPLOY_USER@$DEPLOY_HOST:~/deploy/remote-swap.sh"
+          scp -o StrictHostKeyChecking=no -i ~/.ssh/deploy_key expo.tar.gz "$DEPLOY_USER@$DEPLOY_HOST:/tmp/expo.tar.gz"
+          ssh -o StrictHostKeyChecking=no -i ~/.ssh/deploy_key "$DEPLOY_USER@$DEPLOY_HOST" "bash ~/deploy/remote-swap.sh expo /tmp/expo.tar.gz"
+
+  hub:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: 'npm'
+          cache-dependency-path: hub/package-lock.json
+      - name: Install
+        working-directory: hub
+        run: npm ci
+      - name: Write build-time env
+        working-directory: hub
+        run: echo "${{ secrets.HUB_ENV }}" > .env
+      - name: Build
+        working-directory: hub
+        run: npm run build
+      - name: Package artifact
+        working-directory: hub
+        run: tar -czf ../hub.tar.gz .next public package.json package-lock.json next.config.ts
+      - name: Deploy
+        run: |
+          mkdir -p ~/.ssh
+          echo "${{ secrets.DEPLOY_SSH_KEY }}" > ~/.ssh/deploy_key
+          chmod 600 ~/.ssh/deploy_key
+          ssh -o StrictHostKeyChecking=no -i ~/.ssh/deploy_key "$DEPLOY_USER@$DEPLOY_HOST" "mkdir -p ~/deploy"
+          scp -o StrictHostKeyChecking=no -i ~/.ssh/deploy_key deploy/remote-swap.sh "$DEPLOY_USER@$DEPLOY_HOST:~/deploy/remote-swap.sh"
+          scp -o StrictHostKeyChecking=no -i ~/.ssh/deploy_key hub.tar.gz "$DEPLOY_USER@$DEPLOY_HOST:/tmp/hub.tar.gz"
+          ssh -o StrictHostKeyChecking=no -i ~/.ssh/deploy_key "$DEPLOY_USER@$DEPLOY_HOST" "bash ~/deploy/remote-swap.sh hub /tmp/hub.tar.gz"
