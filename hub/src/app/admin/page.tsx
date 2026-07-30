@@ -13,6 +13,8 @@ export default function AdminPage() {
   const [viewerEmail, setViewerEmail] = useState<string | null | undefined>(undefined);
   const [rows, setRows] = useState<AccessRow[]>([]);
   const [loading, setLoading] = useState(true);
+  const [registeredEmails, setRegisteredEmails] = useState<string[]>([]);
+  const [emailsError, setEmailsError] = useState('');
   const [editEmail, setEditEmail] = useState('');
   const [editKeys, setEditKeys] = useState<Set<string>>(new Set());
   const [saving, setSaving] = useState(false);
@@ -24,13 +26,24 @@ export default function AdminPage() {
     setLoading(false);
   }, []);
 
+  const loadRegisteredEmails = useCallback(async () => {
+    const res = await fetch('/api/admin/users');
+    const data = await res.json();
+    if (!res.ok) {
+      setEmailsError(data.error ?? '이메일 목록을 불러오지 못했습니다.');
+      return;
+    }
+    setRegisteredEmails(data.emails as string[]);
+  }, []);
+
   useEffect(() => {
     (async () => {
       const { data: { user } } = await supabase.auth.getUser();
       setViewerEmail(user?.email ?? null);
     })();
     loadRows();
-  }, [loadRows]);
+    loadRegisteredEmails();
+  }, [loadRows, loadRegisteredEmails]);
 
   const grouped = rows.reduce<Record<string, string[]>>((acc, r) => {
     (acc[r.email] ??= []).push(r.app_key);
@@ -109,14 +122,29 @@ export default function AdminPage() {
 
         {/* 편집 폼 */}
         <section className="rounded-2xl border border-white/60 bg-white/70 backdrop-blur-xl shadow-glass p-6">
+          {editEmail && (
+            <div className="mb-4 flex items-center gap-2 text-sm font-semibold text-amber-800 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2">
+              <span className="w-2 h-2 rounded-full bg-amber-500 shrink-0" />
+              지금 수정 중: {editEmail}
+            </div>
+          )}
           <label className="text-sm font-semibold text-gray-700 mb-1.5 block">이메일</label>
-          <input
-            type="email"
+          <select
             value={editEmail}
-            onChange={e => setEditEmail(e.target.value)}
-            placeholder="user@example.com"
+            onChange={e => { setEditEmail(e.target.value); setNotice(''); }}
             className="w-full mb-5 px-4 py-2.5 border border-gray-200/80 bg-white/60 rounded-lg text-base text-gray-700 focus:outline-none focus:border-neutral-500 focus:ring-1 focus:ring-neutral-500 transition-colors"
-          />
+          >
+            <option value="">이메일 선택...</option>
+            {registeredEmails.map(email => (
+              <option key={email} value={email}>{email}</option>
+            ))}
+          </select>
+          {emailsError && <p className="text-sm text-red-500 -mt-3 mb-5">{emailsError}</p>}
+          {!emailsError && registeredEmails.length === 0 && (
+            <p className="text-sm text-gray-400 -mt-3 mb-5">
+              {SUPER_ADMIN_EMAIL} 외에 등록된 계정이 아직 없습니다. Supabase에서 계정을 먼저 생성해주세요.
+            </p>
+          )}
 
           <p className="text-sm font-semibold text-gray-700 mb-2">접근 허용할 모노레포</p>
           <div className="grid grid-cols-2 sm:grid-cols-3 gap-2 mb-5">
@@ -159,7 +187,11 @@ export default function AdminPage() {
               {Object.entries(grouped).map(([email, keys]) => (
                 <li
                   key={email}
-                  className="flex items-center justify-between gap-3 rounded-xl border border-white/60 bg-white/70 backdrop-blur-xl shadow-glass px-5 py-3"
+                  className={`flex items-center justify-between gap-3 rounded-xl border backdrop-blur-xl shadow-glass px-5 py-3 transition-colors ${
+                    email === editEmail
+                      ? 'border-amber-300 bg-amber-50/80 ring-1 ring-amber-300'
+                      : 'border-white/60 bg-white/70'
+                  }`}
                 >
                   <div className="min-w-0">
                     <p className="font-bold text-neutral-900 truncate">{email}</p>

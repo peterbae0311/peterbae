@@ -17,7 +17,8 @@ import { SUPER_ADMIN_EMAIL } from '@/lib/apps';
 
 // 로그인만 되어 있으면 되고, 개별 app_access 부여가 필요 없는 hub 자체 경로.
 function isSystemPath(path: string): boolean {
-  return path === '/' || path === '/dashboard' || path === '/forbidden' || path === '/admin';
+  return path === '/' || path === '/dashboard' || path === '/forbidden' || path === '/admin'
+    || path.startsWith('/api/admin/');
 }
 
 function extractAppKey(path: string): string | null {
