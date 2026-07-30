@@ -4,12 +4,8 @@ import { createServerClient } from '@supabase/ssr';
 import { clientEnv } from './env.client';
 
 /**
- * Route Handler / Server Component 전용 Supabase 클라이언트.
- * 요청의 쿠키에서 세션을 읽어오므로, RLS의 auth.uid()가 올바르게 해석됨.
- * (브라우저 싱글턴 `supabase`는 document.cookie에 의존하므로 서버에서 사용 불가)
- *
- * 로그인은 별도 hub 앱에서 이루어지고 세션 쿠키를 도메인 전체(path: '/')에서 공유하므로,
- * 이 클라이언트가 토큰을 갱신(refresh)할 때도 동일하게 path: '/'로 써야 쿠키 범위가 좁아지지 않음.
+ * Route Handler 전용 Supabase 클라이언트.
+ * career 앱과 동일한 프로젝트를 사용하므로, career에서 로그인해도 세션을 그대로 읽음.
  */
 export async function createServerSupabaseClient() {
   const cookieStore = await cookies();

@@ -1,7 +1,7 @@
 'use client';
 
-import { useState, type FormEvent } from 'react';
-import { useRouter } from 'next/navigation';
+import { Suspense, useState, type FormEvent } from 'react';
+import { useSearchParams } from 'next/navigation';
 import { supabase } from '@/lib/supabase';
 
 const PASSWORD_RULE_TEXT = '최소 8자 이상이며 숫자, 특수문자 포함';
@@ -13,8 +13,25 @@ function validatePassword(pw: string): string | null {
   return null;
 }
 
+// 도메인 전체 SSO 게이트(nginx)가 붙인 redirect 쿼리로 로그인 후 원래 경로로 돌아가기 위함.
+// '/'로 시작하지 않거나 '//'·':'를 포함하면(오픈 리다이렉트 방지) 기본 경로로 폴백.
+function safeRedirectTarget(raw: string | null): string {
+  if (!raw) return '/dashboard';
+  if (!raw.startsWith('/') || raw.startsWith('//') || raw.includes(':')) return '/dashboard';
+  return raw;
+}
+
 export default function LoginPage() {
-  const router = useRouter();
+  return (
+    <Suspense fallback={null}>
+      <LoginPageInner />
+    </Suspense>
+  );
+}
+
+function LoginPageInner() {
+  const searchParams = useSearchParams();
+  const redirectTarget = safeRedirectTarget(searchParams.get('redirect'));
   const [mode, setMode] = useState<'login' | 'change'>('login');
 
   const [email,    setEmail]    = useState('');
@@ -43,8 +60,9 @@ export default function LoginPage() {
       return;
     }
 
-    router.replace('/resume');
-    router.refresh();
+    // redirect는 career 바깥의 다른 서비스 경로(예: /lottery)일 수 있어, basePath를 자동으로
+    // 붙이는 next/navigation 라우터 대신 실제 브라우저 이동을 사용한다.
+    window.location.href = redirectTarget;
   }
 
   function openChangePassword() {
@@ -182,7 +200,7 @@ export default function LoginPage() {
   return (
     <div className="min-h-screen flex items-center justify-center px-4">
       <div className="w-full max-w-[450px] bg-white/70 backdrop-blur-xl border border-white/50 rounded-2xl shadow-[0_1px_20px_rgba(0,0,0,0.08)] p-10">
-        <h1 className="text-xl font-extrabold tracking-tight text-neutral-900 mb-2">경력 관리 시스템에 로그인하세요.</h1>
+        <h1 className="text-xl font-extrabold tracking-tight text-neutral-900 mb-2">Paul&apos;s 시스템에 로그인하세요.</h1>
         <p className="text-sm text-gray-500 mb-7">서비스를 이용하려면 로그인이 필요합니다.</p>
 
         <form onSubmit={handleSubmit} className="space-y-4">

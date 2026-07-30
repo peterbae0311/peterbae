@@ -2,8 +2,11 @@
 
 import { useState, useEffect } from 'react';
 import Link from 'next/link';
-import { usePathname, useRouter } from 'next/navigation';
+import { usePathname } from 'next/navigation';
 import { supabase, NavTab, NavTabBuiltinKey } from '@/lib/supabase';
+
+// hub 앱(별도 배포)의 최고관리자 계정과 반드시 동일한 값이어야 함.
+const SUPER_ADMIN_EMAIL = 'peter.bae0311@gmail.com';
 
 const BUILTIN_ICONS: Record<NavTabBuiltinKey, React.ReactNode> = {
   resume: (
@@ -54,7 +57,6 @@ function tabIcon(tab: NavTab): React.ReactNode {
 
 export default function NavBar() {
   const pathname = usePathname();
-  const router = useRouter();
   const [email, setEmail] = useState('');
   const [tabs, setTabs] = useState<NavTab[]>([]);
   const [settingsOpen, setSettingsOpen] = useState(false);
@@ -94,18 +96,17 @@ export default function NavBar() {
 
   async function handleLogout() {
     await supabase.auth.signOut();
-    router.replace('/login');
-    router.refresh();
+    // 로그인 화면은 이제 career가 아니라 별도 hub 앱에 있으므로 절대 경로로 이동.
+    window.location.href = '/login';
   }
-
-  if (pathname === '/login') return null;
 
   return (
     <>
     <header className="bg-white/60 backdrop-blur-xl border-b border-white/50 shadow-[0_1px_20px_rgba(0,0,0,0.08)] sticky top-0 z-20">
       <div className="flex items-center h-14">
-        {/* 앱 로고 — 사이드바(20%) 너비에 맞춤 */}
-        <div className="w-[20%] shrink-0 flex items-center gap-2 px-4 border-r border-white/50">
+        {/* 앱 로고 — 사이드바(20%) 너비에 맞춤, 클릭 시 hub 대시보드로 이동.
+            hub는 career 바깥의 별도 앱이라 Link(basePath 자동 적용) 대신 <a> 절대경로 사용. */}
+        <a href="/dashboard" className="w-[20%] shrink-0 flex items-center gap-2 px-4 border-r border-white/50">
           <div className="w-8 h-8 bg-gradient-to-br from-neutral-900 to-neutral-800 rounded-lg flex items-center justify-center shadow-glow-dark">
             <svg className="w-4 h-4 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
@@ -113,7 +114,7 @@ export default function NavBar() {
             </svg>
           </div>
           <span className="font-black text-gray-900 tracking-tighter">경력 관리</span>
-        </div>
+        </a>
 
         {/* 탭 메뉴 — 본문 영역(80%) 시작점에 맞춤 */}
         <nav className="flex items-center gap-1 px-2">
@@ -146,6 +147,14 @@ export default function NavBar() {
 
         {/* 로그인 계정 + 로그아웃 */}
         <div className="ml-auto flex items-center gap-3 px-4">
+          {email === SUPER_ADMIN_EMAIL && (
+            <a
+              href="/admin"
+              className="text-xs text-gray-600 border border-gray-200/80 rounded-md px-3 py-1.5 hover:border-neutral-500 hover:text-neutral-900 hover:bg-neutral-100/60 transition-colors"
+            >
+              Admin
+            </a>
+          )}
           {email && <span className="text-xs text-gray-500">{email}</span>}
           <button
             onClick={handleLogout}

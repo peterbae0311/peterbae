@@ -1,8 +1,10 @@
 import { createBrowserClient } from '@supabase/ssr';
 import { clientEnv } from './env.client';
 
-// 쿠키 기반 세션 저장소 사용 — 미들웨어(서버)와 브라우저가 동일한 세션을 공유하기 위함.
-export const supabase = createBrowserClient(clientEnv.supabaseUrl, clientEnv.supabaseAnonKey);
+// 쿠키 기반 세션 저장소 사용. path: '/' 명시 — hub 앱에서 로그인해도 career가 같은 세션을 읽도록.
+export const supabase = createBrowserClient(clientEnv.supabaseUrl, clientEnv.supabaseAnonKey, {
+  cookieOptions: { path: '/' },
+});
 
 // ── 타입 정의 ──────────────────────────────────────────────
 
