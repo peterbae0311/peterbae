@@ -148,23 +148,19 @@ export default function DashboardPage() {
             {cards.map(card => (
               <div
                 key={card.key}
-                className="w-full sm:w-[350px] flex flex-col rounded-xl border border-white/60 bg-white/70 backdrop-blur-xl shadow-glass px-5 py-4"
+                onClick={() => window.open(card.path, '_blank', 'noopener,noreferrer')}
+                className="group w-full sm:w-[350px] flex flex-col rounded-xl border border-white/60 hover:border-neutral-300 bg-white/70 hover:bg-white backdrop-blur-xl shadow-glass hover:shadow-lg hover:-translate-y-1 px-5 py-4 transition-all duration-200 cursor-pointer"
               >
-                <a
-                  href={card.path}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="font-bold text-neutral-900 hover:underline truncate"
-                >
+                <span className="font-bold text-neutral-900 group-hover:underline truncate">
                   {card.label}
-                </a>
+                </span>
                 <p className="text-xs text-gray-500 mt-1 line-clamp-1 min-h-[1rem]">
                   {card.description}
                 </p>
                 <div className="mt-3 pt-3 border-t border-gray-100/80 flex items-center justify-between gap-2">
                   <span className="text-xs text-gray-400 truncate">{card.path}</span>
                   <button
-                    onClick={() => copyUrl(card.key, card.path)}
+                    onClick={e => { e.stopPropagation(); copyUrl(card.key, card.path); }}
                     className="shrink-0 text-xs text-gray-600 border border-gray-200/80 rounded-lg px-3 py-2 hover:border-neutral-500 hover:text-neutral-900 hover:bg-neutral-100/60 transition-colors"
                   >
                     {copiedKey === card.key ? '복사됨' : 'URL 복사'}
@@ -226,11 +222,8 @@ function CardSettingsModal({
   }
 
   return (
-    <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50" onClick={onClose}>
-      <div
-        className="bg-white rounded-lg shadow-xl w-[520px] max-w-[92vw] max-h-[85vh] flex flex-col"
-        onClick={e => e.stopPropagation()}
-      >
+    <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50">
+      <div className="bg-white rounded-lg shadow-xl w-[520px] max-w-[92vw] max-h-[85vh] flex flex-col">
         <div className="shrink-0 flex items-center justify-between px-5 py-3 border-b border-gray-200">
           <span className="text-sm font-bold text-gray-800">카드 설정</span>
           <button onClick={onClose} className="text-gray-400 hover:text-gray-700 text-lg leading-none">✕</button>
