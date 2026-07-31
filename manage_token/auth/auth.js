@@ -344,13 +344,13 @@ window.initAuth = async function initAuth({ supabaseUrl, supabaseKey, onLogin, o
     showScreen('screen-login');
     const el = document.getElementById('login-success');
     if (el) el.textContent = '이메일 인증이 완료됐습니다. 로그인해주세요.';
-    return { supabase: _supabase, signOut: () => _supabase.auth.signOut() };
+    return { supabase: _supabase, signOut: () => _supabase.auth.signOut({ scope: 'local' }) };
   }
 
   if (_isPasswordRecovery) {
     showAuthUI();
     showScreen('screen-new-password');
-    return { supabase: _supabase, signOut: () => _supabase.auth.signOut() };
+    return { supabase: _supabase, signOut: () => _supabase.auth.signOut({ scope: 'local' }) };
   }
 
   const result = await _supabase.auth.getSession();
@@ -363,5 +363,8 @@ window.initAuth = async function initAuth({ supabaseUrl, supabaseKey, onLogin, o
     showScreen('screen-login');
   }
 
-  return { supabase: _supabase, signOut: () => _supabase.auth.signOut() };
+  // scope: 'local' — 이 계정이 대시보드/다른 앱에서도 로그인돼 있을 수 있어
+  // (모두 같은 Supabase 프로젝트), 기본값(global)으로 로그아웃하면 그 세션들까지
+  // 서버에서 전부 폐기돼 다른 앱에서도 재로그인해야 하는 문제가 생긴다.
+  return { supabase: _supabase, signOut: () => _supabase.auth.signOut({ scope: 'local' }) };
 }
