@@ -3,6 +3,7 @@ import { culturePortalAdapter } from './culturePortal.js';
 import { cultureDataPlazaExpoAdapter } from './cultureDataPlazaExpo.js';
 import { seoulCultureEventAdapter } from './seoulCultureEvent.js';
 import { kotraOverseasFairAdapter } from './kotraOverseasFair.js';
+import { tourApiFestivalAdapter } from './tourApiFestival.js';
 
 // 나머지 소스(culture_data_plaza_perf(보류), motie_trade_fair, at_agrifood_fair)는
 // 사후 실적 통계이거나 과거 연도 스냅샷이라 실시간성이 없어 exh_sources에서 is_active=false로 제외돼 있다.
@@ -15,6 +16,7 @@ const adapters: Record<string, SourceAdapter> = {
   [cultureDataPlazaExpoAdapter.code]: cultureDataPlazaExpoAdapter,
   [seoulCultureEventAdapter.code]: seoulCultureEventAdapter,
   [kotraOverseasFairAdapter.code]: kotraOverseasFairAdapter,
+  [tourApiFestivalAdapter.code]: tourApiFestivalAdapter,
 };
 
 export function getAdapter(code: string): SourceAdapter {
