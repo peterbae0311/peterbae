@@ -87,7 +87,7 @@ export default function DashboardPage() {
 
   return (
     <div className="min-h-screen px-4 py-10">
-      <div className="max-w-4xl mx-auto">
+      <div className="max-w-[1416px] mx-auto">
         <div className="flex items-center justify-between mb-8">
           <div>
             <h1 className="text-2xl font-black tracking-tighter text-neutral-900">모노레포</h1>
@@ -126,11 +126,18 @@ export default function DashboardPage() {
             아직 접근 권한이 부여된 항목이 없습니다.<br />관리자에게 문의하세요.
           </div>
         ) : (
-          <div className="flex flex-wrap justify-center gap-4">
+          <div
+            className={
+              cards.length <= 2
+                ? 'flex flex-wrap justify-center gap-x-[33px] gap-y-4'
+                : 'grid gap-x-[33px] gap-y-4'
+            }
+            style={cards.length <= 2 ? undefined : { gridTemplateColumns: 'repeat(3, 450px)' }}
+          >
             {cards.map(card => (
               <div
                 key={card.key}
-                className="w-full sm:w-64 flex flex-col rounded-xl border border-white/60 bg-white/70 backdrop-blur-xl shadow-glass px-5 py-4"
+                className="w-full sm:w-[450px] flex flex-col rounded-xl border border-white/60 bg-white/70 backdrop-blur-xl shadow-glass px-5 py-4"
               >
                 <a
                   href={card.path}
