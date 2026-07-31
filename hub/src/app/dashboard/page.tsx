@@ -116,7 +116,7 @@ export default function DashboardPage() {
             {isSuperAdmin && (
               <Link
                 href="/admin"
-                className="px-4 py-2 text-sm font-medium text-white bg-gradient-to-r from-neutral-900 to-neutral-800 rounded-lg shadow-glow-dark hover:shadow-lg hover:-translate-y-0.5 transition-all duration-200"
+                className="text-xs text-gray-600 border border-gray-200/80 rounded-lg px-3 py-2 hover:border-neutral-500 hover:text-neutral-900 hover:bg-neutral-100/60 transition-colors"
               >
                 Admin
               </Link>
@@ -279,7 +279,7 @@ function CardSettingsModal({
           <button
             onClick={save}
             disabled={saving}
-            className="px-4 py-2 text-sm font-medium text-white bg-gradient-to-r from-neutral-900 to-neutral-800 rounded-lg shadow-glow-dark hover:shadow-lg hover:-translate-y-0.5 disabled:opacity-50 disabled:hover:shadow-glow-dark disabled:hover:translate-y-0 transition-all duration-200"
+            className="px-3 py-2 text-xs text-gray-600 border border-gray-200/80 rounded-lg hover:border-neutral-500 hover:text-neutral-900 hover:bg-neutral-100/60 disabled:opacity-50 transition-colors"
           >
             {saving ? '저장 중...' : '저장'}
           </button>
