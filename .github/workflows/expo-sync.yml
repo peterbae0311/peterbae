@@ -1,4 +1,9 @@
-name: Data Sync
+name: Expo Data Sync
+
+# 왜 필요한가: 이 워크플로우는 원래 expo/.github/workflows/sync.yml에 있었는데,
+# 그건 expo가 독립 저장소였을 때 얘기다. GitHub Actions는 레포 루트의
+# .github/workflows/만 인식하므로, 모노레포로 합쳐진 뒤로는 이 파일이
+# (경로만 다를 뿐 내용은 그대로) 한 번도 실행되지 않고 있었다.
 
 on:
   schedule:
@@ -21,6 +26,9 @@ permissions:
 jobs:
   sync:
     runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: expo
     steps:
       - uses: actions/checkout@v4
 
@@ -28,6 +36,7 @@ jobs:
         with:
           node-version: "22"
           cache: "npm"
+          cache-dependency-path: expo/package-lock.json
 
       - run: npm ci
 
