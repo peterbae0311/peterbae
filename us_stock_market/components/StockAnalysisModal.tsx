@@ -114,7 +114,7 @@ export default function StockAnalysisModal({
 
   useEffect(() => {
     setPriceLoading(true);
-    fetch(`/api/us/stock-quote?ticker=${encodeURIComponent(ticker)}`)
+    fetch(`/us_stock_market/api/us/stock-quote?ticker=${encodeURIComponent(ticker)}`)
       .then(r => r.json() as Promise<{ price: number; changePct: number }>)
       .then(d => { setLivePrice(d.price ?? 0); setLiveChangePct(d.changePct ?? 0); })
       .catch(() => {})
@@ -124,7 +124,7 @@ export default function StockAnalysisModal({
   useEffect(() => {
     setLoading(true);
     setError(null);
-    fetch(`/api/analysis/stock?ticker=${encodeURIComponent(ticker)}&date=${encodeURIComponent(date)}`)
+    fetch(`/us_stock_market/api/analysis/stock?ticker=${encodeURIComponent(ticker)}&date=${encodeURIComponent(date)}`)
       .then(res => {
         if (!res.ok) throw new Error(`HTTP ${res.status}`);
         return res.json() as Promise<StockAnalysisData>;

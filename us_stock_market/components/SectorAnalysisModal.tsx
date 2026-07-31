@@ -50,7 +50,7 @@ export default function SectorAnalysisModal({
   useEffect(() => {
     setLoading(true);
     setError(null);
-    fetch(`/api/analysis/sector?name=${encodeURIComponent(sectorName)}&date=${encodeURIComponent(date)}`)
+    fetch(`/us_stock_market/api/analysis/sector?name=${encodeURIComponent(sectorName)}&date=${encodeURIComponent(date)}`)
       .then(res => {
         if (!res.ok) throw new Error(`HTTP ${res.status}`);
         return res.json() as Promise<SectorAnalysisData>;

@@ -235,7 +235,7 @@ export default function KrStockAnalysisModal({
   useEffect(() => {
     if (price > 0 || !stockCode) { setPriceReady(true); return; }
     setPriceLoading(true);
-    fetch(`/api/kr/stock-quote?code=${encodeURIComponent(stockCode)}`)
+    fetch(`/us_stock_market/api/kr/stock-quote?code=${encodeURIComponent(stockCode)}`)
       .then(r => r.json() as Promise<{ price: number; changeRate: number; changeAmount: number }>)
       .then(d => {
         if (d.price > 0) { setLivePrice(d.price); setLiveChangeRate(d.changeRate); }
@@ -248,7 +248,7 @@ export default function KrStockAnalysisModal({
   useEffect(() => {
     if (!stockCode) return;
     setFLoading(true);
-    fetch(`/api/kr/stock-fundamentals?code=${encodeURIComponent(stockCode)}`)
+    fetch(`/us_stock_market/api/kr/stock-fundamentals?code=${encodeURIComponent(stockCode)}`)
       .then(res => res.json() as Promise<FundamentalsData>)
       .then(setFundamentals)
       .catch(() => setFundamentals(null))

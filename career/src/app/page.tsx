@@ -239,7 +239,7 @@ export default function CoverLetterPage() {
     if (!selectedQ.question.trim()) { alert('문항을 먼저 입력해주세요.'); return; }
     setGeneratingQId(selectedQ.id);
     try {
-      const res = await fetch('/api/cover-letter/generate', {
+      const res = await fetch('/career/api/cover-letter/generate', {
         method:  'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -267,7 +267,7 @@ export default function CoverLetterPage() {
     if (!selectedId) return;
     setGeneratingInterview(difficulty);
     try {
-      const res = await fetch('/api/cover-letter/interview', {
+      const res = await fetch('/career/api/cover-letter/interview', {
         method:  'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -327,7 +327,7 @@ export default function CoverLetterPage() {
     if (!selectedIQ) return;
     setRegeneratingAnswer(true);
     try {
-      const res = await fetch('/api/cover-letter/interview/regen', {
+      const res = await fetch('/career/api/cover-letter/interview/regen', {
         method:  'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({

@@ -27,7 +27,7 @@ export default function HomePage() {
       if (params.employmentType) qs.set('employmentType', params.employmentType);
       if (params.minSalary)      qs.set('minSalary',      String(params.minSalary));
 
-      const res  = await fetch(`/api/jobs?${qs.toString()}`);
+      const res  = await fetch(`/career/api/jobs?${qs.toString()}`);
       const data = await res.json();
 
       if (!res.ok) {

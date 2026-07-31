@@ -60,7 +60,7 @@ export default function DashboardPage() {
   }, [theme]);
 
   useEffect(() => {
-    fetch('/api/dashboard')
+    fetch('/us_stock_market/api/dashboard')
       .then(r => r.json())
       .then((json: { data: DayData[] }) => {
         const loaded = json.data ?? [];

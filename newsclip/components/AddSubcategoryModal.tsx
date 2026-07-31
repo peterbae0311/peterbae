@@ -47,7 +47,7 @@ export default function AddSubcategoryModal({ categoryId, onClose, onSaved }: Pr
     setLoading(true);
     setError("");
     try {
-      const res = await fetch("/api/subcategories", {
+      const res = await fetch("/newsclip/api/subcategories", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({

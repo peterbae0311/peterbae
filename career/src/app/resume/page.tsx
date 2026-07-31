@@ -750,7 +750,7 @@ export default function ResumePage() {
   async function generateSelfIntroduction() {
     setGeneratingIntro(true);
     try {
-      const res = await fetch('/api/resume/self-introduction', {
+      const res = await fetch('/career/api/resume/self-introduction', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ profile_id: profile.id || null, ...aiPayload(introPrompt) }),
@@ -768,7 +768,7 @@ export default function ResumePage() {
   async function generateCompetencies() {
     setGeneratingCompetency(true);
     try {
-      const res = await fetch('/api/resume/competencies', {
+      const res = await fetch('/career/api/resume/competencies', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(aiPayload(competencyPrompt)),

@@ -83,7 +83,7 @@ export default function EditModal({ target, onClose, onSaved }: Props) {
     setDeleting(true);
     setError("");
     try {
-      const res = await fetch(`/api/subcategories?id=${target.item.id}`, { method: "DELETE" });
+      const res = await fetch(`/newsclip/api/subcategories?id=${target.item.id}`, { method: "DELETE" });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || "삭제 실패");
       onSaved();

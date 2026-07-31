@@ -81,7 +81,7 @@ export default function HomePage() {
   // ── 카테고리 목록 로드 ──
   const loadCategories = useCallback(async () => {
     try {
-      const res = await fetch("/api/categories");
+      const res = await fetch("/newsclip/api/categories");
       const data = await res.json();
       const cats: Category[] = data.categories || [];
       setCategories(cats);
@@ -114,7 +114,7 @@ export default function HomePage() {
       const newMap: Record<string, Article[]> = {};
       await Promise.all(
         subcategoryIds.map(async (subId) => {
-          const res = await fetch(`/api/articles?subcategoryId=${subId}&limit=30`);
+          const res = await fetch(`/newsclip/api/articles?subcategoryId=${subId}&limit=30`);
           const data = await res.json();
           newMap[subId] = data.articles || [];
         })
@@ -145,7 +145,7 @@ export default function HomePage() {
     setFetching(true);
     setStatus("RSS 피드에서 최신 기사를 수집 중…");
     try {
-      const res = await fetch("/api/articles", {
+      const res = await fetch("/newsclip/api/articles", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ categoryId: cat.id, categoryName: cat.name }),
@@ -177,7 +177,7 @@ export default function HomePage() {
     if (!confirm(`"${catName}" 카테고리와 모든 기사를 삭제할까요?`)) return;
     setDeletingId(catId);
     try {
-      const res = await fetch(`/api/categories?id=${catId}`, { method: "DELETE" });
+      const res = await fetch(`/newsclip/api/categories?id=${catId}`, { method: "DELETE" });
       if (!res.ok) throw new Error((await res.json()).error);
 
       // 삭제된 카테고리가 활성인 경우 다른 탭으로 이동
@@ -201,7 +201,7 @@ export default function HomePage() {
     setSearchError("");
     setSearchResults(null);
     try {
-      const res = await fetch("/api/search", {
+      const res = await fetch("/newsclip/api/search", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ query: trimmed }),

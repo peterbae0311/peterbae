@@ -709,7 +709,7 @@ export default function Home() {
         totalRounds: analyzed.length,
         hitRate: Math.round(analyzed.filter(p => p.prize_tier !== '낙첨').length / analyzed.length * 1000) / 10,
       } : null;
-      const res = await fetch('/api/lotto/llm-strategy', {
+      const res = await fetch('/lottery/api/lotto/llm-strategy', {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           conditionResults,
@@ -737,7 +737,7 @@ export default function Home() {
       const latestRound = results[0]?.round ?? 0;
       const endRound = latestRound > 0 ? latestRound - 1 : undefined;
       const startRound = endRound ? endRound - backtestRounds + 1 : undefined;
-      const res = await fetch('/api/lotto/backtest', {
+      const res = await fetch('/lottery/api/lotto/backtest', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -800,7 +800,7 @@ export default function Home() {
     setWheelError('');
     setWheelResult(null);
     try {
-      const res = await fetch('/api/lotto/wheel', {
+      const res = await fetch('/lottery/api/lotto/wheel', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -830,7 +830,7 @@ export default function Home() {
   useEffect(() => {
     (async () => {
       try {
-        const res = await fetch('/api/lotto/save-conditions');
+        const res = await fetch('/lottery/api/lotto/save-conditions');
         const data = await res.json();
         if (!data.success || !Array.isArray(data.data) || data.data.length === 0) return;
 
@@ -896,7 +896,7 @@ export default function Home() {
           initial.map(async (row) => {
             if (!row.isLoading) return row;
             try {
-              const r = await fetch('/api/lotto/execute-condition', {
+              const r = await fetch('/lottery/api/lotto/execute-condition', {
                 method: 'POST', headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify(rowToApiBody(row)),
               });
@@ -919,7 +919,7 @@ export default function Home() {
 
   const syncAndLoad = useCallback(async () => {
     try {
-      const res = await fetch('/api/lotto/results');
+      const res = await fetch('/lottery/api/lotto/results');
       const data = await res.json();
       if (data.success) setResults(data.data ?? []);
       else setSyncMessage('데이터 로드 실패: ' + (data.error ?? ''));
@@ -930,13 +930,13 @@ export default function Home() {
     setIsSyncing(true);
     setSyncMessage('동기화 중...');
     try {
-      const syncRes = await fetch('/api/lotto/sync');
+      const syncRes = await fetch('/lottery/api/lotto/sync');
       const syncData = await syncRes.json();
       if (syncData.success) {
         const synced = syncData.data?.syncedRounds ?? 0;
         if (synced > 0) {
           setSyncMessage(`${synced}개 회차 동기화 완료`);
-          const res = await fetch('/api/lotto/results');
+          const res = await fetch('/lottery/api/lotto/results');
           const data = await res.json();
           if (data.success) setResults(data.data ?? []);
         } else {
@@ -956,14 +956,14 @@ export default function Home() {
     setIsRegisteringLatest(true);
     setRegisterLatestMsg('');
     try {
-      const res = await fetch('/api/lotto/sync');
+      const res = await fetch('/lottery/api/lotto/sync');
       const data = await res.json();
       if (data.success) {
         const synced = data.data?.syncedRounds ?? 0;
         if (synced > 0) {
           const rounds: number[] = data.data?.rounds ?? [];
           setRegisterLatestMsg(`${rounds[rounds.length - 1]}회차 등록 완료`);
-          const r = await fetch('/api/lotto/results');
+          const r = await fetch('/lottery/api/lotto/results');
           const d = await r.json();
           if (d.success) setResults(d.data ?? []);
         } else {
@@ -988,7 +988,7 @@ export default function Home() {
     (async () => {
       let loaded = false;
       try {
-        const res = await fetch('/api/lotto/predicted');
+        const res = await fetch('/lottery/api/lotto/predicted');
         const data = await res.json();
         if (data.success && Array.isArray(data.data.type3) && data.data.type3.length >= 100) {
           skipSaveRef.current = true;
@@ -1000,7 +1000,7 @@ export default function Home() {
 
       if (!loaded) {
         try {
-          const res = await fetch('/api/lotto/ai-predict', {
+          const res = await fetch('/lottery/api/lotto/ai-predict', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ count: 100, mode: 'random' }),
@@ -1009,7 +1009,7 @@ export default function Home() {
           if (d.success && Array.isArray(d.data?.combinations)) {
             skipSaveRef.current = true;
             setType3Numbers(d.data.combinations);
-            await fetch('/api/lotto/predicted', {
+            await fetch('/lottery/api/lotto/predicted', {
               method: 'POST', headers: { 'Content-Type': 'application/json' },
               body: JSON.stringify({ type3: d.data.combinations }),
             });
@@ -1029,7 +1029,7 @@ export default function Home() {
     if (!row) return;
     setConditions((prev) => prev.map((c) => (c.id === rowId ? { ...c, isLoading: true } : c)));
     try {
-      const res = await fetch('/api/lotto/execute-condition', {
+      const res = await fetch('/lottery/api/lotto/execute-condition', {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(rowToApiBody(row)),
       });
@@ -1071,7 +1071,7 @@ export default function Home() {
     // 분포 데이터 없으면 독립적으로 fetch
     setDistLoadingIds((prev) => new Set(prev).add(rowId));
     try {
-      const res = await fetch('/api/lotto/execute-condition', {
+      const res = await fetch('/lottery/api/lotto/execute-condition', {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(rowBody),
       });
@@ -1188,7 +1188,7 @@ export default function Home() {
     }
     setIsSavingConditions(true);
     try {
-      const res = await fetch('/api/lotto/save-conditions', {
+      const res = await fetch('/lottery/api/lotto/save-conditions', {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           conditions: executed.map((c) => ({
@@ -1210,7 +1210,7 @@ export default function Home() {
         setSaveConditionsMsg(`${executed.length}개 조건 저장 완료`);
         // 앵커 스냅샷 저장
         const anchorData = computeAnchorData(executed);
-        await fetch('/api/lotto/anchor-config', {
+        await fetch('/lottery/api/lotto/anchor-config', {
           method: 'POST', headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ target_round: 0, ...anchorData }),
         }).catch(() => {/* ignore */});
@@ -1226,7 +1226,7 @@ export default function Home() {
     setAutoSettingMsg('Claude가 조건을 생성하는 중...');
     try {
       // 1. Claude에게 조건 생성 요청
-      const genRes = await fetch('/api/lotto/auto-conditions', { method: 'POST' });
+      const genRes = await fetch('/lottery/api/lotto/auto-conditions', { method: 'POST' });
       const genData = await genRes.json();
       if (!genData.success) {
         setAutoSettingMsg(`생성 실패: ${genData.error}`);
@@ -1260,7 +1260,7 @@ export default function Home() {
       const executed = await Promise.all(
         newConditions.map(async (row) => {
           try {
-            const r = await fetch('/api/lotto/execute-condition', {
+            const r = await fetch('/lottery/api/lotto/execute-condition', {
               method: 'POST', headers: { 'Content-Type': 'application/json' },
               body: JSON.stringify(rowToApiBody(row)),
             });
@@ -1277,7 +1277,7 @@ export default function Home() {
       // 4. DB 저장
       const toSave = executed.filter((c) => c.numbers !== null && (c.numbers as number[]).length === 6);
       if (toSave.length > 0) {
-        const saveRes = await fetch('/api/lotto/save-conditions', {
+        const saveRes = await fetch('/lottery/api/lotto/save-conditions', {
           method: 'POST', headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
             conditions: toSave.map((c) => ({
@@ -1298,7 +1298,7 @@ export default function Home() {
         if (saveData.success) {
           // 앵커 스냅샷 저장
           const anchorData = computeAnchorData(toSave);
-          await fetch('/api/lotto/anchor-config', {
+          await fetch('/lottery/api/lotto/anchor-config', {
             method: 'POST', headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ target_round: 0, ...anchorData }),
           }).catch(() => {/* ignore */});
@@ -1341,7 +1341,7 @@ export default function Home() {
       // mergedBonusNums: bonusCandidateNums + strategyWatchNums를 memoized로 통합
       if (isAnchorMode && mergedBonusNums.length > 0) reqBody.bonusNumbers = mergedBonusNums;
 
-      const res = await fetch('/api/lotto/ai-predict', {
+      const res = await fetch('/lottery/api/lotto/ai-predict', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(reqBody),
@@ -1351,7 +1351,7 @@ export default function Home() {
         skipSaveRef.current = true;
         setType3Numbers(d.data.combinations);
         setGeneratedMode(generationMode);
-        await fetch('/api/lotto/predicted', {
+        await fetch('/lottery/api/lotto/predicted', {
           method: 'POST', headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ type3: d.data.combinations }),
         });
@@ -1371,7 +1371,7 @@ export default function Home() {
     if (t3.length === 0) return;
     setIsSavingPredicted(true);
     try {
-      await fetch('/api/lotto/predicted', {
+      await fetch('/lottery/api/lotto/predicted', {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ type3: t3 }),
       });
@@ -1420,7 +1420,7 @@ export default function Home() {
 
   const loadConfirmed = useCallback(async () => {
     try {
-      const res = await fetch('/api/lotto/confirmed');
+      const res = await fetch('/lottery/api/lotto/confirmed');
       const d = await res.json();
       if (d.success) setConfirmedPurchases(d.data);
     } catch { /* ignore */ }
@@ -1449,7 +1449,7 @@ export default function Home() {
         const bestTier = tiers.reduce((best, t) =>
           tierOrder.indexOf(t) < tierOrder.indexOf(best) ? t : best, '낙첨');
         try {
-          await fetch('/api/lotto/confirmed', {
+          await fetch('/lottery/api/lotto/confirmed', {
             method: 'PATCH',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ id: p.id, prize_tier: bestTier, matched_numbers: matchCounts }),
@@ -1469,7 +1469,7 @@ export default function Home() {
     try {
       const target_round = results[0].round + 1;
       const mode = wheelType === 'full' ? 'wheel-full' : 'wheel-budget';
-      const res = await fetch('/api/lotto/confirmed', {
+      const res = await fetch('/lottery/api/lotto/confirmed', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ target_round, combos: wheelResult.combos, generation_mode: mode }),
@@ -1504,7 +1504,7 @@ export default function Home() {
     setIsConfirming(true);
     try {
       const selectedCombos = type3Numbers.filter((_, i) => selectedComboIndices.has(i));
-      const res = await fetch('/api/lotto/confirmed', {
+      const res = await fetch('/lottery/api/lotto/confirmed', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ target_round, combos: selectedCombos, generation_mode: generationMode }),
@@ -1520,7 +1520,7 @@ export default function Home() {
 
   const deleteConfirmed = useCallback(async (id: number) => {
     try {
-      await fetch(`/api/lotto/confirmed?id=${id}`, { method: 'DELETE' });
+      await fetch(`/lottery/api/lotto/confirmed?id=${id}`, { method: 'DELETE' });
       await loadConfirmed();
     } catch { /* ignore */ }
   }, [loadConfirmed]);
@@ -1530,7 +1530,7 @@ export default function Home() {
     const target_round = results[0].round + 1;
     setIsConfirmingExpert(true);
     try {
-      const res = await fetch('/api/lotto/confirmed', {
+      const res = await fetch('/lottery/api/lotto/confirmed', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ target_round, combos: expertPicks, generation_mode: generationMode }),
@@ -1550,7 +1550,7 @@ export default function Home() {
       : roundPurchases;
     setSendingTelegramRound(round);
     try {
-      const res = await fetch('/api/lotto/telegram', {
+      const res = await fetch('/lottery/api/lotto/telegram', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({

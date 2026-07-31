@@ -46,7 +46,7 @@ export default function KoreanDashboard() {
   // 날짜 목록 fetch (마운트 시 1회)
   useEffect(() => {
     setDatesLoading(true);
-    fetch('/api/kr/sectors/dates')
+    fetch('/us_stock_market/api/kr/sectors/dates')
       .then(res => {
         if (!res.ok) throw new Error(`HTTP ${res.status}`);
         return res.json() as Promise<KrDatesResponse>;
@@ -70,7 +70,7 @@ export default function KoreanDashboard() {
     if (!selectedDate) return;
     setIsLoading(true);
     setError(null);
-    fetch(`/api/kr/sectors?date=${selectedDate}`)
+    fetch(`/us_stock_market/api/kr/sectors?date=${selectedDate}`)
       .then(res => {
         if (!res.ok) throw new Error(`HTTP ${res.status}`);
         return res.json() as Promise<KrSectorsResponse>;

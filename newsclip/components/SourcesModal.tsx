@@ -56,7 +56,7 @@ export default function SourcesModal({ categories, onClose }: Props) {
   const load = async () => {
     setLoading(true);
     try {
-      const res = await fetch("/api/sources");
+      const res = await fetch("/newsclip/api/sources");
       const data = await res.json();
       setSources(data.sources ?? []);
     } catch (e) { console.error(e); }
@@ -105,7 +105,7 @@ export default function SourcesModal({ categories, onClose }: Props) {
         weight: form.weight !== "" ? Number(form.weight) : 0,
         priority: form.priority !== "" ? Number(form.priority) : 0,
       };
-      const res = await fetch("/api/sources", {
+      const res = await fetch("/newsclip/api/sources", {
         method: editingId ? "PATCH" : "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(editingId ? { ...body, id: editingId } : body),
@@ -121,7 +121,7 @@ export default function SourcesModal({ categories, onClose }: Props) {
 
   const handleDelete = async (id: string) => {
     try {
-      const res = await fetch(`/api/sources?id=${id}`, { method: "DELETE" });
+      const res = await fetch(`/newsclip/api/sources?id=${id}`, { method: "DELETE" });
       if (!res.ok) throw new Error((await res.json()).error);
       setConfirmDeleteId(null);
       await load();
@@ -143,14 +143,14 @@ export default function SourcesModal({ categories, onClose }: Props) {
       let res: Response;
       if (editingCatId && editingCatId !== "__deleted__") {
         // 활성 카테고리 → categories 테이블 수정 (sources.category_name도 동기화됨)
-        res = await fetch("/api/categories", {
+        res = await fetch("/newsclip/api/categories", {
           method: "PATCH",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ id: editingCatId, name: editingCatName.trim() }),
         });
       } else {
         // 삭제된 카테고리 → sources.category_name만 직접 수정
-        res = await fetch("/api/sources", {
+        res = await fetch("/newsclip/api/sources", {
           method: "PATCH",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({

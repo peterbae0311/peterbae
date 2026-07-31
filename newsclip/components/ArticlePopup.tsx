@@ -33,7 +33,7 @@ export default function ArticlePopup({ article, onClose }: Props) {
     if (!article?.summary) return;
     setTranslatingSummary(true);
     try {
-      const res = await fetch("/api/translate", {
+      const res = await fetch("/newsclip/api/translate", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ text: article.summary }),
@@ -52,7 +52,7 @@ export default function ArticlePopup({ article, onClose }: Props) {
     if (!article.full_content) return;
     setTranslating(true);
     try {
-      const res = await fetch("/api/translate", {
+      const res = await fetch("/newsclip/api/translate", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ text: article.full_content }),

@@ -175,7 +175,7 @@ export default function SectorRotationModal({ onClose }: SectorRotationModalProp
   useEffect(() => {
     setLoading(true);
     setError(null);
-    fetch('/api/sector-rotation')
+    fetch('/us_stock_market/api/sector-rotation')
       .then(res => {
         if (!res.ok) throw new Error(`HTTP ${res.status}`);
         return res.json() as Promise<{ success: boolean; data?: RotationData; error?: string }>;

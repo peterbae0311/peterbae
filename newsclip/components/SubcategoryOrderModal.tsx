@@ -34,7 +34,7 @@ export default function SubcategoryOrderModal({ subcategories, onClose, onSaved 
     setError("");
     try {
       const payload = items.map((item, idx) => ({ id: item.id, order_num: idx }));
-      const res = await fetch("/api/subcategories", {
+      const res = await fetch("/newsclip/api/subcategories", {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ items: payload }),
