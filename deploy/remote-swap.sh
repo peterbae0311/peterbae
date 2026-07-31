@@ -37,7 +37,20 @@ if [ -d "$APP" ]; then
 fi
 mv "${APP}-new" "$APP"
 
-pm2 reload "$APP" --update-env
+# pm2는 프로세스 단위가 아니라 데몬 전체에 reload 락을 걸어서, 여러 앱이 동시에
+# 배포될 때(CI가 6개 job을 병렬로 돌림) 한쪽이 "Reload already in progress"로
+# 실패한다. 락이 보통 30초 안에 풀리므로 짧게 재시도한다.
+for i in 1 2 3 4 5 6; do
+  if pm2 reload "$APP" --update-env; then
+    break
+  fi
+  if [ "$i" -eq 6 ]; then
+    echo "pm2 reload $APP failed after 6 attempts" >&2
+    exit 1
+  fi
+  echo "pm2 reload busy, retrying in 15s ($i/6)..."
+  sleep 15
+done
 
 rm -f "$ARCHIVE"
 echo "deployed: $APP"
