@@ -87,7 +87,7 @@ export default function DashboardPage() {
 
   return (
     <div className="min-h-screen px-4 py-10">
-      <div className="max-w-[1416px] mx-auto">
+      <div className="max-w-[1500px] mx-auto">
         <div className="flex items-center justify-between mb-8">
           <div>
             <h1 className="text-2xl font-black tracking-tighter text-neutral-900">모노레포</h1>
@@ -128,16 +128,16 @@ export default function DashboardPage() {
         ) : (
           <div
             className={
-              cards.length <= 2
+              cards.length <= 3
                 ? 'flex flex-wrap justify-center gap-x-[33px] gap-y-4'
                 : 'grid gap-x-[33px] gap-y-4'
             }
-            style={cards.length <= 2 ? undefined : { gridTemplateColumns: 'repeat(3, 450px)' }}
+            style={cards.length <= 3 ? undefined : { gridTemplateColumns: 'repeat(4, 350px)' }}
           >
             {cards.map(card => (
               <div
                 key={card.key}
-                className="w-full sm:w-[450px] flex flex-col rounded-xl border border-white/60 bg-white/70 backdrop-blur-xl shadow-glass px-5 py-4"
+                className="w-full sm:w-[350px] flex flex-col rounded-xl border border-white/60 bg-white/70 backdrop-blur-xl shadow-glass px-5 py-4"
               >
                 <a
                   href={card.path}
@@ -147,7 +147,7 @@ export default function DashboardPage() {
                 >
                   {card.label}
                 </a>
-                <p className="text-xs text-gray-500 mt-1 line-clamp-2 min-h-[2rem]">
+                <p className="text-xs text-gray-500 mt-1 line-clamp-1 min-h-[1rem]">
                   {card.description}
                 </p>
                 <div className="mt-3 pt-3 border-t border-gray-100/80 flex items-center justify-between gap-2">
