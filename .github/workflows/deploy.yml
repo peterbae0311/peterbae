@@ -6,12 +6,9 @@ name: Build and deploy
 # GitHub 호스팅 러너에서 하고, 성공한 빌드 산출물만 서버로 옮긴다.
 
 on:
-  # TODO: 6개 앱 env 시크릿(CAREER_ENV, LOTTERY_ENV, NEWSCLIP_ENV, US_STOCK_MARKET_ENV,
-  # EXPO_ENV, HUB_ENV)을 채우고 수동 실행(workflow_dispatch)으로 한 번 검증한 뒤,
-  # 아래 push 트리거의 주석을 해제할 것. 시크릿이 비어있는 상태로 push 트리거가
-  # 켜지면 build가 빈 .env로 진행되어 운영 중인 배포를 깨진 버전으로 덮어쓴다.
-  # push:
-  #   branches: [main]
+  # 2026-07-31: 전체 15개 job 수동 실행으로 검증 완료(런 30596595192) — push 트리거 활성화.
+  push:
+    branches: [main]
   workflow_dispatch: {}
 
 env:
