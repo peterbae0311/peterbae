@@ -30,44 +30,6 @@ window.injectAuthUI = function injectAuthUI() {
           <div class="error-msg" id="login-error"></div>
           <button type="button" class="btn-primary" id="btn-login-submit">로그인</button>
         </form>
-        <div class="auth-footer">
-          계정이 없으신가요?
-          <a id="link-register">계정을 만드세요</a>
-        </div>
-      </div>
-
-      <div id="screen-register" class="screen">
-        <h1>계정을 만드세요.</h1>
-        <form id="form-register" novalidate>
-          <div class="field">
-            <label for="reg-name">성명</label>
-            <input type="text" id="reg-name" name="name" maxlength="100" autocomplete="name" />
-          </div>
-          <div class="field">
-            <label for="reg-email">이메일</label>
-            <input type="email" id="reg-email" name="email" maxlength="100" autocomplete="email" />
-          </div>
-          <div class="field">
-            <label for="reg-password">비밀번호</label>
-            <input type="password" id="reg-password" name="password" maxlength="100" autocomplete="new-password" />
-            <p class="pw-hint">※ 비밀 번호 설정 조건<br>- 최소 8자 이상이며 숫자, 특수문자 포함</p>
-          </div>
-          <div class="error-msg" id="register-error"></div>
-          <button type="button" class="btn-primary" id="btn-register-submit">가입하기</button>
-        </form>
-        <div class="auth-footer">
-          이미 계정이 있으신가요?
-          <a id="link-login-from-register">로그인하세요</a>
-        </div>
-      </div>
-
-      <div id="screen-register-confirm" class="screen">
-        <h1>계정을 만드세요.</h1>
-        <p class="confirm-text" id="register-confirm-text"></p>
-        <div class="auth-footer">
-          이미 계정이 있으신가요?
-          <a id="link-login-from-register-confirm">로그인하세요</a>
-        </div>
       </div>
 
       <div id="screen-forgot" class="screen">

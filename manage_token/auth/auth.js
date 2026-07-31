@@ -7,7 +7,7 @@ window.initAuth = async function initAuth({ supabaseUrl, supabaseKey, onLogin, o
 
   /* ── Screen management ── */
   const SCREENS = [
-    'screen-login', 'screen-register', 'screen-register-confirm',
+    'screen-login',
     'screen-forgot', 'screen-forgot-confirm', 'screen-new-password',
   ];
 
@@ -20,7 +20,7 @@ window.initAuth = async function initAuth({ supabaseUrl, supabaseKey, onLogin, o
   }
 
   function clearAllErrors() {
-    ['login-error', 'register-error', 'forgot-error', 'new-password-error', 'login-success'].forEach(id => {
+    ['login-error', 'forgot-error', 'new-password-error', 'login-success'].forEach(id => {
       const el = document.getElementById(id);
       if (el) el.textContent = '';
     });
@@ -118,7 +118,6 @@ window.initAuth = async function initAuth({ supabaseUrl, supabaseKey, onLogin, o
     return type === 'signup' || type === 'email';
   })();
 
-  let _signupSuccess    = false;
   let _recoveryEmail    = null;
   let _isChangingPassword = false; // M-1: 비밀번호 변경 중 플래그
 
@@ -170,20 +169,12 @@ window.initAuth = async function initAuth({ supabaseUrl, supabaseKey, onLogin, o
       clearLoginForm();
       showAuthUI();
       showScreen('screen-login');
-      if (_signupSuccess) {
-        _signupSuccess = false;
-        const el = document.getElementById('login-success');
-        if (el) el.textContent = '가입이 완료됐습니다. 로그인해주세요.';
-      }
     }
   });
 
   /* ── Navigation links ── */
   const nav = {
-    'link-register':                    'screen-register',
     'link-forgot':                      'screen-forgot',
-    'link-login-from-register':         'screen-login',
-    'link-login-from-register-confirm': 'screen-login',
     'link-login-from-forgot':           'screen-login',
     'link-login-from-forgot-confirm':   'screen-login',
     'link-login-from-new-password':     'screen-login',
@@ -201,7 +192,6 @@ window.initAuth = async function initAuth({ supabaseUrl, supabaseKey, onLogin, o
   /* ── Enter key → button click ── */
   [
     ['form-login',        'btn-login-submit'],
-    ['form-register',     'btn-register-submit'],
     ['form-forgot',       'btn-forgot-submit'],
     ['form-new-password', 'btn-new-password-submit'],
   ].forEach(([formId, btnId]) => {
@@ -244,58 +234,6 @@ window.initAuth = async function initAuth({ supabaseUrl, supabaseKey, onLogin, o
     } catch (err) {
       showError('login-error', '오류가 발생했습니다. 다시 시도해주세요.');
       console.error('login error:', err);
-    } finally {
-      setButtonLoading(btn, false);
-    }
-  });
-
-  /* ── Form: Register ── */
-  document.getElementById('btn-register-submit').addEventListener('click', async function () {
-    const name     = document.getElementById('reg-name').value.trim();
-    const email    = document.getElementById('reg-email').value.trim();
-    const password = document.getElementById('reg-password').value;
-    const btn      = this;
-
-    showError('register-error', '');
-    if (!name || !email || !password) { showError('register-error', '모든 항목을 입력해주세요.'); return; }
-    // U-2: 이메일 형식 검증
-    if (!validateEmail(email)) { showError('register-error', '올바른 이메일 형식을 입력해주세요.'); return; }
-
-    const pwErr = validatePassword(password);
-    if (pwErr) { showError('register-error', pwErr); return; }
-
-    setButtonLoading(btn, true);
-    try {
-      const result = await _supabase.auth.signUp({
-        email, password,
-        options: {
-          data: { name },
-          emailRedirectTo: window.location.origin + window.location.pathname,
-        },
-      });
-
-      if (result.error) {
-        const msg = result.error.message || '';
-        if (msg.includes('rate limit') || msg.includes('email rate')) {
-          showError('register-error', '이메일 발송 한도를 초과했습니다. 잠시 후 다시 시도해주세요.');
-        } else {
-          showError('register-error', msg || '회원가입 중 오류가 발생했습니다.');
-        }
-        return;
-      }
-
-      if (result.data?.session) {
-        _signupSuccess = true;
-        await _supabase.auth.signOut();
-        return;
-      }
-
-      document.getElementById('register-confirm-text').innerHTML =
-        '계정 생성을 완료하기 위해\n<span class="highlight">' + escapeHtml(email) + '</span> 계정으로\n확인 메일을 보냈습니다.';
-      showScreen('screen-register-confirm');
-    } catch (err) {
-      showError('register-error', '오류가 발생했습니다. 다시 시도해주세요.');
-      console.error('register error:', err);
     } finally {
       setButtonLoading(btn, false);
     }
