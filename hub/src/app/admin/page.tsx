@@ -62,7 +62,7 @@ export default function AdminPage() {
       <div className="max-w-[1500px] mx-auto space-y-6">
         <div className="flex items-center justify-between">
           <h1 className="text-2xl font-black tracking-tighter text-neutral-900">Admin</h1>
-          <a href="/dashboard" className="text-xs text-gray-600 border border-gray-200/80 rounded-md px-3 py-1.5 hover:border-neutral-500 hover:text-neutral-900 hover:bg-neutral-100/60 transition-colors">
+          <a href="/dashboard" className="text-xs text-gray-600 border border-gray-200/80 rounded-lg px-3 py-2 hover:border-neutral-500 hover:text-neutral-900 hover:bg-neutral-100/60 transition-colors">
             대시보드로
           </a>
         </div>
@@ -228,7 +228,7 @@ function AccessTab() {
         <button
           onClick={saveGrants}
           disabled={saving || !editEmail.trim()}
-          className="px-6 py-2 bg-gradient-to-r from-neutral-900 to-neutral-800 text-white text-sm font-medium rounded-lg shadow-glow-dark hover:shadow-lg disabled:opacity-50 transition-all duration-200"
+          className="px-4 py-2 bg-gradient-to-r from-neutral-900 to-neutral-800 text-white text-sm font-medium rounded-lg shadow-glow-dark hover:shadow-lg hover:-translate-y-0.5 disabled:opacity-50 disabled:hover:shadow-glow-dark disabled:hover:translate-y-0 transition-all duration-200"
         >
           {saving ? '저장 중...' : '저장'}
         </button>
@@ -261,13 +261,13 @@ function AccessTab() {
                 <div className="shrink-0 flex items-center gap-2">
                   <button
                     onClick={() => loadEmailIntoForm(email, keys)}
-                    className="text-xs text-gray-600 border border-gray-200/80 rounded-md px-3 py-1.5 hover:border-neutral-500 hover:text-neutral-900 hover:bg-neutral-100/60 transition-colors"
+                    className="text-xs text-gray-600 border border-gray-200/80 rounded-lg px-3 py-2 hover:border-neutral-500 hover:text-neutral-900 hover:bg-neutral-100/60 transition-colors"
                   >
                     수정
                   </button>
                   <button
                     onClick={() => removeEmail(email)}
-                    className="text-xs text-gray-600 border border-gray-200/80 rounded-md px-3 py-1.5 hover:border-red-400 hover:text-red-500 hover:bg-red-50/60 transition-colors"
+                    className="text-xs text-gray-600 border border-gray-200/80 rounded-lg px-3 py-2 hover:border-red-400 hover:text-red-500 hover:bg-red-50/60 transition-colors"
                   >
                     전체 제거
                   </button>
@@ -362,7 +362,7 @@ function LoginHistoryTab() {
           <button
             onClick={() => setPage(p => Math.max(0, p - 1))}
             disabled={page === 0}
-            className="px-3 py-1.5 border border-gray-200/80 rounded-md hover:border-neutral-500 hover:text-neutral-900 disabled:opacity-30 transition-colors"
+            className="px-3 py-2 border border-gray-200/80 rounded-lg hover:border-neutral-500 hover:text-neutral-900 disabled:opacity-30 transition-colors"
           >
             이전
           </button>
@@ -370,7 +370,7 @@ function LoginHistoryTab() {
           <button
             onClick={() => setPage(p => Math.min(totalPages - 1, p + 1))}
             disabled={page >= totalPages - 1}
-            className="px-3 py-1.5 border border-gray-200/80 rounded-md hover:border-neutral-500 hover:text-neutral-900 disabled:opacity-30 transition-colors"
+            className="px-3 py-2 border border-gray-200/80 rounded-lg hover:border-neutral-500 hover:text-neutral-900 disabled:opacity-30 transition-colors"
           >
             다음
           </button>

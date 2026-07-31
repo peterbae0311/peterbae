@@ -108,7 +108,7 @@ export default function DashboardPage() {
             {cards.length > 0 && (
               <button
                 onClick={() => setSettingsOpen(true)}
-                className="text-xs text-gray-600 border border-gray-200/80 rounded-md px-3 py-2 hover:border-neutral-500 hover:text-neutral-900 hover:bg-neutral-100/60 transition-colors"
+                className="text-xs text-gray-600 border border-gray-200/80 rounded-lg px-3 py-2 hover:border-neutral-500 hover:text-neutral-900 hover:bg-neutral-100/60 transition-colors"
               >
                 카드 설정
               </button>
@@ -123,7 +123,7 @@ export default function DashboardPage() {
             )}
             <button
               onClick={logout}
-              className="text-xs text-gray-600 border border-gray-200/80 rounded-md px-3 py-2 hover:border-neutral-500 hover:text-neutral-900 hover:bg-neutral-100/60 transition-colors"
+              className="text-xs text-gray-600 border border-gray-200/80 rounded-lg px-3 py-2 hover:border-neutral-500 hover:text-neutral-900 hover:bg-neutral-100/60 transition-colors"
             >
               로그아웃
             </button>
@@ -165,7 +165,7 @@ export default function DashboardPage() {
                   <span className="text-xs text-gray-400 truncate">{card.path}</span>
                   <button
                     onClick={() => copyUrl(card.key, card.path)}
-                    className="shrink-0 text-xs text-gray-600 border border-gray-200/80 rounded-md px-3 py-1.5 hover:border-neutral-500 hover:text-neutral-900 hover:bg-neutral-100/60 transition-colors"
+                    className="shrink-0 text-xs text-gray-600 border border-gray-200/80 rounded-lg px-3 py-2 hover:border-neutral-500 hover:text-neutral-900 hover:bg-neutral-100/60 transition-colors"
                   >
                     {copiedKey === card.key ? '복사됨' : 'URL 복사'}
                   </button>
@@ -273,13 +273,13 @@ function CardSettingsModal({
         </div>
 
         <div className="shrink-0 flex items-center justify-end gap-2 px-5 py-3 border-t border-gray-200">
-          <button onClick={onClose} className="px-4 py-1.5 text-sm text-gray-600 border border-gray-200/80 rounded-lg hover:bg-gray-50 transition-colors">
+          <button onClick={onClose} className="px-3 py-2 text-xs text-gray-600 border border-gray-200/80 rounded-lg hover:border-neutral-500 hover:text-neutral-900 hover:bg-neutral-100/60 transition-colors">
             취소
           </button>
           <button
             onClick={save}
             disabled={saving}
-            className="px-4 py-1.5 text-sm text-white bg-neutral-900 rounded-lg hover:bg-neutral-800 disabled:opacity-50 transition-colors"
+            className="px-4 py-2 text-sm font-medium text-white bg-gradient-to-r from-neutral-900 to-neutral-800 rounded-lg shadow-glow-dark hover:shadow-lg hover:-translate-y-0.5 disabled:opacity-50 disabled:hover:shadow-glow-dark disabled:hover:translate-y-0 transition-all duration-200"
           >
             {saving ? '저장 중...' : '저장'}
           </button>
