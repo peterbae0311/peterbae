@@ -147,9 +147,9 @@ export default function DashboardPage() {
                 >
                   {card.label}
                 </a>
-                {card.description && (
-                  <p className="text-xs text-gray-500 mt-1 line-clamp-2">{card.description}</p>
-                )}
+                <p className="text-xs text-gray-500 mt-1 line-clamp-2 min-h-[2rem]">
+                  {card.description}
+                </p>
                 <div className="mt-3 pt-3 border-t border-gray-100/80 flex items-center justify-between gap-2">
                   <span className="text-xs text-gray-400 truncate">{card.path}</span>
                   <button
