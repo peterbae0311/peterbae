@@ -1,14 +1,41 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useCallback } from 'react';
 import Link from 'next/link';
 import { supabase } from '@/lib/supabase';
 import { APPS, SUPER_ADMIN_EMAIL, fullUrl } from '@/lib/apps';
 
+interface CardOverride {
+  app_key: string;
+  custom_label: string | null;
+  custom_description: string | null;
+  sort_order: number;
+}
+
+interface CardData {
+  key: string;
+  path: string;
+  label: string;
+  description: string;
+  sortOrder: number;
+}
+
 export default function DashboardPage() {
   const [email, setEmail] = useState<string | null>(null);
   const [allowedKeys, setAllowedKeys] = useState<Set<string> | null>(null);
+  const [overrides, setOverrides] = useState<Record<string, CardOverride>>({});
   const [copiedKey, setCopiedKey] = useState<string | null>(null);
+  const [settingsOpen, setSettingsOpen] = useState(false);
+
+  const loadOverrides = useCallback(async (userEmail: string) => {
+    const { data } = await supabase
+      .from('dashboard_cards')
+      .select('app_key, custom_label, custom_description, sort_order')
+      .eq('email', userEmail);
+    const map: Record<string, CardOverride> = {};
+    (data ?? []).forEach(row => { map[row.app_key as string] = row as CardOverride; });
+    setOverrides(map);
+  }, []);
 
   useEffect(() => {
     (async () => {
@@ -20,17 +47,17 @@ export default function DashboardPage() {
 
       if (userEmail === SUPER_ADMIN_EMAIL) {
         setAllowedKeys(new Set(APPS.map(a => a.key)));
-        return;
+      } else {
+        const { data } = await supabase
+          .from('app_access')
+          .select('app_key')
+          .eq('email', userEmail);
+        setAllowedKeys(new Set((data ?? []).map(r => r.app_key as string)));
       }
 
-      const { data } = await supabase
-        .from('app_access')
-        .select('app_key')
-        .eq('email', userEmail);
-
-      setAllowedKeys(new Set((data ?? []).map(r => r.app_key as string)));
+      await loadOverrides(userEmail);
     })();
-  }, []);
+  }, [loadOverrides]);
 
   async function copyUrl(key: string, path: string) {
     await navigator.clipboard.writeText(fullUrl(path));
@@ -44,17 +71,37 @@ export default function DashboardPage() {
   }
 
   const isSuperAdmin = email === SUPER_ADMIN_EMAIL;
-  const visibleApps = allowedKeys ? APPS.filter(a => allowedKeys.has(a.key)) : [];
+
+  const cards: CardData[] = (allowedKeys ? APPS.filter(a => allowedKeys.has(a.key)) : [])
+    .map((app, i) => {
+      const o = overrides[app.key];
+      return {
+        key: app.key,
+        path: app.path,
+        label: o?.custom_label || app.label,
+        description: o?.custom_description || '',
+        sortOrder: o?.sort_order ?? i,
+      };
+    })
+    .sort((a, b) => a.sortOrder - b.sortOrder);
 
   return (
     <div className="min-h-screen px-4 py-10">
-      <div className="max-w-3xl mx-auto">
+      <div className="max-w-4xl mx-auto">
         <div className="flex items-center justify-between mb-8">
           <div>
             <h1 className="text-2xl font-black tracking-tighter text-neutral-900">모노레포</h1>
             <p className="text-sm text-gray-500 mt-1">{email}로 로그인됨</p>
           </div>
           <div className="flex items-center gap-2">
+            {cards.length > 0 && (
+              <button
+                onClick={() => setSettingsOpen(true)}
+                className="text-xs text-gray-600 border border-gray-200/80 rounded-md px-3 py-2 hover:border-neutral-500 hover:text-neutral-900 hover:bg-neutral-100/60 transition-colors"
+              >
+                카드 설정
+              </button>
+            )}
             {isSuperAdmin && (
               <Link
                 href="/admin"
@@ -74,38 +121,151 @@ export default function DashboardPage() {
 
         {allowedKeys === null ? (
           <p className="text-sm text-gray-400">불러오는 중...</p>
-        ) : visibleApps.length === 0 ? (
+        ) : cards.length === 0 ? (
           <div className="rounded-2xl border border-white/60 bg-white/70 backdrop-blur-xl shadow-glass p-10 text-center text-gray-400 text-sm">
             아직 접근 권한이 부여된 항목이 없습니다.<br />관리자에게 문의하세요.
           </div>
         ) : (
-          <ul className="space-y-2">
-            {visibleApps.map(app => (
-              <li
-                key={app.key}
-                className="flex items-center justify-between gap-3 rounded-xl border border-white/60 bg-white/70 backdrop-blur-xl shadow-glass px-5 py-4"
+          <div className="flex flex-wrap justify-center gap-4">
+            {cards.map(card => (
+              <div
+                key={card.key}
+                className="w-full sm:w-64 flex flex-col rounded-xl border border-white/60 bg-white/70 backdrop-blur-xl shadow-glass px-5 py-4"
               >
                 <a
-                  href={app.path}
+                  href={card.path}
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="flex-1 font-bold text-neutral-900 hover:underline truncate"
+                  className="font-bold text-neutral-900 hover:underline truncate"
                 >
-                  {app.label}
+                  {card.label}
                 </a>
-                <span className="text-xs text-gray-400 truncate max-w-[220px] hidden sm:inline">
-                  {app.path}
-                </span>
-                <button
-                  onClick={() => copyUrl(app.key, app.path)}
-                  className="shrink-0 text-xs text-gray-600 border border-gray-200/80 rounded-md px-3 py-1.5 hover:border-neutral-500 hover:text-neutral-900 hover:bg-neutral-100/60 transition-colors"
-                >
-                  {copiedKey === app.key ? '복사됨' : 'URL 복사'}
-                </button>
-              </li>
+                {card.description && (
+                  <p className="text-xs text-gray-500 mt-1 line-clamp-2">{card.description}</p>
+                )}
+                <div className="mt-3 pt-3 border-t border-gray-100/80 flex items-center justify-between gap-2">
+                  <span className="text-xs text-gray-400 truncate">{card.path}</span>
+                  <button
+                    onClick={() => copyUrl(card.key, card.path)}
+                    className="shrink-0 text-xs text-gray-600 border border-gray-200/80 rounded-md px-3 py-1.5 hover:border-neutral-500 hover:text-neutral-900 hover:bg-neutral-100/60 transition-colors"
+                  >
+                    {copiedKey === card.key ? '복사됨' : 'URL 복사'}
+                  </button>
+                </div>
+              </div>
             ))}
-          </ul>
+          </div>
         )}
+      </div>
+
+      {settingsOpen && email && (
+        <CardSettingsModal
+          email={email}
+          cards={cards}
+          onSaved={async () => { await loadOverrides(email); setSettingsOpen(false); }}
+          onClose={() => setSettingsOpen(false)}
+        />
+      )}
+    </div>
+  );
+}
+
+function CardSettingsModal({
+  email, cards, onSaved, onClose,
+}: {
+  email: string;
+  cards: CardData[];
+  onSaved: () => void;
+  onClose: () => void;
+}) {
+  const [rows, setRows] = useState<CardData[]>(cards.map(c => ({ ...c })));
+  const [saving, setSaving] = useState(false);
+
+  function updateRow(key: string, changes: Partial<CardData>) {
+    setRows(rs => rs.map(r => r.key === key ? { ...r, ...changes } : r));
+  }
+
+  function moveRow(index: number, direction: -1 | 1) {
+    const target = index + direction;
+    if (target < 0 || target >= rows.length) return;
+    const reordered = [...rows];
+    [reordered[index], reordered[target]] = [reordered[target], reordered[index]];
+    setRows(reordered);
+  }
+
+  async function save() {
+    setSaving(true);
+    const payload = rows.map((r, i) => ({
+      email,
+      app_key: r.key,
+      custom_label: r.label.trim() || null,
+      custom_description: r.description.trim() || null,
+      sort_order: i,
+    }));
+    await supabase.from('dashboard_cards').upsert(payload, { onConflict: 'email,app_key' });
+    setSaving(false);
+    onSaved();
+  }
+
+  return (
+    <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50" onClick={onClose}>
+      <div
+        className="bg-white rounded-lg shadow-xl w-[520px] max-w-[92vw] max-h-[85vh] flex flex-col"
+        onClick={e => e.stopPropagation()}
+      >
+        <div className="shrink-0 flex items-center justify-between px-5 py-3 border-b border-gray-200">
+          <span className="text-sm font-bold text-gray-800">카드 설정</span>
+          <button onClick={onClose} className="text-gray-400 hover:text-gray-700 text-lg leading-none">✕</button>
+        </div>
+
+        <div className="flex-1 overflow-y-auto px-5 py-4 space-y-3">
+          {rows.map((row, i) => (
+            <div key={row.key} className="flex gap-2 border border-gray-200/80 rounded-lg p-3">
+              <div className="flex flex-col shrink-0 pt-1">
+                <button
+                  onClick={() => moveRow(i, -1)}
+                  disabled={i === 0}
+                  className="text-gray-400 hover:text-neutral-900 disabled:opacity-20 disabled:hover:text-gray-400 leading-none text-xs px-1"
+                  title="위로"
+                >▲</button>
+                <button
+                  onClick={() => moveRow(i, 1)}
+                  disabled={i === rows.length - 1}
+                  className="text-gray-400 hover:text-neutral-900 disabled:opacity-20 disabled:hover:text-gray-400 leading-none text-xs px-1"
+                  title="아래로"
+                >▼</button>
+              </div>
+              <div className="flex-1 min-w-0 space-y-1.5">
+                <input
+                  value={row.label}
+                  onChange={e => updateRow(row.key, { label: e.target.value })}
+                  placeholder="카드 이름"
+                  className="w-full px-2.5 py-1.5 border border-gray-200/80 bg-white/60 rounded-md text-sm font-semibold text-gray-800 focus:outline-none focus:border-neutral-500 focus:ring-1 focus:ring-neutral-500 transition-colors"
+                />
+                <input
+                  value={row.description}
+                  onChange={e => updateRow(row.key, { description: e.target.value })}
+                  placeholder="설명 (선택)"
+                  className="w-full px-2.5 py-1.5 border border-gray-200/80 bg-white/60 rounded-md text-xs text-gray-600 focus:outline-none focus:border-neutral-500 focus:ring-1 focus:ring-neutral-500 transition-colors"
+                />
+                <p className="text-[11px] text-gray-400 truncate">{row.path}</p>
+              </div>
+            </div>
+          ))}
+        </div>
+
+        <div className="shrink-0 flex items-center justify-end gap-2 px-5 py-3 border-t border-gray-200">
+          <button onClick={onClose} className="px-4 py-1.5 text-sm text-gray-600 border border-gray-200/80 rounded-lg hover:bg-gray-50 transition-colors">
+            취소
+          </button>
+          <button
+            onClick={save}
+            disabled={saving}
+            className="px-4 py-1.5 text-sm text-white bg-neutral-900 rounded-lg hover:bg-neutral-800 disabled:opacity-50 transition-colors"
+          >
+            {saving ? '저장 중...' : '저장'}
+          </button>
+        </div>
       </div>
     </div>
   );
