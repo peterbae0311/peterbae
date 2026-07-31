@@ -87,6 +87,8 @@ export default function DashboardPage() {
               >
                 <a
                   href={app.path}
+                  target="_blank"
+                  rel="noopener noreferrer"
                   className="flex-1 font-bold text-neutral-900 hover:underline truncate"
                 >
                   {app.label}
