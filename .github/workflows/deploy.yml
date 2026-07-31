@@ -314,7 +314,6 @@ jobs:
   # /usr/share/nginx/html은 root 소유라 원격에서 sudo rsync로 실행.
   static-sites:
     needs: changes
-    if: github.event_name != 'push' || needs.changes.outputs[matrix.site] == 'true'
     runs-on: ubuntu-latest
     strategy:
       matrix:
@@ -331,6 +330,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - name: Deploy static site
+        if: github.event_name != 'push' || needs.changes.outputs[matrix.site] == 'true'
         run: |
           mkdir -p ~/.ssh
           echo "${{ secrets.DEPLOY_SSH_KEY }}" > ~/.ssh/deploy_key
