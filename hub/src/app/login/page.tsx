@@ -3,6 +3,16 @@
 import { Suspense, useState, type FormEvent } from 'react';
 import { useSearchParams } from 'next/navigation';
 import { supabase } from '@/lib/supabase';
+import { decodeSessionId } from '@/lib/jwt';
+
+function logLoginEvent(payload: { email: string; result: 'success' | 'fail'; failReason?: string; sessionId?: string | null }) {
+  // 이력 기록 실패가 로그인 흐름을 막으면 안 되므로 fire-and-forget.
+  fetch('/api/auth/login-event', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(payload),
+  }).catch(() => {});
+}
 
 const PASSWORD_RULE_TEXT = '최소 8자 이상이며 숫자, 특수문자 포함';
 
@@ -52,13 +62,17 @@ function LoginPageInner() {
     setError('');
     setLoading(true);
 
-    const { error: signInError } = await supabase.auth.signInWithPassword({ email, password });
+    const { data: signInData, error: signInError } = await supabase.auth.signInWithPassword({ email, password });
 
     if (signInError) {
+      logLoginEvent({ email, result: 'fail', failReason: signInError.message });
       setError('이메일 또는 비밀번호가 올바르지 않습니다.');
       setLoading(false);
       return;
     }
+
+    const sessionId = signInData.session ? decodeSessionId(signInData.session.access_token) : null;
+    logLoginEvent({ email, result: 'success', sessionId });
 
     // redirect는 career 바깥의 다른 서비스 경로(예: /lottery)일 수 있어, basePath를 자동으로
     // 붙이는 next/navigation 라우터 대신 실제 브라우저 이동을 사용한다.

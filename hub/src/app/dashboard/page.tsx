@@ -4,6 +4,7 @@ import { useEffect, useState, useCallback } from 'react';
 import Link from 'next/link';
 import { supabase } from '@/lib/supabase';
 import { APPS, SUPER_ADMIN_EMAIL, fullUrl } from '@/lib/apps';
+import { decodeSessionId } from '@/lib/jwt';
 
 interface CardOverride {
   app_key: string;
@@ -66,6 +67,16 @@ export default function DashboardPage() {
   }
 
   async function logout() {
+    const { data: { session } } = await supabase.auth.getSession();
+    const sessionId = session ? decodeSessionId(session.access_token) : null;
+    if (sessionId) {
+      // signOut 전에 보내야 세션 쿠키가 아직 유효 — 실패해도 로그아웃 자체는 계속 진행.
+      await fetch('/api/auth/logout-event', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ sessionId }),
+      }).catch(() => {});
+    }
     await supabase.auth.signOut();
     window.location.href = '/login';
   }
