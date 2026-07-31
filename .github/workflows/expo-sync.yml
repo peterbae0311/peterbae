@@ -44,11 +44,9 @@ jobs:
         env:
           SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
           SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
-          KOPIS_SERVICE_KEY: ${{ secrets.KOPIS_SERVICE_KEY }}
           CULTURE_PORTAL_SERVICE_KEY: ${{ secrets.CULTURE_PORTAL_SERVICE_KEY }}
           CULTURE_DATA_PLAZA_EXPO_SERVICE_KEY: ${{ secrets.CULTURE_DATA_PLAZA_EXPO_SERVICE_KEY }}
           CULTURE_DATA_PLAZA_PERF_SERVICE_KEY: ${{ secrets.CULTURE_DATA_PLAZA_PERF_SERVICE_KEY }}
           SEOUL_CULTURE_EVENT_SERVICE_KEY: ${{ secrets.SEOUL_CULTURE_EVENT_SERVICE_KEY }}
-          WORKNET_JOB_FAIR_SERVICE_KEY: ${{ secrets.WORKNET_JOB_FAIR_SERVICE_KEY }}
           KOTRA_OVERSEAS_FAIR_SERVICE_KEY: ${{ secrets.KOTRA_OVERSEAS_FAIR_SERVICE_KEY }}
         run: npm run sync -- ${{ github.event.inputs.source || 'all' }}
