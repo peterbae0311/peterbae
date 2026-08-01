@@ -7,7 +7,7 @@ export async function POST(req: NextRequest) {
 
   let body: {
     conditionType?: number; years?: number; months?: number;
-    maxWinners?: number; maxConsec?: number;
+    maxConsec?: number;
     oddCount?: number; sumMin?: number; sumMax?: number; minAC?: number;
     minBands?: number; lowCount?: number; primeCount?: number; minUniqueTails?: number;
   };
@@ -40,7 +40,6 @@ export async function POST(req: NextRequest) {
     conditionType,
     years: Number(body.years ?? 0),
     months: Number(body.months ?? 0),
-    maxWinners: Number(body.maxWinners ?? 5),
     maxConsec: Number(body.maxConsec ?? 0),
     oddCount: Number(body.oddCount ?? 3),
     sumMin: Number(body.sumMin ?? 110),

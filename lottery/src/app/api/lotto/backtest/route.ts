@@ -19,8 +19,6 @@ export async function POST(req: NextRequest) {
     conditionType?: number;
     years?: number;
     months?: number;
-    maxWinners?: number;
-    maxPrizeAmt?: number;
     maxConsec?: number;
     oddCount?: number;
     sumMin?: number;
@@ -37,7 +35,6 @@ export async function POST(req: NextRequest) {
     conditionType: (Number(body.conditionType ?? 1)) as FilterParams['conditionType'],
     years: Number(body.years ?? 1),
     months: Number(body.months ?? 0),
-    maxWinners: Number(body.maxWinners ?? 5),
     maxConsec: Number(body.maxConsec ?? 0),
     oddCount: Number(body.oddCount ?? 3),
     sumMin: Number(body.sumMin ?? 110),

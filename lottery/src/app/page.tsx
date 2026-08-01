@@ -23,14 +23,13 @@ interface LottoResult {
   first_prize_amount: number | null;
 }
 
-type ConditionType = 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 | 9 | 10 | 11;
+type ConditionType = 1 | 4 | 5 | 6 | 7 | 8 | 9 | 10 | 11;
 
 interface ConditionRow {
   id: string;
   conditionType: ConditionType;
   years: number;
   months: number;
-  maxWinners: number;
   maxConsec: number;       // 0=없음, 2=2개, 3=3개+
   oddCount: number;        // 홀수 개수 (0~6)
   sumMin: number;          // 합계 최소
@@ -168,10 +167,8 @@ function selectBestPurchases(
   }
 }
 
-function buildConditionText(c: Pick<ConditionRow, 'conditionType' | 'years' | 'months' | 'maxWinners' | 'maxConsec' | 'oddCount' | 'sumMin' | 'sumMax' | 'minAC' | 'minBands' | 'lowCount' | 'primeCount' | 'minUniqueTails'>): string {
-  const { conditionType, years, months, maxWinners, maxConsec, oddCount, sumMin, sumMax, minAC, minBands, lowCount, primeCount, minUniqueTails } = c;
-  if (conditionType === 2) return `당첨자 ${maxWinners}명 미만 당첨번호에서 가장 많이 나온 숫자 6개 추출`;
-  if (conditionType === 3) return `롤오버(전 회차 1등 없음) 회차에서 가장 많이 나온 숫자 6개 추출`;
+function buildConditionText(c: Pick<ConditionRow, 'conditionType' | 'years' | 'months' | 'maxConsec' | 'oddCount' | 'sumMin' | 'sumMax' | 'minAC' | 'minBands' | 'lowCount' | 'primeCount' | 'minUniqueTails'>): string {
+  const { conditionType, years, months, maxConsec, oddCount, sumMin, sumMax, minAC, minBands, lowCount, primeCount, minUniqueTails } = c;
   if (conditionType === 4) {
     const label = maxConsec === 0 ? '없음' : maxConsec === 2 ? '2개' : '3개+';
     return `연속번호 ${label} 회차에서 가장 많이 나온 숫자 6개 추출`;
@@ -191,14 +188,7 @@ function buildConditionText(c: Pick<ConditionRow, 'conditionType' | 'years' | 'm
 }
 
 function parseConditionText(text: string): Omit<ConditionRow, 'id' | 'roundsAnalyzed' | 'numbers' | 'frequencies' | 'distribution' | 'bonusNumbers' | 'isLoading'> {
-  const base = { years: 0, months: 0, maxWinners: 0, maxConsec: 0, oddCount: 3, sumMin: 110, sumMax: 166, minAC: 7, minBands: 5, lowCount: 3, primeCount: 2, minUniqueTails: 5 };
-  if (text.includes('당첨자')) {
-    const m = text.match(/당첨자 (\d+)명/);
-    return { ...base, conditionType: 2, maxWinners: m ? parseInt(m[1]) : 5 };
-  }
-  if (text.includes('롤오버') || text.includes('당첨금')) {
-    return { ...base, conditionType: 3 };
-  }
+  const base = { years: 0, months: 0, maxConsec: 0, oddCount: 3, sumMin: 110, sumMax: 166, minAC: 7, minBands: 5, lowCount: 3, primeCount: 2, minUniqueTails: 5 };
   if (text.includes('연속번호')) {
     const m = text.match(/연속번호 (없음|2개|3개\+)/);
     const label = m ? m[1] : '없음';
@@ -242,7 +232,7 @@ function rowToApiBody(row: ConditionRow) {
   return {
     conditionType: row.conditionType,
     years: row.years, months: row.months,
-    maxWinners: row.maxWinners, maxConsec: row.maxConsec,
+    maxConsec: row.maxConsec,
     oddCount: row.oddCount, sumMin: row.sumMin, sumMax: row.sumMax, minAC: row.minAC,
     minBands: row.minBands, lowCount: row.lowCount, primeCount: row.primeCount, minUniqueTails: row.minUniqueTails,
   };
@@ -280,7 +270,7 @@ function computeAnchorData(rows: ConditionRow[]) {
 }
 
 const BLANK_ROW = { roundsAnalyzed: null, numbers: null, frequencies: null, distribution: null, bonusNumbers: null, isLoading: false };
-const ROW_DEFAULTS = { maxWinners: 0, maxConsec: 0, oddCount: 3, sumMin: 110, sumMax: 166, minAC: 7, minBands: 5, lowCount: 3, primeCount: 2, minUniqueTails: 5 };
+const ROW_DEFAULTS = { maxConsec: 0, oddCount: 3, sumMin: 110, sumMax: 166, minAC: 7, minBands: 5, lowCount: 3, primeCount: 2, minUniqueTails: 5 };
 const DEFAULT_CONDITIONS: ConditionRow[] = [
   { id: makeId(), conditionType: 1, years: 0, months: 1,  ...ROW_DEFAULTS, ...BLANK_ROW },
   { id: makeId(), conditionType: 1, years: 0, months: 3,  ...ROW_DEFAULTS, ...BLANK_ROW },
@@ -490,6 +480,12 @@ function getTierTextColor(tier: string): string {
   return 'text-gray-400';
 }
 
+// Claude 추천 5개 표시용 점수 — selectExpertPicks의 선정 기준(앵커·보너스후보·빈도상위 가중치)과
+// 동일한 공식을 재사용해, 화면에 보이는 순위와 점수가 항상 같은 기준으로 정렬되게 한다.
+function expertDisplayScore(combo: number[], anchorNums: number[], bonusNums: number[], freqNums: number[]): number {
+  return scoreCombo(combo, bonusNums, freqNums) + combo.filter(n => anchorNums.includes(n)).length * 5;
+}
+
 // ---------------------------------------------------------------------------
 // Main
 // ---------------------------------------------------------------------------
@@ -514,7 +510,6 @@ export default function Home() {
   const [type3Numbers, setType3Numbers] = useState<number[][]>([]);
   const [selectedComboIndices, setSelectedComboIndices] = useState<Set<number>>(new Set());
   const [expertPicks, setExpertPicks] = useState<number[][]>([]);
-  const [isConfirmingExpert, setIsConfirmingExpert] = useState(false);
   const [generatedMode, setGeneratedMode] = useState<string | null>(null);
   const [isGeneratingAI, setIsGeneratingAI] = useState(false);
   const [aiError, setAiError] = useState('');
@@ -527,6 +522,14 @@ export default function Home() {
   const [telegramMsg, setTelegramMsg] = useState<{ round: number; ok: boolean; text: string } | null>(null);
   // DB에서 불러온 직후 auto-save 방지용 플래그
   const skipSaveRef = useRef(false);
+
+  // Claude 추천 5개 중 확정에 포함할 항목 체크 (기본 상위 3개)
+  const [expertPickChecked, setExpertPickChecked] = useState<Set<number>>(new Set());
+  // 고급(게임수 조절 · 전체 조합) 아코디언
+  const [showAdvanced, setShowAdvanced] = useState(false);
+  // Claude 추천 + 휠링 통합 최종 확정
+  const [isConfirmingFinal, setIsConfirmingFinal] = useState(false);
+  const [finalConfirmMsg, setFinalConfirmMsg] = useState('');
 
   // 앵커 모드 전환 시 게임 수 자동 조정
   useEffect(() => {
@@ -651,6 +654,17 @@ export default function Home() {
     [...new Set([...bonusCandidateNums, ...strategyWatchNums])],
   [bonusCandidateNums, strategyWatchNums]);
 
+  // 휠링 풀: 앵커+보너스후보 합집합을 기본으로 하고, 7개 미만이면 빈도상위 번호로 보충 (최대 10개)
+  const wheelPool = useMemo(() => {
+    const base = [...new Set([...activeAnchorNums, ...mergedBonusNums])];
+    const padded = [...base];
+    for (const n of topFreqNums) {
+      if (padded.length >= 8) break;
+      if (!padded.includes(n)) padded.push(n);
+    }
+    return padded.sort((a, b) => a - b).slice(0, 10);
+  }, [activeAnchorNums, mergedBonusNums, topFreqNums]);
+
   // 분포도 팝업
   const [distPopup, setDistPopup] = useState<{
     distribution: number[];
@@ -659,27 +673,9 @@ export default function Home() {
   } | null>(null);
   const [distLoadingIds, setDistLoadingIds] = useState<Set<string>>(new Set());
 
-  // 백테스팅
-  const [showBacktest, setShowBacktest] = useState(false);
-  const [backtestMode, setBacktestMode] = useState<'anchor2' | 'anchor3' | 'anchor' | 'no-consec' | 'two-consec' | 'random'>('anchor2');
-  const [backtestRounds, setBacktestRounds] = useState(100);
-  const [backtestGames, setBacktestGames] = useState(5);
-  const [backtestLookback, setBacktestLookback] = useState(1); // 분석 기간(년)
-  const [isRunningBacktest, setIsRunningBacktest] = useState(false);
-  const [backtestResult, setBacktestResult] = useState<{
-    mode: string;
-    totalRounds: number;
-    totalGames: number;
-    startRound: number;
-    endRound: number;
-    tierCounts: Record<string, number>;
-    bestTierCounts: Record<string, number>;
-    hitRate5Plus: number;
-    hitRate3Plus: number;
-    roi: number;
-    recentResults: { round: number; anchorNums: number[]; bestTier: string; tiers: string[] }[];
-  } | null>(null);
-  const [backtestError, setBacktestError] = useState('');
+  // 백테스팅 — 생성 모드 전체에 대한 과거 성과 배지 (개별 조합 단위 지표는 존재하지 않음)
+  const [modeBacktest, setModeBacktest] = useState<{ mode: string; hitRate3Plus: number; hitRate5Plus: number; roi: number } | null>(null);
+  const [isRunningModeBacktest, setIsRunningModeBacktest] = useState(false);
 
   const [tooltipInfo, setTooltipInfo] = useState<{ id: string; x: number; y: number; above: boolean } | null>(null);
   const showTooltip = (e: React.MouseEvent, id: string) => {
@@ -729,44 +725,27 @@ export default function Home() {
     finally { setIsRunningStrategy(false); }
   }, [conditions, confirmedPurchases, anchor2Numbers, anchor3Numbers, anchorNumbers, results]);
 
-  const runBacktest = useCallback(async () => {
-    setIsRunningBacktest(true);
-    setBacktestError('');
-    setBacktestResult(null);
+  const runModeBacktest = useCallback(async (mode: typeof generationMode) => {
+    setIsRunningModeBacktest(true);
     try {
       const latestRound = results[0]?.round ?? 0;
       const endRound = latestRound > 0 ? latestRound - 1 : undefined;
-      const startRound = endRound ? endRound - backtestRounds + 1 : undefined;
+      const startRound = endRound ? endRound - 100 + 1 : undefined;
       const res = await fetch('/lottery/api/lotto/backtest', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          mode: backtestMode,
-          gamesPerRound: backtestGames,
-          startRound,
-          endRound,
-          conditionType: 1,
-          years: backtestLookback,
-          months: 0,
-        }),
+        body: JSON.stringify({ mode, gamesPerRound: 5, startRound, endRound, conditionType: 1, years: 1, months: 0 }),
       });
       const data = await res.json();
-      if (!data.success) { setBacktestError(data.error ?? '오류'); return; }
-      setBacktestResult(data.data);
-    } catch (e) {
-      setBacktestError(e instanceof Error ? e.message : '오류');
-    } finally {
-      setIsRunningBacktest(false);
-    }
-  }, [backtestMode, backtestRounds, backtestGames, backtestLookback, results]);
+      if (data.success) {
+        setModeBacktest({ mode, hitRate3Plus: data.data.hitRate3Plus, hitRate5Plus: data.data.hitRate5Plus, roi: data.data.roi });
+      }
+    } catch { /* 참고용 배지라 실패 시 조용히 무시 */ }
+    finally { setIsRunningModeBacktest(false); }
+  }, [results]);
 
-  // 휠링 시스템
-  const [showWheel, setShowWheel] = useState(false);
-  const [wheelNums, setWheelNums] = useState<number[]>([]);
-  const [wheelType, setWheelType] = useState<'full' | 'budget'>('full');
-  const [wheelBudget, setWheelBudget] = useState(10);
+  // 휠링 — 조건분석에서 나온 앵커+보너스+빈도상위 번호(wheelPool)로 예산 2게임 자동 생성
   const [isGeneratingWheel, setIsGeneratingWheel] = useState(false);
-  const [isSavingWheel, setIsSavingWheel] = useState(false);
   const [wheelResult, setWheelResult] = useState<{
     combos: number[][];
     scores: number[];
@@ -774,54 +753,29 @@ export default function Home() {
     fullWheelSize: number;
     coverage: { rate3plus: number; rate4plus: number; rate5plus: number; rate6: number; totalScenarios: number };
   } | null>(null);
+  const [wheelChecked, setWheelChecked] = useState<Set<number>>(new Set());
   const [wheelError, setWheelError] = useState('');
-  const [wheelSaveMsg, setWheelSaveMsg] = useState('');
 
-  const toggleWheelNum = useCallback((n: number) => {
-    setWheelNums(prev => {
-      if (prev.includes(n)) return prev.filter(x => x !== n);
-      if (prev.length >= 12) return prev;
-      return [...prev, n].sort((a, b) => a - b);
-    });
-    setWheelResult(null);
-  }, []);
-
-  const fillWheelFromAnchor = useCallback(() => {
-    // 앵커+보너스 상위 번호로 채우기 (최대 9개)
-    const anchorSet = new Set([...anchor2Numbers, ...bonusCandidateNums]);
-    const candidates = [...anchorSet].slice(0, 9).sort((a, b) => a - b);
-    setWheelNums(candidates);
-    setWheelResult(null);
-  }, [anchor2Numbers, bonusCandidateNums]);
-
-  const generateWheel = useCallback(async () => {
-    if (wheelNums.length < 7) { setWheelError('번호를 7개 이상 선택하세요'); return; }
+  const runAutoWheel = useCallback(async (pool: number[]) => {
+    if (pool.length < 7) { setWheelResult(null); setWheelError('조건분석 번호가 부족해 휠링 풀을 구성할 수 없습니다'); return; }
     setIsGeneratingWheel(true);
     setWheelError('');
-    setWheelResult(null);
     try {
       const res = await fetch('/lottery/api/lotto/wheel', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          numbers: wheelNums,
-          type: wheelType,
-          budget: wheelBudget,
-          bonusNumbers: bonusCandidateNums,
-          topFreqNums,
-        }),
+        body: JSON.stringify({ numbers: pool, type: 'budget', budget: 2, bonusNumbers: bonusCandidateNums, topFreqNums }),
       });
       const data = await res.json();
-      if (!data.success) { setWheelError(data.error ?? '오류'); return; }
+      if (!data.success) { setWheelError(data.error ?? '오류'); setWheelResult(null); return; }
       setWheelResult(data.data);
+      setWheelChecked(new Set((data.data.combos as number[][]).map((_, i) => i)));
     } catch (e) {
       setWheelError(e instanceof Error ? e.message : '오류');
     } finally {
       setIsGeneratingWheel(false);
     }
-  }, [wheelNums, wheelType, wheelBudget, bonusCandidateNums, topFreqNums]);
-
-  // saveWheelCombos는 loadConfirmed 선언 이후에 정의 (하단 참조)
+  }, [bonusCandidateNums, topFreqNums]);
 
   // ---------------------------------------------------------------------------
   // Load saved conditions from DB on mount
@@ -836,7 +790,7 @@ export default function Home() {
 
         type FullData = {
           conditionType: number; years: number; months: number;
-          maxWinners: number; maxConsec: number;
+          maxConsec: number;
           oddCount: number; sumMin: number; sumMax: number; minAC: number;
           minBands?: number; lowCount?: number; primeCount?: number; minUniqueTails?: number;
           numbers: number[] | null; frequencies: number[] | null;
@@ -857,7 +811,6 @@ export default function Home() {
               id: makeId(),
               conditionType: fd.conditionType as ConditionType,
               years: fd.years, months: fd.months,
-              maxWinners: fd.maxWinners,
               maxConsec: fd.maxConsec, oddCount: fd.oddCount,
               sumMin: fd.sumMin, sumMax: fd.sumMax, minAC: fd.minAC,
               minBands: fd.minBands ?? 5, lowCount: fd.lowCount ?? 3,
@@ -1113,10 +1066,6 @@ export default function Home() {
     setConditions((prev) => prev.map((c) => c.id === rowId ? { ...c, months, ...BLANK_ROW } : c));
   }, []);
 
-  const updateMaxWinners = useCallback((rowId: string, maxWinners: number) => {
-    setConditions((prev) => prev.map((c) => c.id === rowId ? { ...c, maxWinners, ...BLANK_ROW } : c));
-  }, []);
-
   const updateOddCount = useCallback((rowId: string, oddCount: number) => {
     setConditions((prev) => prev.map((c) => c.id === rowId ? { ...c, oddCount, ...BLANK_ROW } : c));
   }, []);
@@ -1157,8 +1106,6 @@ export default function Home() {
   const conditionSortKey = useCallback((c: ConditionRow): number => {
     const base = c.conditionType * 100000;
     if (c.conditionType === 1) return base + c.years * 12 + c.months;
-    if (c.conditionType === 2) return base + c.maxWinners;
-    if (c.conditionType === 3) return base;
     if (c.conditionType === 4) return base + c.maxConsec;
     if (c.conditionType === 5) return base + c.oddCount;
     if (c.conditionType === 6) return base + c.sumMin;
@@ -1236,7 +1183,7 @@ export default function Home() {
 
       const generated = genData.data.conditions as Array<{
         conditionType: number; years: number; months: number;
-        maxWinners: number; maxConsec: number;
+        maxConsec: number;
         oddCount: number; sumMin: number; sumMax: number; minAC?: number;
         minBands?: number; lowCount?: number; primeCount?: number; minUniqueTails?: number;
       }>;
@@ -1246,7 +1193,7 @@ export default function Home() {
         id: makeId(),
         conditionType: c.conditionType as ConditionType,
         years: c.years, months: c.months,
-        maxWinners: c.maxWinners, maxConsec: c.maxConsec,
+        maxConsec: c.maxConsec,
         oddCount: c.oddCount, sumMin: c.sumMin, sumMax: c.sumMax, minAC: c.minAC ?? 7,
         minBands: c.minBands ?? 5, lowCount: c.lowCount ?? 3,
         primeCount: c.primeCount ?? 2, minUniqueTails: c.minUniqueTails ?? 5,
@@ -1356,12 +1303,15 @@ export default function Home() {
           body: JSON.stringify({ type3: d.data.combinations }),
         });
         setTimeout(() => { skipSaveRef.current = false; }, 0);
+        // 생성 즉시 이 모드의 과거 성과 배지 + 휠링 2게임을 함께 준비
+        runModeBacktest(generationMode);
+        runAutoWheel(wheelPool);
       } else {
         setAiError(d.error ?? '조합 생성 오류');
       }
     } catch { setAiError('서버 연결 오류'); }
     finally { setIsGeneratingAI(false); }
-  }, [gameCount, generationMode, activeAnchorNums, mergedBonusNums]);
+  }, [gameCount, generationMode, activeAnchorNums, mergedBonusNums, wheelPool, runModeBacktest, runAutoWheel]);
 
   // ---------------------------------------------------------------------------
   // Section 3: Save all predictions to DB
@@ -1391,8 +1341,44 @@ export default function Home() {
   //   → 비활성 앵커 배열 변경 시 불필요한 selectExpertPicks 재계산 방지
   // - bonusCandidateNums + strategyWatchNums spread 연산을 memoized mergedBonusNums로 교체
   useEffect(() => {
-    setExpertPicks(selectExpertPicks(type3Numbers, activeAnchorNums, mergedBonusNums, topFreqNums));
+    const picks = selectExpertPicks(type3Numbers, activeAnchorNums, mergedBonusNums, topFreqNums);
+    setExpertPicks(picks);
+    // 기본 체크 3개 = 표시 점수 기준 상위 3개 (화면에 보이는 1~3위와 항상 일치)
+    const top3 = picks
+      .map((combo, i) => ({ i, score: expertDisplayScore(combo, activeAnchorNums, mergedBonusNums, topFreqNums) }))
+      .sort((a, b) => b.score - a.score)
+      .slice(0, 3)
+      .map(p => p.i);
+    setExpertPickChecked(new Set(top3));
   }, [type3Numbers, activeAnchorNums, mergedBonusNums, topFreqNums]);
+
+  // Claude 추천 5개 — 표시 점수 내림차순으로 정렬 (원래 배열 인덱스 i는 체크 상태 참조용으로 보존)
+  const rankedExpertPicks = useMemo(() =>
+    expertPicks
+      .map((combo, i) => ({ combo, i, score: expertDisplayScore(combo, activeAnchorNums, mergedBonusNums, topFreqNums) }))
+      .sort((a, b) => b.score - a.score),
+  [expertPicks, activeAnchorNums, mergedBonusNums, topFreqNums]);
+
+  // 최종확정은 앵커(Claude 추천)+휠링을 합쳐 5게임을 넘을 수 없음 — 해제는 항상 허용, 추가만 캡에서 막음
+  const toggleExpertPick = useCallback((idx: number) => {
+    setExpertPickChecked(prev => {
+      const next = new Set(prev);
+      if (next.has(idx)) { next.delete(idx); return next; }
+      if (next.size + wheelChecked.size >= 5) return prev;
+      next.add(idx);
+      return next;
+    });
+  }, [wheelChecked]);
+
+  const toggleWheelPick = useCallback((idx: number) => {
+    setWheelChecked(prev => {
+      const next = new Set(prev);
+      if (next.has(idx)) { next.delete(idx); return next; }
+      if (next.size + expertPickChecked.size >= 5) return prev;
+      next.add(idx);
+      return next;
+    });
+  }, [expertPickChecked]);
 
   const toggleComboSelection = useCallback((idx: number) => {
     setSelectedComboIndices(prev => {
@@ -1460,34 +1446,35 @@ export default function Home() {
     })();
   }, [results, confirmedPurchases, loadConfirmed]);
 
-  // 휠링 확정 등록 (loadConfirmed 이후 정의)
-  const saveWheelCombos = useCallback(async () => {
-    if (!wheelResult || wheelResult.combos.length === 0) return;
-    if (results.length === 0) { setWheelSaveMsg('회차 데이터가 없습니다'); return; }
-    setIsSavingWheel(true);
-    setWheelSaveMsg('');
+  // Claude 추천(체크된 것) + 휠링(체크된 것) 통합 확정 — loadConfirmed 이후 정의
+  const confirmFinalSelection = useCallback(async () => {
+    const chosenExpert = expertPicks.filter((_, i) => expertPickChecked.has(i));
+    const chosenWheel = wheelResult ? wheelResult.combos.filter((_, i) => wheelChecked.has(i)) : [];
+    const combos = [...chosenExpert, ...chosenWheel];
+    // 앵커(Claude 추천)+휠링을 합쳐 최대 5게임까지만 1세트로 확정 (토글 단계에서도 캡을 걸어두지만 여기서도 방어)
+    if (combos.length === 0 || combos.length > 5 || results.length === 0) return;
+    setIsConfirmingFinal(true);
+    setFinalConfirmMsg('');
     try {
       const target_round = results[0].round + 1;
-      const mode = wheelType === 'full' ? 'wheel-full' : 'wheel-budget';
+      const generation_mode = chosenExpert.length > 0 && chosenWheel.length > 0
+        ? `${generationMode}+wheel`
+        : chosenWheel.length > 0 ? 'wheel-budget' : generationMode;
       const res = await fetch('/lottery/api/lotto/confirmed', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ target_round, combos: wheelResult.combos, generation_mode: mode }),
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ target_round, combos, generation_mode }),
       });
       const data = await res.json();
-      if (data.success) {
-        setWheelSaveMsg(`제${target_round}회 확정 등록 완료`);
-        await loadConfirmed();
-      } else {
-        setWheelSaveMsg(`저장 실패: ${data.error}`);
-      }
+      if (!data.success) { setFinalConfirmMsg(data.error ?? '확정 실패'); return; }
+      setFinalConfirmMsg(`제${target_round}회 ${combos.length}게임 1세트 확정 완료`);
+      await loadConfirmed();
     } catch (e) {
-      setWheelSaveMsg(e instanceof Error ? e.message : '오류');
+      setFinalConfirmMsg(e instanceof Error ? e.message : '확정 실패');
     } finally {
-      setIsSavingWheel(false);
-      setTimeout(() => setWheelSaveMsg(''), 4000);
+      setIsConfirmingFinal(false);
+      setTimeout(() => setFinalConfirmMsg(''), 4000);
     }
-  }, [wheelResult, wheelType, results, loadConfirmed]);
+  }, [expertPicks, expertPickChecked, wheelResult, wheelChecked, results, generationMode, loadConfirmed]);
 
   // 삭제된 항목이 열려 있으면 닫기
   useEffect(() => {
@@ -1524,22 +1511,6 @@ export default function Home() {
       await loadConfirmed();
     } catch { /* ignore */ }
   }, [loadConfirmed]);
-
-  const confirmExpertPicks = useCallback(async () => {
-    if (expertPicks.length === 0 || results.length === 0) return;
-    const target_round = results[0].round + 1;
-    setIsConfirmingExpert(true);
-    try {
-      const res = await fetch('/lottery/api/lotto/confirmed', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ target_round, combos: expertPicks, generation_mode: generationMode }),
-      });
-      const d = await res.json();
-      if (d.success) await loadConfirmed();
-    } catch { /* ignore */ }
-    finally { setIsConfirmingExpert(false); }
-  }, [expertPicks, results, loadConfirmed, confirmedPurchases, generationMode]);
 
   const sendTelegram = useCallback(async (round: number) => {
     const roundPurchases = confirmedPurchases.filter(p => p.target_round === round);
@@ -1658,18 +1629,6 @@ export default function Home() {
                   {isSavingConditions ? '저장 중...' : '결과 저장'}
                 </button>
                 <button onClick={resetConditionNumbers} disabled={isAutoSetting} className="px-3 py-1.5 text-xs font-semibold bg-gray-100 text-gray-600 rounded-lg hover:bg-gray-200 active:scale-95 transition-all disabled:opacity-40">초기화</button>
-                <button
-                  onClick={() => setShowBacktest(true)}
-                  onMouseEnter={(e) => showTooltip(e, 'backtest')}
-                  onMouseLeave={() => setTooltipInfo(null)}
-                  className="px-3 py-1.5 text-xs font-semibold bg-sky-500 text-white rounded-lg hover:bg-sky-600 active:scale-95 transition-all"
-                >백테스팅</button>
-                <button
-                  onClick={() => { setShowWheel(true); setWheelResult(null); setWheelError(''); }}
-                  onMouseEnter={(e) => showTooltip(e, 'wheel')}
-                  onMouseLeave={() => setTooltipInfo(null)}
-                  className="px-3 py-1.5 text-xs font-semibold bg-rose-500 text-white rounded-lg hover:bg-rose-600 active:scale-95 transition-all"
-                >휠링</button>
               </div>
             </div>
             <div className="overflow-x-auto overflow-y-auto max-h-72 md:max-h-none md:flex-1 md:min-h-0">
@@ -1698,8 +1657,6 @@ export default function Home() {
                           <select value={row.conditionType} onChange={(e) => updateConditionType(row.id, Number(e.target.value) as ConditionType)}
                             className="border border-gray-200 rounded px-1 py-0.5 text-xs bg-white focus:outline-none focus:ring-1 focus:ring-emerald-400">
                             <option value={1}>기간</option>
-                            <option value={2}>당첨자</option>
-                            <option value={3}>롤오버</option>
                             <option value={4}>연속번호</option>
                             <option value={5}>홀짝</option>
                             <option value={6}>합계</option>
@@ -1728,16 +1685,6 @@ export default function Home() {
                               </span>
                             </>
                           )}
-                          {row.conditionType === 2 && (
-                            <>
-                              <input type="number" min={1} value={row.maxWinners || ''} onChange={(e) => updateMaxWinners(row.id, Number(e.target.value))}
-                                placeholder="명" className="border border-gray-200 rounded px-1 py-0.5 text-xs bg-white w-14 focus:outline-none focus:ring-1 focus:ring-emerald-400" />
-                              <span className="text-gray-400">명 미만 빈도 상위 6개</span>
-                            </>
-                          )}
-                          {row.conditionType === 3 && (
-                            <span className="text-gray-400">전 회차 1등 없음(롤오버) 직후 회차 빈도 상위 6개</span>
-                          )}
                           {row.conditionType === 4 && (
                             <>
                               <select value={row.maxConsec} onChange={(e) => updateMaxConsec(row.id, Number(e.target.value))}
@@ -1762,11 +1709,11 @@ export default function Home() {
                           {row.conditionType === 6 && (
                             <>
                               <span className="text-gray-400">합계</span>
-                              <input type="number" min={21} max={270} value={row.sumMin}
+                              <input type="number" min={21} max={255} value={row.sumMin}
                                 onChange={(e) => updateSumMin(row.id, Number(e.target.value))}
                                 className="border border-gray-200 rounded px-1 py-0.5 text-xs bg-white w-14 focus:outline-none focus:ring-1 focus:ring-emerald-400" />
                               <span className="text-gray-400">~</span>
-                              <input type="number" min={21} max={270} value={row.sumMax}
+                              <input type="number" min={21} max={255} value={row.sumMax}
                                 onChange={(e) => updateSumMax(row.id, Number(e.target.value))}
                                 className="border border-gray-200 rounded px-1 py-0.5 text-xs bg-white w-14 focus:outline-none focus:ring-1 focus:ring-emerald-400" />
                               <span className="text-gray-400">범위 빈도 상위 6개</span>
@@ -1943,46 +1890,26 @@ export default function Home() {
                 </div>
               </div>
 
-              {/* 게임 수 조절 패널 */}
-              <div className="bg-indigo-50/70 rounded-xl border border-indigo-100 px-4 py-3">
-                <div className="flex items-center gap-3 flex-wrap">
-                  <span className="text-sm font-semibold text-indigo-800 whitespace-nowrap">게임 수</span>
-                  <div className="flex-1 min-w-[120px]">
-                    <input
-                      type="range" min={5} max={maxGameCount} step={5} value={gameCount}
-                      onChange={(e) => setGameCount(Number(e.target.value))}
-                      className="w-full h-2 rounded-full appearance-none cursor-pointer accent-indigo-600 bg-indigo-200"
-                    />
-                    <div className="flex justify-between text-[10px] text-indigo-400 mt-0.5">
-                      {(generationMode === 'anchor' || generationMode === 'anchor3' || generationMode === 'anchor2')
-                        ? <><span>5</span><span>90</span><span>175</span><span>260</span><span>350</span></>
-                        : <><span>5</span><span>25</span><span>50</span><span>75</span><span>100</span></>}
-                    </div>
-                  </div>
-                  <div className="flex items-center gap-1">
-                    <input
-                      type="number" min={5} max={100} step={5} value={gameCount}
-                      onChange={(e) => setGameCount(Math.min(maxGameCount, Math.max(5, Number(e.target.value))))}
-                      className="w-14 border border-indigo-300 rounded-lg px-2 py-1 text-sm text-center font-bold text-indigo-700 bg-white focus:outline-none focus:ring-2 focus:ring-indigo-400"
-                    />
-                    <span className="text-sm text-indigo-600 font-medium">게임</span>
-                  </div>
+              {/* AI 전략 적용 현황 */}
+              {strategyResult && (
+                <div className="flex items-center gap-2 rounded-xl border border-teal-200 bg-teal-50 px-3 py-2 text-xs">
+                  <span className="flex-shrink-0 font-bold text-teal-700">AI 전략</span>
+                  <span className="flex-1 min-w-0 text-teal-800 truncate">{strategyResult.modeReason}</span>
+                  {generationMode === strategyResult.recommendedMode ? (
+                    <span className="flex-shrink-0 font-semibold text-teal-600 bg-white px-2 py-0.5 rounded-full">적용됨</span>
+                  ) : (
+                    <button
+                      onClick={() => {
+                        setGenerationMode(strategyResult.recommendedMode as typeof generationMode);
+                        setStrategyWatchNums(strategyResult.watchNumbers);
+                      }}
+                      className="flex-shrink-0 font-semibold text-white bg-teal-600 px-2.5 py-1 rounded-full hover:bg-teal-700 transition-colors"
+                    >
+                      적용
+                    </button>
+                  )}
                 </div>
-                <div className="mt-2.5 grid grid-cols-3 gap-2">
-                  <div className="bg-white rounded-xl border border-indigo-100 px-2 py-2 text-center">
-                    <div className="text-[10px] text-gray-400 mb-0.5">구매 비용</div>
-                    <div className="text-sm font-bold text-gray-800">{(gameCount * 1000).toLocaleString()}원</div>
-                  </div>
-                  <div className="bg-white rounded-xl border border-indigo-100 px-2 py-2 text-center">
-                    <div className="text-[10px] text-gray-400 mb-0.5">1등 확률</div>
-                    <div className="text-sm font-bold text-indigo-600">1 / {Math.round(8145060 / gameCount).toLocaleString()}</div>
-                  </div>
-                  <div className="bg-white rounded-xl border border-amber-100 px-2 py-2 text-center">
-                    <div className="text-[10px] text-amber-500 mb-0.5">기본 대비</div>
-                    <div className="text-sm font-bold text-amber-600">× {(gameCount / 5).toFixed(1)} 배</div>
-                  </div>
-                </div>
-              </div>
+              )}
               {/* 앵커 번호 · AI 전략 추천 · 보너스 후보 — 1행 표시 */}
               {(generationMode === 'anchor2' || generationMode === 'anchor3' || generationMode === 'anchor') && (() => {
                 const nums = generationMode === 'anchor2' ? anchor2Numbers : generationMode === 'anchor3' ? anchor3Numbers : anchorNumbers;
@@ -2045,36 +1972,50 @@ export default function Home() {
               {/* Claude 추천 5개 */}
               {expertPicks.length > 0 && (
                 <div className="flex-none rounded-2xl border border-violet-200 bg-violet-50/60 px-4 py-3">
-                  <div className="flex items-center justify-between gap-2 mb-2.5">
-                    <div className="flex items-center gap-2 min-w-0">
-                      <span className="inline-flex items-center gap-1.5 text-sm font-bold text-violet-900 whitespace-nowrap">
-                        🤖 Claude 추천 5개
-                      </span>
-                      <span className="text-[10px] text-violet-400 font-medium hidden sm:block">밴드분산 · 홀짝균형 · 보너스후보 · 빈도상위 종합 점수 상위 5개</span>
-                    </div>
-                    <button
-                      onClick={confirmExpertPicks}
-                      disabled={isConfirmingExpert || results.length === 0}
-                      className="flex-shrink-0 inline-flex items-center gap-1 px-3 py-1 text-xs font-semibold bg-rose-500 text-white rounded-lg hover:bg-rose-600 disabled:opacity-40 transition-all"
-                    >
-                      {isConfirmingExpert
-                        ? <><span className="inline-block w-2.5 h-2.5 border-2 border-white border-t-transparent rounded-full animate-spin" />확정 중</>
-                        : '🎯 확정하기'}
-                    </button>
+                  <div className="flex items-center gap-2 mb-2 min-w-0">
+                    <span className="inline-flex items-center gap-1.5 text-sm font-bold text-violet-900 whitespace-nowrap">
+                      🤖 Claude 추천 5개
+                    </span>
+                    <span className="text-[10px] text-violet-400 font-medium hidden sm:block">밴드분산 · 홀짝균형 · 보너스후보 · 빈도상위 종합 점수 상위 5개</span>
                   </div>
+
+                  {/* 모드 단위 백테스팅 배지 — 5개 전체에 적용되는 과거 성과 참고치 */}
+                  <div className="flex items-center gap-2 mb-2 px-3 py-1.5 bg-white/70 rounded-lg text-[11px] flex-wrap">
+                    <span className="flex-shrink-0 font-bold text-violet-700 bg-violet-100 px-2 py-0.5 rounded-full">{MODE_LABELS[generationMode]} 모드</span>
+                    {isRunningModeBacktest ? (
+                      <span className="text-gray-400">과거 성과 확인 중...</span>
+                    ) : modeBacktest && modeBacktest.mode === generationMode ? (
+                      <span className="text-gray-500">
+                        최근 100회차 3등 이상 <b className={modeBacktest.hitRate3Plus > 0 ? 'text-emerald-600' : 'text-gray-400'}>{modeBacktest.hitRate3Plus}%</b>
+                        {' · '}ROI <b className={modeBacktest.roi >= 0 ? 'text-emerald-600' : 'text-red-500'}>{modeBacktest.roi > 0 ? '+' : ''}{modeBacktest.roi}%</b>
+                      </span>
+                    ) : (
+                      <span className="text-gray-400">과거 성과 데이터 없음</span>
+                    )}
+                    <span className="ml-auto text-gray-400 hidden sm:inline">이 5개 전체에 적용되는 참고치입니다</span>
+                  </div>
+
                   <div className="flex flex-col divide-y divide-violet-100 rounded-xl border border-violet-200 bg-white overflow-hidden">
-                    {expertPicks.map((combo, i) => {
-                      const score = scoreCombo(combo);
+                    {rankedExpertPicks.map(({ combo, i, score }, rank) => {
                       const sum = combo.reduce((a, b) => a + b, 0);
                       const odds = combo.filter(n => n % 2 === 1).length;
                       const bandCount = [combo.some(n => n <= 9), combo.some(n => n >= 10 && n <= 19),
                         combo.some(n => n >= 20 && n <= 29), combo.some(n => n >= 30 && n <= 39),
                         combo.some(n => n >= 40)].filter(Boolean).length;
+                      const checked = expertPickChecked.has(i);
+                      const atCap = !checked && expertPickChecked.size + wheelChecked.size >= 5;
                       return (
-                        <div key={i} className="flex items-center gap-2 px-3 py-2">
-                          <span className="flex-shrink-0 w-5 h-5 rounded-full bg-violet-600 text-white text-[10px] font-bold flex items-center justify-center">{i + 1}</span>
+                        <div
+                          key={i}
+                          onClick={() => toggleExpertPick(i)}
+                          className={`flex items-center gap-2 px-3 py-2 transition-all ${atCap ? 'opacity-30 cursor-not-allowed' : `cursor-pointer hover:bg-violet-50/60 ${checked ? '' : 'opacity-50'}`}`}
+                        >
+                          <span className={`flex-shrink-0 w-4 h-4 rounded border-2 flex items-center justify-center ${checked ? 'bg-violet-600 border-violet-600' : 'border-gray-300'}`}>
+                            {checked && <span className="text-white text-[9px] font-bold">✓</span>}
+                          </span>
+                          <span className="flex-shrink-0 w-5 h-5 rounded-full bg-violet-600 text-white text-[10px] font-bold flex items-center justify-center">{rank + 1}</span>
                           <div className="flex gap-1.5 flex-1">
-                            {combo.map((num, j) => <NumberBall key={j} num={num} size="sm" highlighted />)}
+                            {combo.map((num, j) => <NumberBall key={j} num={num} size="sm" highlighted={checked} />)}
                           </div>
                           <div className="flex-shrink-0 flex items-center gap-1.5 text-[10px] text-violet-500 font-medium whitespace-nowrap">
                             <span>합{sum}</span>
@@ -2089,101 +2030,242 @@ export default function Home() {
                 </div>
               )}
 
-              {/* Type 3 */}
-              <div className="flex-none flex flex-col rounded-2xl border border-emerald-200 bg-emerald-50/60 px-4 py-4 md:px-5">
-                <div className="flex-none flex items-center justify-between mb-3">
-                  <div className="flex items-center gap-2">
-                    <span className="text-base font-bold text-emerald-900">
-                      {MODE_LABELS[generationMode]} &times; {type3Numbers.length > 0 ? type3Numbers.length : gameCount}
+              {/* 휠링 2게임 */}
+              {(isGeneratingWheel || wheelResult || wheelError) && (
+                <div className="flex-none rounded-2xl border border-rose-200 bg-rose-50/60 px-4 py-3">
+                  <div className="flex items-center gap-2 mb-2.5 min-w-0">
+                    <span className="inline-flex items-center gap-1.5 text-sm font-bold text-rose-900 whitespace-nowrap">
+                      🎡 휠링 2게임
                     </span>
-                    {type3Numbers.length > 0 && (
-                      <button
-                        onClick={toggleAllCombos}
-                        className="text-xs text-emerald-600 font-medium hover:text-emerald-800 transition-colors"
-                      >
-                        {selectedComboIndices.size === type3Numbers.length ? '전체 해제' : '전체 선택'}
-                      </button>
-                    )}
+                    <span className="text-[10px] text-rose-400 font-medium hidden sm:block">앵커·보너스·빈도상위 번호 풀에서 수학적 커버리지를 보장하는 조합</span>
                   </div>
-                  <div className="flex items-center gap-2">
-                    {confirmMsg && <span className="text-xs font-medium text-red-500">{confirmMsg}</span>}
-                    {isSavingPredicted && <span className="text-xs text-gray-400">저장 중...</span>}
-                    {type3Numbers.length > 0 && (
-                      <button
-                        onClick={confirmPurchase}
-                        disabled={isConfirming || results.length === 0 || selectedComboIndices.size === 0}
-                        className="inline-flex items-center gap-1 px-3 py-1 text-xs font-semibold bg-rose-500 text-white rounded-lg hover:bg-rose-600 disabled:opacity-40 transition-all"
-                      >
-                        {isConfirming
-                          ? <><span className="inline-block w-2.5 h-2.5 border-2 border-white border-t-transparent rounded-full animate-spin" />확정 중</>
-                          : `🎯 확정하기 ${selectedComboIndices.size > 0 ? `(${selectedComboIndices.size}개)` : ''}`}
-                      </button>
-                    )}
-                  </div>
+
+                  {isGeneratingWheel ? (
+                    <p className="text-xs text-gray-400">휠링 조합 생성 중...</p>
+                  ) : wheelError ? (
+                    <p className="text-xs text-red-500">{wheelError}</p>
+                  ) : wheelResult ? (
+                    <>
+                      <div className="flex items-center gap-1.5 mb-2 flex-wrap">
+                        <span className="text-[10px] font-bold text-rose-700 flex-shrink-0">번호 풀</span>
+                        {wheelPool.map(n => <NumberBall key={n} num={n} size="sm" highlighted />)}
+                      </div>
+                      <div className="grid grid-cols-4 gap-1.5 mb-2.5">
+                        {[
+                          { label: '5등 이상', value: wheelResult.coverage.rate3plus },
+                          { label: '4등 이상', value: wheelResult.coverage.rate4plus },
+                          { label: '2~3등 가능', value: wheelResult.coverage.rate5plus },
+                          { label: '1등 보장', value: wheelResult.coverage.rate6 },
+                        ].map(({ label, value }) => (
+                          <div key={label} className="bg-white rounded-lg border border-rose-100 px-2 py-1.5 text-center">
+                            <div className="text-xs font-bold text-rose-600">{value}%</div>
+                            <div className="text-[9px] text-gray-400">{label}</div>
+                          </div>
+                        ))}
+                      </div>
+                      <div className="flex flex-col divide-y divide-rose-100 rounded-xl border border-rose-200 bg-white overflow-hidden">
+                        {wheelResult.combos.map((combo, i) => {
+                          const checked = wheelChecked.has(i);
+                          const atCap = !checked && expertPickChecked.size + wheelChecked.size >= 5;
+                          return (
+                            <div
+                              key={i}
+                              onClick={() => toggleWheelPick(i)}
+                              className={`flex items-center gap-2 px-3 py-2 transition-all ${atCap ? 'opacity-30 cursor-not-allowed' : `cursor-pointer hover:bg-rose-50/60 ${checked ? '' : 'opacity-50'}`}`}
+                            >
+                              <span className={`flex-shrink-0 w-4 h-4 rounded border-2 flex items-center justify-center ${checked ? 'bg-rose-600 border-rose-600' : 'border-gray-300'}`}>
+                                {checked && <span className="text-white text-[9px] font-bold">✓</span>}
+                              </span>
+                              <div className="flex gap-1.5 flex-1">
+                                {combo.map((num, j) => <NumberBall key={j} num={num} size="sm" highlighted={checked} />)}
+                              </div>
+                              <span className="flex-shrink-0 text-[10px] text-rose-500 font-medium">{wheelResult.scores[i]}점</span>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    </>
+                  ) : null}
                 </div>
-                {type3Numbers.length > 0 ? (
-                  <>
-                    {(() => {
-                      const useGrid = type3Numbers.length > 5;
-                      if (useGrid) {
-                        const half = Math.ceil(type3Numbers.length / 2);
-                        const renderCol = (combos: number[][], offset: number) => (
-                          <div className="flex flex-col divide-y divide-emerald-100 rounded-xl border border-emerald-200 bg-white overflow-hidden">
-                            {combos.map((combo, i) => {
-                              const idx = offset + i;
-                              const selected = selectedComboIndices.has(idx);
-                              return (
-                                <div
-                                  key={i}
-                                  onClick={() => toggleComboSelection(idx)}
-                                  className={`flex items-center gap-1.5 py-2 px-2 cursor-pointer transition-all ${selected ? 'bg-indigo-50 ring-1 ring-inset ring-indigo-300' : 'hover:bg-gray-50'}`}
-                                >
-                                  <span className={`w-4 h-4 flex-shrink-0 rounded-full border-2 flex items-center justify-center ${selected ? 'bg-indigo-500 border-indigo-500' : 'border-gray-300'}`}>
-                                    {selected && <span className="text-white text-[9px] font-bold">✓</span>}
-                                  </span>
-                                  <div className="flex justify-center gap-1 flex-1">
-                                    {combo.map((num, j) => <NumberBall key={j} num={num} size="sm" highlighted={selected} />)}
-                                  </div>
+              )}
+
+              {/* 고급 — 게임 수 조절 · 전체 조합 보기 */}
+              <div className="flex-none rounded-2xl border border-gray-200 bg-gray-50/60 overflow-hidden">
+                <button
+                  onClick={() => setShowAdvanced(v => !v)}
+                  className="w-full flex items-center gap-2 px-4 py-2.5 text-xs font-semibold text-gray-500 hover:text-gray-700 transition-colors"
+                >
+                  <span className={`inline-block transition-transform ${showAdvanced ? 'rotate-90' : ''}`}>▸</span>
+                  고급 — 게임 수 조절 · 전체 조합 보기{type3Numbers.length > 0 ? ` (${type3Numbers.length}개)` : ''}
+                </button>
+                {showAdvanced && (
+                  <div className="px-4 pb-4 flex flex-col gap-3">
+                    {/* 게임 수 조절 패널 */}
+                    <div className="bg-indigo-50/70 rounded-xl border border-indigo-100 px-4 py-3">
+                      <div className="flex items-center gap-3 flex-wrap">
+                        <span className="text-sm font-semibold text-indigo-800 whitespace-nowrap">게임 수</span>
+                        <div className="flex-1 min-w-[120px]">
+                          <input
+                            type="range" min={5} max={maxGameCount} step={5} value={gameCount}
+                            onChange={(e) => setGameCount(Number(e.target.value))}
+                            className="w-full h-2 rounded-full appearance-none cursor-pointer accent-indigo-600 bg-indigo-200"
+                          />
+                          <div className="flex justify-between text-[10px] text-indigo-400 mt-0.5">
+                            {(generationMode === 'anchor' || generationMode === 'anchor3' || generationMode === 'anchor2')
+                              ? <><span>5</span><span>90</span><span>175</span><span>260</span><span>350</span></>
+                              : <><span>5</span><span>25</span><span>50</span><span>75</span><span>100</span></>}
+                          </div>
+                        </div>
+                        <div className="flex items-center gap-1">
+                          <input
+                            type="number" min={5} max={100} step={5} value={gameCount}
+                            onChange={(e) => setGameCount(Math.min(maxGameCount, Math.max(5, Number(e.target.value))))}
+                            className="w-14 border border-indigo-300 rounded-lg px-2 py-1 text-sm text-center font-bold text-indigo-700 bg-white focus:outline-none focus:ring-2 focus:ring-indigo-400"
+                          />
+                          <span className="text-sm text-indigo-600 font-medium">게임</span>
+                        </div>
+                      </div>
+                      <div className="mt-2.5 grid grid-cols-3 gap-2">
+                        <div className="bg-white rounded-xl border border-indigo-100 px-2 py-2 text-center">
+                          <div className="text-[10px] text-gray-400 mb-0.5">구매 비용</div>
+                          <div className="text-sm font-bold text-gray-800">{(gameCount * 1000).toLocaleString()}원</div>
+                        </div>
+                        <div className="bg-white rounded-xl border border-indigo-100 px-2 py-2 text-center">
+                          <div className="text-[10px] text-gray-400 mb-0.5">1등 확률</div>
+                          <div className="text-sm font-bold text-indigo-600">1 / {Math.round(8145060 / gameCount).toLocaleString()}</div>
+                        </div>
+                        <div className="bg-white rounded-xl border border-amber-100 px-2 py-2 text-center">
+                          <div className="text-[10px] text-amber-500 mb-0.5">기본 대비</div>
+                          <div className="text-sm font-bold text-amber-600">× {(gameCount / 5).toFixed(1)} 배</div>
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Type 3 원본 조합 리스트 */}
+                    <div className="flex-none flex flex-col rounded-2xl border border-emerald-200 bg-emerald-50/60 px-4 py-4 md:px-5">
+                      <div className="flex-none flex items-center justify-between mb-3">
+                        <div className="flex items-center gap-2">
+                          <span className="text-base font-bold text-emerald-900">
+                            {MODE_LABELS[generationMode]} &times; {type3Numbers.length > 0 ? type3Numbers.length : gameCount}
+                          </span>
+                          {type3Numbers.length > 0 && (
+                            <button
+                              onClick={toggleAllCombos}
+                              className="text-xs text-emerald-600 font-medium hover:text-emerald-800 transition-colors"
+                            >
+                              {selectedComboIndices.size === type3Numbers.length ? '전체 해제' : '전체 선택'}
+                            </button>
+                          )}
+                        </div>
+                        <div className="flex items-center gap-2">
+                          {confirmMsg && <span className="text-xs font-medium text-red-500">{confirmMsg}</span>}
+                          {isSavingPredicted && <span className="text-xs text-gray-400">저장 중...</span>}
+                          {type3Numbers.length > 0 && (
+                            <button
+                              onClick={confirmPurchase}
+                              disabled={isConfirming || results.length === 0 || selectedComboIndices.size === 0}
+                              className="inline-flex items-center gap-1 px-3 py-1 text-xs font-semibold bg-rose-500 text-white rounded-lg hover:bg-rose-600 disabled:opacity-40 transition-all"
+                            >
+                              {isConfirming
+                                ? <><span className="inline-block w-2.5 h-2.5 border-2 border-white border-t-transparent rounded-full animate-spin" />확정 중</>
+                                : `🎯 확정하기 ${selectedComboIndices.size > 0 ? `(${selectedComboIndices.size}개)` : ''}`}
+                            </button>
+                          )}
+                        </div>
+                      </div>
+                      {type3Numbers.length > 0 ? (
+                        <>
+                          {(() => {
+                            const useGrid = type3Numbers.length > 5;
+                            if (useGrid) {
+                              const half = Math.ceil(type3Numbers.length / 2);
+                              const renderCol = (combos: number[][], offset: number) => (
+                                <div className="flex flex-col divide-y divide-emerald-100 rounded-xl border border-emerald-200 bg-white overflow-hidden">
+                                  {combos.map((combo, i) => {
+                                    const idx = offset + i;
+                                    const selected = selectedComboIndices.has(idx);
+                                    return (
+                                      <div
+                                        key={i}
+                                        onClick={() => toggleComboSelection(idx)}
+                                        className={`flex items-center gap-1.5 py-2 px-2 cursor-pointer transition-all ${selected ? 'bg-indigo-50 ring-1 ring-inset ring-indigo-300' : 'hover:bg-gray-50'}`}
+                                      >
+                                        <span className={`w-4 h-4 flex-shrink-0 rounded-full border-2 flex items-center justify-center ${selected ? 'bg-indigo-500 border-indigo-500' : 'border-gray-300'}`}>
+                                          {selected && <span className="text-white text-[9px] font-bold">✓</span>}
+                                        </span>
+                                        <div className="flex justify-center gap-1 flex-1">
+                                          {combo.map((num, j) => <NumberBall key={j} num={num} size="sm" highlighted={selected} />)}
+                                        </div>
+                                      </div>
+                                    );
+                                  })}
                                 </div>
                               );
-                            })}
-                          </div>
-                        );
-                        return (
-                          <div className="grid grid-cols-2 gap-2">
-                            {renderCol(type3Numbers.slice(0, half), 0)}
-                            {renderCol(type3Numbers.slice(half), half)}
-                          </div>
-                        );
-                      }
-                      return (
-                        <div className="flex flex-col rounded-xl border border-emerald-200 bg-white overflow-hidden divide-y divide-emerald-100">
-                          {type3Numbers.map((combo, i) => {
-                            const selected = selectedComboIndices.has(i);
-                            return (
-                              <div
-                                key={i}
-                                onClick={() => toggleComboSelection(i)}
-                                className={`flex items-center gap-3 px-3 py-2.5 cursor-pointer transition-all ${selected ? 'bg-indigo-50 ring-1 ring-inset ring-indigo-300' : 'hover:bg-gray-50'}`}
-                              >
-                                <span className={`w-5 h-5 flex-shrink-0 rounded-full border-2 flex items-center justify-center ${selected ? 'bg-indigo-500 border-indigo-500' : 'border-gray-300'}`}>
-                                  {selected && <span className="text-white text-xs font-bold">✓</span>}
-                                </span>
-                                <div className="flex justify-center gap-2.5 flex-1">
-                                  {combo.map((num, j) => <NumberBall key={j} num={num} size="md" highlighted={selected} />)}
+                              return (
+                                <div className="grid grid-cols-2 gap-2">
+                                  {renderCol(type3Numbers.slice(0, half), 0)}
+                                  {renderCol(type3Numbers.slice(half), half)}
                                 </div>
+                              );
+                            }
+                            return (
+                              <div className="flex flex-col rounded-xl border border-emerald-200 bg-white overflow-hidden divide-y divide-emerald-100">
+                                {type3Numbers.map((combo, i) => {
+                                  const selected = selectedComboIndices.has(i);
+                                  return (
+                                    <div
+                                      key={i}
+                                      onClick={() => toggleComboSelection(i)}
+                                      className={`flex items-center gap-3 px-3 py-2.5 cursor-pointer transition-all ${selected ? 'bg-indigo-50 ring-1 ring-inset ring-indigo-300' : 'hover:bg-gray-50'}`}
+                                    >
+                                      <span className={`w-5 h-5 flex-shrink-0 rounded-full border-2 flex items-center justify-center ${selected ? 'bg-indigo-500 border-indigo-500' : 'border-gray-300'}`}>
+                                        {selected && <span className="text-white text-xs font-bold">✓</span>}
+                                      </span>
+                                      <div className="flex justify-center gap-2.5 flex-1">
+                                        {combo.map((num, j) => <NumberBall key={j} num={num} size="md" highlighted={selected} />)}
+                                      </div>
+                                    </div>
+                                  );
+                                })}
                               </div>
                             );
-                          })}
-                        </div>
-                      );
-                    })()}
-                  </>
-                ) : (
-                  <p className="text-sm text-gray-400">{aiError || '버튼을 눌러 번호를 생성하세요.'}</p>
+                          })()}
+                        </>
+                      ) : (
+                        <p className="text-sm text-gray-400">{aiError || '버튼을 눌러 번호를 생성하세요.'}</p>
+                      )}
+                    </div>
+                  </div>
                 )}
               </div>
 
+              {/* 최종 확정 트레이 — Claude 추천 체크 + 휠링 체크 통합 */}
+              {(expertPicks.length > 0 || wheelResult) && (() => {
+                const totalSelected = expertPickChecked.size + (wheelResult ? wheelChecked.size : 0);
+                return (
+                  <div className="sticky bottom-0 -mx-4 md:-mx-5 mt-auto px-4 md:px-5 py-3 bg-white/95 backdrop-blur-sm border-t border-gray-200 flex items-center justify-between gap-3">
+                    <div>
+                      <div className="text-sm font-bold text-gray-800">선택 {totalSelected}게임 <span className="text-[11px] font-normal text-gray-400">/ 최대 5게임 · 1세트로 확정</span></div>
+                      <div className="text-[11px] text-gray-400">
+                        {(totalSelected * 1000).toLocaleString()}원
+                        {totalSelected > 0 ? ` · 1등 확률 1 / ${Math.round(8145060 / totalSelected).toLocaleString()}` : ''}
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      {finalConfirmMsg && <span className="text-xs font-medium text-emerald-600">{finalConfirmMsg}</span>}
+                      <button
+                        onClick={confirmFinalSelection}
+                        disabled={isConfirmingFinal || totalSelected === 0 || results.length === 0}
+                        className="inline-flex items-center gap-1.5 px-5 py-2 text-sm font-bold bg-indigo-600 text-white rounded-xl hover:bg-indigo-700 disabled:opacity-40 transition-all"
+                      >
+                        {isConfirmingFinal
+                          ? <><span className="inline-block w-3 h-3 border-2 border-white border-t-transparent rounded-full animate-spin" />확정 중</>
+                          : '🎯 최종 확정'}
+                      </button>
+                    </div>
+                  </div>
+                );
+              })()}
 
             </div>
           </section>
@@ -2434,458 +2516,6 @@ export default function Home() {
           onClose={() => setDistPopup(null)}
         />
       )}
-
-      {/* 휠링 시스템 팝업 */}
-      {showWheel && (() => {
-        const fullSize = (() => {
-          const n = wheelNums.length;
-          if (n < 6) return 0;
-          return Math.round((n*(n-1)*(n-2)*(n-3)*(n-4)*(n-5))/720);
-        })();
-        const effectiveCombos = wheelType === 'full' ? fullSize : Math.min(wheelBudget, fullSize);
-        const COVER_ROWS = [
-          { label: '1등 보장', key: 'rate6' as const, color: 'text-yellow-700', bar: 'bg-yellow-400' },
-          { label: '2~3등 가능', key: 'rate5plus' as const, color: 'text-orange-700', bar: 'bg-orange-400' },
-          { label: '4등+ 보장', key: 'rate4plus' as const, color: 'text-blue-700', bar: 'bg-blue-400' },
-          { label: '5등+ 보장', key: 'rate3plus' as const, color: 'text-emerald-700', bar: 'bg-emerald-400' },
-        ];
-        return (
-          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm" onClick={() => setShowWheel(false)}>
-            <div className="bg-white rounded-2xl shadow-2xl w-[700px] max-w-[96vw] max-h-[92vh] flex flex-col" onClick={e => e.stopPropagation()}>
-
-              {/* 헤더 */}
-              <div className="flex-none px-6 py-4 border-b border-gray-100 flex items-center justify-between">
-                <div>
-                  <h3 className="text-base font-bold text-gray-800">🎡 휠링 시스템</h3>
-                  <p className="text-[11px] text-gray-400 mt-0.5">선택 번호로 수학적 커버리지를 보장하는 조합 생성</p>
-                </div>
-                <button onClick={() => setShowWheel(false)} className="text-gray-400 hover:text-gray-700 text-xl leading-none px-1">✕</button>
-              </div>
-
-              <div className="flex-1 overflow-y-auto px-6 py-4 flex flex-col gap-5">
-
-                {/* 번호 선택 그리드 */}
-                <div>
-                  <div className="flex items-center justify-between mb-2">
-                    <div className="flex items-center gap-2">
-                      <span className="text-xs font-semibold text-gray-600">번호 선택</span>
-                      <span className={`text-[11px] font-bold px-1.5 py-0.5 rounded ${
-                        wheelNums.length < 7 ? 'bg-red-50 text-red-500' :
-                        wheelNums.length <= 12 ? 'bg-emerald-50 text-emerald-600' : 'bg-orange-50 text-orange-600'
-                      }`}>{wheelNums.length}/7~12개</span>
-                    </div>
-                    <div className="flex gap-1.5">
-                      <button
-                        onClick={fillWheelFromAnchor}
-                        className="px-2.5 py-1 text-[11px] font-semibold bg-violet-100 text-violet-700 rounded-lg hover:bg-violet-200 transition-colors"
-                      >
-                        분석 추천 번호
-                      </button>
-                      <button
-                        onClick={() => { setWheelNums([]); setWheelResult(null); }}
-                        className="px-2.5 py-1 text-[11px] font-semibold bg-gray-100 text-gray-600 rounded-lg hover:bg-gray-200 transition-colors"
-                      >
-                        초기화
-                      </button>
-                    </div>
-                  </div>
-                  <div className="grid grid-cols-9 gap-1 p-3 bg-gray-50 rounded-xl border border-gray-100">
-                    {Array.from({ length: 45 }, (_, i) => i + 1).map(n => {
-                      const sel = wheelNums.includes(n);
-                      const disabled = !sel && wheelNums.length >= 12;
-                      return (
-                        <button
-                          key={n}
-                          onClick={() => toggleWheelNum(n)}
-                          disabled={disabled}
-                          className={`w-full aspect-square rounded-full text-[11px] font-bold transition-all
-                            ${sel ? getLottoColor(n) + ' shadow-sm scale-105' : disabled ? 'bg-gray-100 text-gray-300 cursor-not-allowed' : 'bg-white border border-gray-200 text-gray-500 hover:border-gray-400'}`}
-                        >
-                          {String(n).padStart(2, '0')}
-                        </button>
-                      );
-                    })}
-                  </div>
-                  {wheelNums.length > 0 && (
-                    <div className="mt-2 flex gap-1 flex-wrap">
-                      {wheelNums.map(n => (
-                        <span key={n} className={`inline-flex items-center justify-center w-8 h-8 rounded-full text-xs font-bold ${getLottoColor(n)}`}>
-                          {String(n).padStart(2, '0')}
-                        </span>
-                      ))}
-                    </div>
-                  )}
-                </div>
-
-                {/* 방식 선택 */}
-                <div className="flex items-center gap-4 p-4 bg-gray-50 rounded-xl border border-gray-100">
-                  <div className="flex gap-2 flex-1">
-                    {(['full', 'budget'] as const).map(t => (
-                      <button
-                        key={t}
-                        onClick={() => { setWheelType(t); setWheelResult(null); }}
-                        className={`flex-1 py-2 rounded-lg text-xs font-bold transition-all border
-                          ${wheelType === t ? 'bg-rose-500 text-white border-rose-500 shadow-sm' : 'bg-white text-gray-500 border-gray-200 hover:border-gray-300'}`}
-                      >
-                        {t === 'full' ? `풀 휠링 (${fullSize}조합)` : '버짓 휠링'}
-                      </button>
-                    ))}
-                  </div>
-                  {wheelType === 'budget' && (
-                    <div className="flex items-center gap-2">
-                      <span className="text-xs text-gray-500">예산</span>
-                      <select
-                        value={wheelBudget}
-                        onChange={e => { setWheelBudget(Number(e.target.value)); setWheelResult(null); }}
-                        className="border border-gray-200 rounded-lg px-2 py-1.5 text-xs focus:outline-none focus:ring-1 focus:ring-rose-400"
-                      >
-                        {[5,7,10,15,20,30,50].map(b => (
-                          <option key={b} value={b} disabled={b > fullSize}>{b}게임</option>
-                        ))}
-                      </select>
-                    </div>
-                  )}
-                  <div className="text-right">
-                    <div className="text-[10px] text-gray-400">예상 비용</div>
-                    <div className="text-sm font-bold text-gray-700">
-                      {(effectiveCombos * 1000).toLocaleString()}원
-                    </div>
-                  </div>
-                </div>
-
-                {/* 생성 버튼 */}
-                <button
-                  onClick={generateWheel}
-                  disabled={isGeneratingWheel || wheelNums.length < 7}
-                  className="w-full py-2.5 rounded-xl bg-rose-500 text-white text-sm font-bold hover:bg-rose-600 disabled:opacity-40 transition-colors flex items-center justify-center gap-2"
-                >
-                  {isGeneratingWheel
-                    ? <><span className="w-3.5 h-3.5 border-2 border-white border-t-transparent rounded-full animate-spin" />생성 중...</>
-                    : `🎡 조합 생성 — ${wheelType === 'full' ? `${fullSize}조합 풀 휠링` : `${Math.min(wheelBudget, fullSize)}조합 버짓 휠링`}`}
-                </button>
-                {wheelError && <div className="rounded-xl bg-red-50 border border-red-100 px-4 py-3 text-sm text-red-600 text-center">{wheelError}</div>}
-
-                {/* 결과 */}
-                {wheelResult && (() => {
-                  const wr = wheelResult;
-                  return (
-                    <div className="flex flex-col gap-4">
-
-                      {/* 요약 */}
-                      <div className="grid grid-cols-3 gap-2">
-                        {[
-                          { label: '생성 조합', value: `${wr.totalCombos}개`, sub: `풀 휠 ${wr.fullWheelSize}개 중` },
-                          { label: '커버리지', value: `${wr.coverage.rate3plus}%`, sub: '5등+ 보장 시나리오' },
-                          { label: '총 비용', value: `${(wr.totalCombos * 1000).toLocaleString()}원`, sub: '게임당 1,000원' },
-                        ].map(({ label, value, sub }) => (
-                          <div key={label} className="bg-gray-50 rounded-xl px-3 py-2.5 text-center border border-gray-100">
-                            <div className="text-[10px] text-gray-400 mb-0.5">{label}</div>
-                            <div className="text-sm font-bold text-gray-800">{value}</div>
-                            <div className="text-[9px] text-gray-400 mt-0.5">{sub}</div>
-                          </div>
-                        ))}
-                      </div>
-
-                      {/* 커버리지 막대 */}
-                      <div className="rounded-xl border border-gray-100 bg-gray-50 px-4 py-3">
-                        <p className="text-[11px] font-semibold text-gray-500 mb-2.5">
-                          커버리지 분석
-                          <span className="ml-1.5 font-normal text-gray-400">— 선택 {wheelNums.length}개 중 6개가 당첨번호인 {wr.coverage.totalScenarios}가지 시나리오 기준</span>
-                        </p>
-                        <div className="flex flex-col gap-1.5">
-                          {COVER_ROWS.map(({ label, key, color, bar }) => {
-                            const val = wr.coverage[key];
-                            return (
-                              <div key={key} className="flex items-center gap-2">
-                                <span className={`w-20 text-right text-[10px] font-semibold ${color} shrink-0`}>{label}</span>
-                                <div className="flex-1 h-3.5 bg-white rounded border border-gray-100 overflow-hidden">
-                                  <div className={`h-full ${bar} transition-all duration-500`} style={{ width: `${val}%` }} />
-                                </div>
-                                <span className="w-14 text-[10px] text-gray-500 text-right shrink-0">{val}%</span>
-                              </div>
-                            );
-                          })}
-                        </div>
-                      </div>
-
-                      {/* 조합 목록 */}
-                      <div>
-                        <p className="text-[11px] font-semibold text-gray-600 mb-2">
-                          생성된 조합 ({wr.totalCombos}개)
-                          <span className="ml-1.5 font-normal text-gray-400">점수 높은 순</span>
-                        </p>
-                        <div className="max-h-52 overflow-y-auto rounded-xl border border-gray-100">
-                          <table className="w-full text-xs">
-                            <thead className="sticky top-0 bg-gray-50">
-                              <tr className="text-gray-400 border-b border-gray-100">
-                                <th className="text-center px-3 py-1.5 font-medium w-8">#</th>
-                                <th className="text-left px-3 py-1.5 font-medium">번호</th>
-                                <th className="text-right px-3 py-1.5 font-medium w-14">점수</th>
-                              </tr>
-                            </thead>
-                            <tbody className="divide-y divide-gray-50">
-                              {wr.combos.map((combo, idx) => (
-                                <tr key={idx} className="bg-white hover:bg-rose-50/40 transition-colors">
-                                  <td className="px-3 py-1.5 text-center text-gray-400">{idx + 1}</td>
-                                  <td className="px-3 py-1.5">
-                                    <div className="flex gap-1">
-                                      {combo.map((n, ni) => (
-                                        <span key={ni} className={`inline-flex items-center justify-center w-6 h-6 rounded-full text-[10px] font-bold ${getLottoColor(n)}`}>
-                                          {String(n).padStart(2, '0')}
-                                        </span>
-                                      ))}
-                                    </div>
-                                  </td>
-                                  <td className="px-3 py-1.5 text-right text-gray-500 font-mono">{wr.scores[idx]}</td>
-                                </tr>
-                              ))}
-                            </tbody>
-                          </table>
-                        </div>
-                      </div>
-
-                      {/* 확정 등록 */}
-                      <div className="flex items-center justify-between pt-1">
-                        {wheelSaveMsg
-                          ? <span className={`text-xs font-medium ${wheelSaveMsg.includes('완료') ? 'text-emerald-600' : 'text-red-500'}`}>{wheelSaveMsg}</span>
-                          : <span className="text-[11px] text-gray-400">확정 등록 시 구매 이력에 저장됩니다</span>}
-                        <button
-                          onClick={saveWheelCombos}
-                          disabled={isSavingWheel}
-                          className="px-5 py-2 rounded-xl bg-emerald-500 text-white text-xs font-bold hover:bg-emerald-600 disabled:opacity-40 transition-colors flex items-center gap-1.5"
-                        >
-                          {isSavingWheel
-                            ? <><span className="w-3 h-3 border-2 border-white border-t-transparent rounded-full animate-spin" />저장 중</>
-                            : '✔ 확정 등록'}
-                        </button>
-                      </div>
-
-                    </div>
-                  );
-                })()}
-
-              </div>
-            </div>
-          </div>
-        );
-      })()}
-
-      {/* 백테스팅 팝업 */}
-      {showBacktest && (() => {
-        const TIER_BADGE: Record<string, string> = {
-          '1등': 'bg-yellow-100 text-yellow-700 border-yellow-200',
-          '2등': 'bg-orange-100 text-orange-700 border-orange-200',
-          '3등': 'bg-red-100 text-red-700 border-red-200',
-          '4등': 'bg-blue-100 text-blue-700 border-blue-200',
-          '5등': 'bg-emerald-100 text-emerald-700 border-emerald-200',
-          '낙첨': 'bg-gray-100 text-gray-400 border-gray-200',
-        };
-        const TIER_BAR: Record<string, string> = {
-          '1등': 'bg-yellow-400', '2등': 'bg-orange-400', '3등': 'bg-red-400',
-          '4등': 'bg-blue-400', '5등': 'bg-emerald-400', '낙첨': 'bg-gray-200',
-        };
-        const TIER_DOT: Record<string, string> = {
-          '1등': 'bg-yellow-400 text-yellow-900',
-          '2등': 'bg-orange-400 text-white',
-          '3등': 'bg-red-400 text-white',
-          '4등': 'bg-blue-400 text-white',
-          '5등': 'bg-emerald-400 text-white',
-          '낙첨': 'bg-gray-200 text-gray-400',
-        };
-        const TIERS = ['1등', '2등', '3등', '4등', '5등', '낙첨'];
-        const r = backtestResult;
-
-        return (
-          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm" onClick={() => setShowBacktest(false)}>
-            <div className="bg-white rounded-2xl shadow-2xl w-[680px] max-w-[96vw] max-h-[92vh] flex flex-col" onClick={e => e.stopPropagation()}>
-
-              {/* 헤더 */}
-              <div className="flex-none px-6 py-4 border-b border-gray-100 flex items-center justify-between">
-                <div>
-                  <h3 className="text-base font-bold text-gray-800">🔬 백테스팅</h3>
-                  <p className="text-[11px] text-gray-400 mt-0.5">과거 회차를 해당 시점의 데이터만으로 시뮬레이션</p>
-                </div>
-                <button onClick={() => setShowBacktest(false)} className="text-gray-400 hover:text-gray-700 text-xl leading-none px-1">✕</button>
-              </div>
-
-              <div className="flex-1 overflow-y-auto px-6 py-4 flex flex-col gap-5">
-
-                {/* 설정 */}
-                <div className="grid grid-cols-4 gap-3">
-                  {[
-                    {
-                      label: '전략', node: (
-                        <select className="w-full text-sm border border-gray-200 rounded-lg px-2 py-1.5 focus:outline-none focus:ring-1 focus:ring-indigo-400"
-                          value={backtestMode} onChange={e => setBacktestMode(e.target.value as typeof backtestMode)}>
-                          <option value="anchor2">앵커2</option>
-                          <option value="anchor3">앵커3</option>
-                          <option value="anchor">앵커4</option>
-                          <option value="no-consec">연속없음</option>
-                          <option value="two-consec">연속2개</option>
-                          <option value="random">랜덤</option>
-                        </select>
-                      ),
-                    },
-                    {
-                      label: '테스트 회차', node: (
-                        <select className="w-full text-sm border border-gray-200 rounded-lg px-2 py-1.5 focus:outline-none focus:ring-1 focus:ring-indigo-400"
-                          value={backtestRounds} onChange={e => setBacktestRounds(Number(e.target.value))}>
-                          <option value={20}>20회</option>
-                          <option value={50}>50회</option>
-                          <option value={100}>100회</option>
-                          <option value={200}>200회</option>
-                        </select>
-                      ),
-                    },
-                    {
-                      label: '회차당 게임', node: (
-                        <select className="w-full text-sm border border-gray-200 rounded-lg px-2 py-1.5 focus:outline-none focus:ring-1 focus:ring-indigo-400"
-                          value={backtestGames} onChange={e => setBacktestGames(Number(e.target.value))}>
-                          <option value={3}>3게임</option>
-                          <option value={5}>5게임</option>
-                          <option value={10}>10게임</option>
-                        </select>
-                      ),
-                    },
-                    {
-                      label: '번호 분석 기간', node: (
-                        <select className="w-full text-sm border border-gray-200 rounded-lg px-2 py-1.5 focus:outline-none focus:ring-1 focus:ring-indigo-400"
-                          value={backtestLookback} onChange={e => setBacktestLookback(Number(e.target.value))}>
-                          <option value={0}>전체</option>
-                          <option value={1}>1년</option>
-                          <option value={2}>2년</option>
-                          <option value={3}>3년</option>
-                          <option value={5}>5년</option>
-                        </select>
-                      ),
-                    },
-                  ].map(({ label, node }) => (
-                    <div key={label}>
-                      <label className="block text-[11px] font-semibold text-gray-500 mb-1">{label}</label>
-                      {node}
-                    </div>
-                  ))}
-                </div>
-
-                <button
-                  onClick={runBacktest}
-                  disabled={isRunningBacktest}
-                  className="w-full py-2.5 rounded-xl bg-indigo-600 text-white text-sm font-bold hover:bg-indigo-700 disabled:opacity-50 transition-colors flex items-center justify-center gap-2"
-                >
-                  {isRunningBacktest
-                    ? <><span className="w-3.5 h-3.5 border-2 border-white border-t-transparent rounded-full animate-spin" />분석 중 — 잠시 기다려 주세요...</>
-                    : '▶ 백테스트 실행'}
-                </button>
-
-                {backtestError && (
-                  <div className="rounded-xl bg-red-50 border border-red-100 px-4 py-3 text-sm text-red-600 text-center">{backtestError}</div>
-                )}
-
-                {/* 결과 */}
-                {r && (
-                  <div className="flex flex-col gap-5">
-
-                    {/* 요약 4개 카드 */}
-                    <div className="grid grid-cols-4 gap-2">
-                      {[
-                        { label: '테스트 범위', value: `${r.startRound}~${r.endRound}회`, sub: `${r.totalRounds}회차 · ${r.totalGames}게임` },
-                        { label: '5등+ 당첨률', value: `${r.hitRate5Plus}%`, sub: `${r.totalRounds}회차 중 ${Math.round(r.totalRounds * r.hitRate5Plus / 100)}회 적중`, highlight: r.hitRate5Plus >= 10 },
-                        { label: '3등+ 당첨률', value: `${r.hitRate3Plus}%`, sub: r.hitRate3Plus > 0 ? '3~1등 포함' : '기록 없음', highlight: r.hitRate3Plus > 0 },
-                        { label: 'ROI 추정', value: `${r.roi > 0 ? '+' : ''}${r.roi.toLocaleString()}%`, sub: '평균 당첨금 기준', highlight: r.roi > 0 },
-                      ].map(({ label, value, sub, highlight }) => (
-                        <div key={label} className={`rounded-xl px-3 py-2.5 text-center border ${highlight ? 'bg-indigo-50 border-indigo-100' : 'bg-gray-50 border-gray-100'}`}>
-                          <div className="text-[10px] text-gray-400 mb-0.5">{label}</div>
-                          <div className={`text-sm font-bold ${highlight ? 'text-indigo-700' : 'text-gray-800'}`}>{value}</div>
-                          <div className="text-[9px] text-gray-400 mt-0.5">{sub}</div>
-                        </div>
-                      ))}
-                    </div>
-
-                    {/* 회차 기준 최고 등수 분포 — 막대 차트 */}
-                    <div className="rounded-xl border border-gray-100 bg-gray-50 px-4 py-3">
-                      <p className="text-xs font-semibold text-gray-600 mb-3">회차 기준 최고 등수 분포 <span className="text-gray-400 font-normal">(총 {r.totalRounds}회차)</span></p>
-                      <div className="flex flex-col gap-1.5">
-                        {TIERS.map(tier => {
-                          const cnt = r.bestTierCounts[tier] ?? 0;
-                          const pct = r.totalRounds > 0 ? cnt / r.totalRounds * 100 : 0;
-                          return (
-                            <div key={tier} className="flex items-center gap-2">
-                              <span className={`w-10 text-right text-[10px] font-bold px-1 py-0.5 rounded border ${TIER_BADGE[tier]}`}>{tier}</span>
-                              <div className="flex-1 h-4 bg-white rounded border border-gray-100 overflow-hidden">
-                                <div
-                                  className={`h-full rounded transition-all duration-500 ${TIER_BAR[tier]}`}
-                                  style={{ width: `${pct}%` }}
-                                />
-                              </div>
-                              <span className="w-20 text-[10px] text-gray-500 text-right">
-                                {cnt}회 <span className="text-gray-400">({pct.toFixed(1)}%)</span>
-                              </span>
-                            </div>
-                          );
-                        })}
-                      </div>
-                    </div>
-
-                    {/* 회차별 상세 결과 */}
-                    <div>
-                      <p className="text-xs font-semibold text-gray-600 mb-2">
-                        최근 {r.recentResults.length}회차 상세
-                        <span className="ml-1.5 text-gray-400 font-normal text-[10px]">각 점 = 1게임 결과</span>
-                      </p>
-                      <div className="overflow-x-auto rounded-xl border border-gray-100">
-                        <table className="w-full text-xs">
-                          <thead>
-                            <tr className="bg-gray-50 text-gray-400 border-b border-gray-100">
-                              <th className="text-left px-3 py-2 font-medium whitespace-nowrap">회차</th>
-                              <th className="text-left px-3 py-2 font-medium whitespace-nowrap">앵커</th>
-                              <th className="text-left px-3 py-2 font-medium">게임 결과</th>
-                              <th className="text-center px-3 py-2 font-medium whitespace-nowrap">최고</th>
-                            </tr>
-                          </thead>
-                          <tbody className="divide-y divide-gray-50">
-                            {[...r.recentResults].reverse().map(rr => {
-                              const isWin = rr.bestTier !== '낙첨';
-                              return (
-                                <tr key={rr.round} className={isWin ? 'bg-emerald-50/60' : 'bg-white'}>
-                                  <td className="px-3 py-1.5 text-gray-600 font-medium whitespace-nowrap">{rr.round}회</td>
-                                  <td className="px-3 py-1.5 text-gray-400 whitespace-nowrap font-mono text-[10px]">
-                                    {rr.anchorNums.length > 0
-                                      ? rr.anchorNums.map(n => String(n).padStart(2, '0')).join(' ')
-                                      : '—'}
-                                  </td>
-                                  <td className="px-3 py-1.5">
-                                    <div className="flex gap-1 flex-wrap">
-                                      {rr.tiers.map((t, i) => (
-                                        <span
-                                          key={i}
-                                          title={t}
-                                          className={`inline-flex items-center justify-center w-5 h-5 rounded-full text-[9px] font-bold ${TIER_DOT[t] ?? 'bg-gray-100 text-gray-400'}`}
-                                        >
-                                          {t === '낙첨' ? '·' : t[0]}
-                                        </span>
-                                      ))}
-                                    </div>
-                                  </td>
-                                  <td className="px-3 py-1.5 text-center">
-                                    <span className={`inline-block px-1.5 py-0.5 rounded border text-[10px] font-bold ${TIER_BADGE[rr.bestTier] ?? ''}`}>
-                                      {rr.bestTier}
-                                    </span>
-                                  </td>
-                                </tr>
-                              );
-                            })}
-                          </tbody>
-                        </table>
-                      </div>
-                    </div>
-
-                  </div>
-                )}
-              </div>
-            </div>
-          </div>
-        );
-      })()}
 
       {/* ===== AI 전략 추천 팝업 ===== */}
       {showStrategy && strategyResult && (() => {
@@ -3226,16 +2856,6 @@ export default function Home() {
     {/* ===== 버튼 호버 툴팁 (fixed — overflow-hidden 섹션에서도 노출) ===== */}
     {tooltipInfo && (() => {
       const TOOLTIPS: Record<string, { title: string; titleColor: string; desc: string }> = {
-        backtest: {
-          title: '🔬 백테스팅',
-          titleColor: 'text-sky-300',
-          desc: '과거 회차에서 현재 앵커 전략을 실제로 구동해 당첨 성과를 시뮬레이션합니다. 전략의 역사적 유효성을 수치로 확인하세요.',
-        },
-        wheel: {
-          title: '🎡 휠링 시스템',
-          titleColor: 'text-rose-300',
-          desc: '선택한 번호를 수학적으로 확장해 가능한 모든 조합(풀 휠링)이나 예산 내 최적 조합(버짓 휠링)을 생성합니다. 2등 보너스 커버리지를 극대화합니다.',
-        },
         strategy: {
           title: '🤖 AI 전략 추천',
           titleColor: 'text-teal-300',

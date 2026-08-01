@@ -21,10 +21,9 @@ export interface LottoRow {
 export type GenerationMode = 'anchor2' | 'anchor3' | 'anchor' | 'no-consec' | 'two-consec' | 'random';
 
 export interface FilterParams {
-  conditionType: 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 | 9 | 10 | 11;
+  conditionType: 1 | 4 | 5 | 6 | 7 | 8 | 9 | 10 | 11;
   years?: number;
   months?: number;
-  maxWinners?: number;
   maxConsec?: number;      // 0=없음, 2=2개, 3+=3이상
   oddCount?: number;
   sumMin?: number;
@@ -332,18 +331,6 @@ const PRIMES = new Set([2, 3, 5, 7, 11, 13, 17, 19, 23, 29, 31, 37, 41, 43]);
 export function filterByCondition(results: LottoRow[], params: FilterParams): LottoRow[] {
   const { conditionType } = params;
 
-  if (conditionType === 2) {
-    const maxWinners = params.maxWinners ?? 5;
-    return results.filter(r => r.first_prize_winners != null && r.first_prize_winners < maxWinners);
-  }
-  if (conditionType === 3) {
-    // 롤오버 회차: 전 회차 1등 당첨자가 0명인 직후 회차 (잭팟 누적 후 첫 당첨)
-    // results는 내림차순이므로 results[i+1]이 이전(오래된) 회차
-    return results.filter((_, i) => {
-      const prev = results[i + 1];
-      return prev != null && prev.first_prize_winners === 0;
-    });
-  }
   if (conditionType === 4) {
     const maxConsec = params.maxConsec ?? 0;
     return results.filter(r => {

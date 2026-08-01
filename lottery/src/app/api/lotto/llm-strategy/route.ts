@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { callChatWithFallback, type ChatMessage } from '@/lib/ai-providers';
 
 interface ConditionResult {
   conditionText: string;
@@ -39,11 +40,6 @@ const SYSTEM_PROMPT = `당신은 한국 로또 6/45 번호 전략 분석 전문�
 규칙: insight 100자 이내, modeReason 80자 이내, watchNumbers 최대 6개, recommendedGames 5~50`;
 
 export async function POST(req: NextRequest) {
-  const apiKey = process.env.OPENROUTER_API_KEY;
-  if (!apiKey) {
-    return NextResponse.json({ success: false, error: 'API 키가 설정되지 않았습니다.' }, { status: 500 });
-  }
-
   let body: {
     conditionResults?: ConditionResult[];
     anchorNumbers?: AnchorNumbers;
@@ -100,73 +96,59 @@ ${perfLine}
 
 위 데이터를 분석하여 제${latestRound + 1}회 최적 전략을 추천하세요. JSON만 반환.`;
 
+  const messages: ChatMessage[] = [
+    { role: 'system', content: SYSTEM_PROMPT },
+    { role: 'user', content: userPrompt },
+  ];
+
+  let rawContent: string;
+  let usedProvider: string;
+  let failures: string[];
   try {
-    const res = await fetch('https://openrouter.ai/api/v1/chat/completions', {
-      method: 'POST',
-      headers: {
-        'Authorization': `Bearer ${apiKey}`,
-        'Content-Type': 'application/json',
-        'HTTP-Referer': 'https://lotto-app.vercel.app',
-        'X-Title': 'Lotto Strategy',
-      },
-      body: JSON.stringify({
-        model: 'nvidia/nemotron-3-super-120b-a12b:free',
-        messages: [
-          { role: 'system', content: SYSTEM_PROMPT },
-          { role: 'user', content: userPrompt },
-        ],
-        max_tokens: 2000,
-        temperature: 0.4,
-      }),
-      signal: AbortSignal.timeout(30000),
-    });
-
-    if (!res.ok) {
-      const errText = await res.text();
-      return NextResponse.json({ success: false, error: `AI 호출 실패: ${errText.slice(0, 200)}` }, { status: 500 });
-    }
-
-    const aiData = await res.json();
-    const rawContent = aiData.choices?.[0]?.message?.content ?? '';
-    // think 블록 및 마크다운 코드 펜스 제거
-    const content = rawContent
-      .replace(/<think>[\s\S]*?<\/think>/gi, '')
-      .replace(/```(?:json)?/gi, '')
-      .replace(/```/g, '')
-      .trim();
-
-    // recommendedMode 키가 포함된 JSON 객체 추출 (그리디 매칭으로 전체 캡처)
-    const jsonMatch = content.match(/\{[^{}]*"recommendedMode"[\s\S]*\}/);
-    if (!jsonMatch) {
-      return NextResponse.json({ success: false, error: `AI 응답 파싱 실패. 응답: ${content.slice(0, 400)}` }, { status: 500 });
-    }
-
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    let parsed: Record<string, any>;
-    try {
-      parsed = JSON.parse(jsonMatch[0]);
-    } catch {
-      // JSON이 불완전한 경우 닫는 괄호 보완 시도
-      try {
-        parsed = JSON.parse(jsonMatch[0] + '}');
-      } catch {
-        return NextResponse.json({ success: false, error: `JSON 파싱 실패. 응답: ${jsonMatch[0].slice(0, 200)}` }, { status: 500 });
-      }
-    }
-    const VALID_MODES = ['anchor', 'anchor3', 'anchor2', 'no-consec', 'two-consec', 'random'];
-    const result = {
-      recommendedMode: VALID_MODES.includes(parsed.recommendedMode) ? parsed.recommendedMode : 'anchor3',
-      recommendedGames: Math.min(50, Math.max(5, Number(parsed.recommendedGames ?? 10))),
-      watchNumbers: Array.isArray(parsed.watchNumbers)
-        ? parsed.watchNumbers.filter((n: unknown) => typeof n === 'number' && n >= 1 && n <= 45).slice(0, 6)
-        : [],
-      insight: String(parsed.insight ?? '').slice(0, 150),
-      modeReason: String(parsed.modeReason ?? '').slice(0, 120),
-    };
-
-    return NextResponse.json({ success: true, data: result });
+    const result = await callChatWithFallback(messages, { maxTokens: 2000, temperature: 0.4 });
+    rawContent = result.content;
+    usedProvider = result.provider;
+    failures = result.failures;
   } catch (err) {
-    const message = err instanceof Error ? err.message : 'Unknown error';
-    return NextResponse.json({ success: false, error: message }, { status: 500 });
+    return NextResponse.json({ success: false, error: err instanceof Error ? err.message : String(err) }, { status: 500 });
   }
+  console.info(`[llm-strategy] provider=${usedProvider}${failures.length > 0 ? ` (선행 실패: ${failures.join(' / ')})` : ''}`);
+
+  // think 블록 및 마크다운 코드 펜스 제거
+  const content = rawContent
+    .replace(/<think>[\s\S]*?<\/think>/gi, '')
+    .replace(/```(?:json)?/gi, '')
+    .replace(/```/g, '')
+    .trim();
+
+  // recommendedMode 키가 포함된 JSON 객체 추출 (그리디 매칭으로 전체 캡처)
+  const jsonMatch = content.match(/\{[^{}]*"recommendedMode"[\s\S]*\}/);
+  if (!jsonMatch) {
+    return NextResponse.json({ success: false, error: `AI 응답 파싱 실패. 응답: ${content.slice(0, 400)}` }, { status: 500 });
+  }
+
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  let parsed: Record<string, any>;
+  try {
+    parsed = JSON.parse(jsonMatch[0]);
+  } catch {
+    // JSON이 불완전한 경우 닫는 괄호 보완 시도
+    try {
+      parsed = JSON.parse(jsonMatch[0] + '}');
+    } catch {
+      return NextResponse.json({ success: false, error: `JSON 파싱 실패. 응답: ${jsonMatch[0].slice(0, 200)}` }, { status: 500 });
+    }
+  }
+  const VALID_MODES = ['anchor', 'anchor3', 'anchor2', 'no-consec', 'two-consec', 'random'];
+  const result = {
+    recommendedMode: VALID_MODES.includes(parsed.recommendedMode) ? parsed.recommendedMode : 'anchor3',
+    recommendedGames: Math.min(50, Math.max(5, Number(parsed.recommendedGames ?? 10))),
+    watchNumbers: Array.isArray(parsed.watchNumbers)
+      ? parsed.watchNumbers.filter((n: unknown) => typeof n === 'number' && n >= 1 && n <= 45).slice(0, 6)
+      : [],
+    insight: String(parsed.insight ?? '').slice(0, 150),
+    modeReason: String(parsed.modeReason ?? '').slice(0, 120),
+  };
+
+  return NextResponse.json({ success: true, data: result });
 }
