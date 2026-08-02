@@ -3,6 +3,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import oracledb from 'oracledb';
 import { verifyImageSlideshowRequest } from '@/lib/imageSlideshow/auth';
 import { withConnection, formatOracleDate, formatOracleTimestamp } from '@/lib/imageSlideshow/oracleDb';
+import { handleApiError } from '@/lib/imageSlideshow/apiError';
 
 interface AlbumRow {
   ID: string;
@@ -14,7 +15,7 @@ interface AlbumRow {
   MUSIC_ARTIST: string | null;
   // eungmomoa-db가 19c라 네이티브 JSON 타입이 없어 CLOB(JSON 문자열)로 저장 — fetchAsString 설정 덕에 string으로 옴
   MUSIC_LIST: string | null;
-  AI_ANALYSIS: string | null;
+  COVER_PHOTO_ID: string | null;
   CREATED_AT: unknown;
 }
 
@@ -36,7 +37,7 @@ function serializeAlbum(row: AlbumRow, photos: PhotoRow[]) {
     music_url: row.MUSIC_URL,
     music_artist: row.MUSIC_ARTIST,
     music_list: row.MUSIC_LIST ? JSON.parse(row.MUSIC_LIST) : [],
-    ai_analysis: row.AI_ANALYSIS,
+    cover_photo_id: row.COVER_PHOTO_ID,
     created_at: formatOracleTimestamp(row.CREATED_AT),
     photos: photos
       .filter((p) => p.ALBUM_ID === row.ID)
@@ -50,20 +51,24 @@ export async function GET(request: NextRequest) {
   const user = await verifyImageSlideshowRequest(request);
   if (!user) return NextResponse.json({ error: '인증이 필요합니다.' }, { status: 401 });
 
-  const albums = await withConnection(async (conn) => {
-    const albumResult = await conn.execute<AlbumRow>(
-      `SELECT id, name, album_date, music_id, music_name, music_url, music_artist, music_list, ai_analysis, created_at
-       FROM albums ORDER BY created_at DESC`
-    );
-    const photoResult = await conn.execute<PhotoRow>(
-      `SELECT id, album_id, filename, url, sort_order FROM photos`
-    );
-    const albumRows = albumResult.rows ?? [];
-    const photoRows = photoResult.rows ?? [];
-    return albumRows.map((row) => serializeAlbum(row, photoRows));
-  });
+  try {
+    const albums = await withConnection(async (conn) => {
+      const albumResult = await conn.execute<AlbumRow>(
+        `SELECT id, name, album_date, music_id, music_name, music_url, music_artist, music_list, cover_photo_id, created_at
+         FROM albums ORDER BY created_at DESC`
+      );
+      const photoResult = await conn.execute<PhotoRow>(
+        `SELECT id, album_id, filename, url, sort_order FROM photos`
+      );
+      const albumRows = albumResult.rows ?? [];
+      const photoRows = photoResult.rows ?? [];
+      return albumRows.map((row) => serializeAlbum(row, photoRows));
+    });
 
-  return NextResponse.json({ albums });
+    return NextResponse.json({ albums });
+  } catch (err) {
+    return handleApiError(err);
+  }
 }
 
 /** 앨범 메타데이터만 생성 — 사진/음악 파일은 /upload-url로 먼저 업로드 후 /photos로 별도 등록 */
@@ -80,23 +85,31 @@ export async function POST(request: NextRequest) {
 
   const id = randomUUID();
 
-  await withConnection(async (conn) => {
-    await conn.execute(
-      `INSERT INTO albums (id, name, album_date, music_id, music_name, music_url, music_artist, music_list)
-       VALUES (:id, :name, ${album_date ? `TO_DATE(:album_date, 'YYYY-MM-DD')` : 'NULL'},
-               :music_id, :music_name, :music_url, :music_artist, :music_list)`,
-      {
-        id,
-        name,
-        ...(album_date ? { album_date } : {}),
-        music_id: music_id ?? null,
-        music_name: music_name ?? null,
-        music_url: music_url ?? null,
-        music_artist: music_artist ?? null,
-        music_list: { val: JSON.stringify(music_list ?? []), type: oracledb.CLOB },
-      }
-    );
-  });
+  // 값이 없으면 null인데, node-oracledb는 타입 힌트 없는 순수 JS null만으로는 바인드할
+  // 컬럼의 Oracle 타입을 추론하지 못해 NJS-012로 거부한다(null이어도 STRING 명시 필요).
+  const nullableString = (v: unknown) => ({ val: v ?? null, type: oracledb.STRING });
+
+  try {
+    await withConnection(async (conn) => {
+      await conn.execute(
+        `INSERT INTO albums (id, name, album_date, music_id, music_name, music_url, music_artist, music_list)
+         VALUES (:id, :name, ${album_date ? `TO_DATE(:album_date, 'YYYY-MM-DD')` : 'NULL'},
+                 :music_id, :music_name, :music_url, :music_artist, :music_list)`,
+        {
+          id,
+          name,
+          ...(album_date ? { album_date } : {}),
+          music_id: nullableString(music_id),
+          music_name: nullableString(music_name),
+          music_url: nullableString(music_url),
+          music_artist: nullableString(music_artist),
+          music_list: { val: JSON.stringify(music_list ?? []), type: oracledb.CLOB },
+        }
+      );
+    });
+  } catch (err) {
+    return handleApiError(err);
+  }
 
   return NextResponse.json({ id }, { status: 201 });
 }

@@ -2,6 +2,11 @@
 <html lang="ko">
 <head>
   <meta charset="UTF-8">
+  <!-- 상대경로 리소스(style.css, app.js 등)가 항상 /image_slideshow/ 기준으로 풀리도록 고정.
+       hub에 얹혀 로컬 테스트할 때 주소창이 트레일링 슬래시 없이 /image_slideshow로 남는 경우
+       상대경로가 루트(/) 기준으로 잘못 풀려 전부 404 나던 문제를 해결함. 운영 배포 시에도
+       이미 이 경로이므로 동작 변화 없음. -->
+  <base href="/image_slideshow/">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>앨범</title>
   <link rel="preconnect" href="https://cdn.jsdelivr.net" crossorigin>
@@ -14,40 +19,63 @@
 </head>
 <body>
 
-<!-- ===================== SETTINGS MODAL ===================== -->
-<div id="settings-modal" class="modal-overlay">
+<!-- ===================== APP SETTINGS MODAL ===================== -->
+<div id="app-settings-modal" class="modal-overlay" style="display:none">
   <div class="modal-box settings-box">
     <div class="modal-header">
       <div class="modal-title-group">
         <span class="modal-emoji">⚙️</span>
         <div>
-          <h2>API 키 설정</h2>
-          <p class="modal-subtitle">AI 분석에 필요한 키를 입력해주세요 (선택)</p>
+          <h2>설정</h2>
+          <p class="modal-subtitle">슬라이드쇼와 음악을 설정하세요</p>
         </div>
       </div>
+      <button class="btn-close" id="btn-close-app-settings">✕</button>
     </div>
     <div class="modal-body">
-      <div class="settings-section">
-        <div class="settings-section-title">🤖 AI API 키 (이미지 분석)</div>
-        <div class="form-group">
-          <label>OpenRouter API Key</label>
-          <input type="password" id="cfg-openrouter-key" placeholder="sk-or-v1-..." autocomplete="off">
+      <div class="modal-section-card">
+        <div class="modal-section-label">
+          <span class="label-dot"></span>
+          전환 시간
         </div>
-        <div class="form-group">
-          <label>Groq API Key</label>
-          <input type="password" id="cfg-groq-key" placeholder="gsk_..." autocomplete="off">
+        <select id="pano-speed-select" class="select-input">
+          <option value="2000">2초</option>
+          <option value="3000" selected>3초</option>
+          <option value="5000">5초</option>
+          <option value="8000">8초</option>
+          <option value="10000">10초</option>
+        </select>
+      </div>
+      <div class="modal-section-card">
+        <div class="modal-section-label">
+          <span class="label-dot"></span>
+          전환 효과
         </div>
-        <div class="form-group">
-          <label>HuggingFace Token</label>
-          <input type="password" id="cfg-hf-token" placeholder="hf_..." autocomplete="off">
+        <select id="pano-effect-select" class="select-input">
+          <option value="fade">페이드</option>
+          <option value="slide">슬라이드</option>
+          <option value="push">푸시</option>
+          <option value="zoom">줌</option>
+          <option value="zoomout">줌아웃</option>
+          <option value="kenburns">켄번즈</option>
+          <option value="rotate">회전</option>
+          <option value="flip">플립</option>
+          <option value="swing">스윙</option>
+          <option value="wipe">와이프</option>
+          <option value="blur">블러</option>
+          <option value="glitch">글리치</option>
+        </select>
+      </div>
+      <div class="modal-section-card">
+        <div class="modal-section-label">
+          <span class="label-dot"></span>
+          배경 음악
+        </div>
+        <div class="settings-music-row">
+          <button id="cfg-btn-play-stop" class="pano-ctrl-btn" title="재생/정지">▶</button>
+          <input type="range" id="cfg-volume-slider" class="pano-volume-slider" min="0" max="1" step="0.05" value="0.7">
         </div>
       </div>
-    </div>
-    <div class="modal-footer">
-      <button id="btn-save-settings" class="btn-primary btn-full">저장</button>
-      <button onclick="localStorage.clear(); location.reload();" class="btn-reset-settings">
-        설정 초기화 후 새로고침
-      </button>
     </div>
   </div>
 </div>
@@ -204,22 +232,8 @@
       </div>
     </div>
 
-    <div class="left-footer" style="display:none">
-      <button id="btn-generate" class="btn-generate" disabled>
-        <span class="generate-icon">🤖</span>
-        <span>AI 분석</span>
-      </button>
-      <div id="generate-progress" class="generate-progress" style="display:none">
-        <div class="gen-progress-track">
-          <div id="gen-progress-fill" class="gen-progress-fill"></div>
-        </div>
-        <p id="gen-status-text" class="gen-status-text">AI 모델 조회 중...</p>
-      </div>
-    </div>
-
     <div class="left-bottom">
       <button class="btn-settings" id="btn-logout" title="로그아웃">🚪 로그아웃</button>
-      <button class="btn-settings" id="btn-open-settings" title="설정">⚙️ 설정</button>
     </div>
   </aside>
 
@@ -236,103 +250,18 @@
     <!-- Panorama view -->
     <div id="panorama-view" class="panorama-view" style="display:none">
 
-      <div class="pano-header">
-        <div class="pano-header-left">
-          <h3 id="pano-title">앨범 제목</h3>
-          <span id="pano-photo-count" class="pano-photo-count">0장</span>
-        </div>
-        <span id="pano-date" class="pano-date"></span>
+      <!-- 슬라이드쇼 뷰어 (호버 시 좌/우 이동 + 전체화면 아이콘 노출) — 이미지만 표시 -->
+      <div id="pano-strip-wrap" class="pano-strip-wrap">
+        <div id="pano-layer-a" class="pano-slide-layer" style="z-index:2"></div>
+        <div id="pano-layer-b" class="pano-slide-layer" style="opacity:0;z-index:1"></div>
+        <button id="btn-slide-prev" class="stage-nav-arrow stage-nav-prev" title="이전">❮</button>
+        <button id="btn-slide-next" class="stage-nav-arrow stage-nav-next" title="다음">❯</button>
+        <button id="btn-pano-fullscreen" class="stage-nav-arrow stage-fullscreen-btn" title="전체화면">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M8 3H5a2 2 0 0 0-2 2v3m18 0V5a2 2 0 0 0-2-2h-3m0 18h3a2 2 0 0 0 2-2v-3M3 16v3a2 2 0 0 0 2 2h3"/></svg>
+        </button>
       </div>
-
-      <!-- 슬라이드쇼 컨트롤 바 -->
-      <div id="pano-controls" class="pano-controls" style="display:none">
-        <span id="pano-slide-index" class="pano-ctrl-index">1 / 1</span>
-        <div class="pano-ctrl-divider"></div>
-        <button id="btn-slide-prev" class="pano-ctrl-btn" title="이전">❮</button>
-        <button id="btn-pano-play" class="pano-ctrl-btn pano-play-btn" title="자동재생 정지">⏸</button>
-        <button id="btn-slide-next" class="pano-ctrl-btn" title="다음">❯</button>
-        <div class="pano-ctrl-divider"></div>
-        <span class="pano-ctrl-label">전환 시간</span>
-        <select id="pano-speed-select" class="pano-ctrl-select">
-          <option value="2000">2초</option>
-          <option value="3000" selected>3초</option>
-          <option value="5000">5초</option>
-          <option value="8000">8초</option>
-          <option value="10000">10초</option>
-        </select>
-        <div class="pano-ctrl-divider"></div>
-        <span class="pano-ctrl-label">전환 효과</span>
-        <select id="pano-effect-select" class="pano-ctrl-select">
-          <option value="fade">페이드</option>
-          <option value="slide">슬라이드</option>
-          <option value="push">푸시</option>
-          <option value="zoom">줌</option>
-          <option value="zoomout">줌아웃</option>
-          <option value="kenburns">켄번즈</option>
-          <option value="rotate">회전</option>
-          <option value="flip">플립</option>
-          <option value="swing">스윙</option>
-          <option value="wipe">와이프</option>
-          <option value="blur">블러</option>
-          <option value="glitch">글리치</option>
-        </select>
-        <div class="pano-ctrl-spacer"></div>
-        <!-- 인라인 음악 플레이어 -->
-        <div id="pano-music-divider" class="pano-ctrl-divider" style="display:none"></div>
-        <div id="pano-music-inline" class="pano-music-inline" style="display:none">
-          <div id="music-icon-anim" class="music-icon-anim pano-music-icon">🎵</div>
-          <span id="np-name" class="pano-np-name">-</span>
-          <button id="btn-music-prev" class="pano-ctrl-btn music-track-btn" title="이전 곡" style="display:none">⏮</button>
-          <button id="btn-play" class="pano-ctrl-btn" title="재생/정지">▶</button>
-          <button id="btn-music-next" class="pano-ctrl-btn music-track-btn" title="다음 곡" style="display:none">⏭</button>
-          <button id="btn-music-shuffle" class="pano-ctrl-btn music-track-btn" title="셔플" style="display:none">
-            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><polyline points="16 3 21 3 21 8"/><line x1="4" y1="20" x2="21" y2="3"/><polyline points="21 16 21 21 16 21"/><line x1="15" y1="15" x2="21" y2="21"/></svg>
-          </button>
-          <div id="music-progress-wrap" class="pano-music-progress-wrap">
-            <div id="music-progress-fill" class="pano-music-progress-fill"></div>
-          </div>
-          <span id="music-cur-time" class="pano-ctrl-label">0:00</span>
-          <span class="pano-ctrl-label" style="opacity:.4">/</span>
-          <span id="music-total-time" class="pano-ctrl-label">-:--</span>
-          <button id="btn-mute" class="pano-ctrl-btn" title="음소거">🔊</button>
-          <input type="range" id="volume-slider" class="pano-volume-slider" min="0" max="1" step="0.05" value="0.7">
-        </div>
-      </div>
-
-      <!-- 3단 메인 영역: 썸네일 | 슬라이드 | AI 패널 -->
-      <div class="pano-main">
-
-        <!-- 좌측: 이미지 썸네일 목록 -->
-        <div id="pano-thumb-list" class="pano-thumb-list"></div>
-
-        <!-- 중앙: 슬라이드쇼 뷰어 -->
-        <div id="pano-strip-wrap" class="pano-strip-wrap">
-          <div id="pano-layer-a" class="pano-slide-layer" style="z-index:2"></div>
-          <div id="pano-layer-b" class="pano-slide-layer" style="opacity:0;z-index:1"></div>
-          <div id="pano-loading" class="pano-loading" style="display:none">
-            <div class="loading-ring"></div>
-            <p>AI 분석 중...</p>
-          </div>
-        </div>
-
-        <!-- 우측: 좋은 글 패널 -->
-        <div id="pano-ai-panel" class="pano-ai-panel">
-          <div class="pano-ai-empty">
-            <div class="pano-ai-empty-icon">🌸</div>
-            <p>좋은 글 버튼을<br>눌러주세요</p>
-          </div>
-        </div>
-
-      </div>
-
-      <!-- 하위 호환용 hidden 요소 -->
-      <div id="ai-models-section" style="display:none"><div id="ai-models-total"></div><div id="ai-models-grid"></div></div>
-      <div id="ai-results-section" style="display:none"><div id="ai-results-total"></div><div id="ai-results-list"></div></div>
-      <div id="ai-model-badges" style="display:none"></div>
 
     </div>
-
-    <!-- music-bar removed: controls moved into pano-controls -->
 
   </main>
 </div>

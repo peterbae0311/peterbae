@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { verifyImageSlideshowRequest } from '@/lib/imageSlideshow/auth';
 import { createUploadPar } from '@/lib/imageSlideshow/ociStorage';
+import { handleApiError } from '@/lib/imageSlideshow/apiError';
 
 /**
  * 브라우저가 사진/음악 파일을 OCI Object Storage에 직접 PUT할 수 있도록
@@ -17,6 +18,10 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: '올바르지 않은 path입니다.' }, { status: 400 });
   }
 
-  const { uploadUrl, publicUrl } = await createUploadPar(path);
-  return NextResponse.json({ uploadUrl, publicUrl });
+  try {
+    const { uploadUrl, publicUrl } = await createUploadPar(path);
+    return NextResponse.json({ uploadUrl, publicUrl });
+  } catch (err) {
+    return handleApiError(err);
+  }
 }

@@ -14,16 +14,18 @@
 -- ============================================================
 
 CREATE TABLE albums (
-  id            VARCHAR2(36)              NOT NULL,
-  name          VARCHAR2(200)             NOT NULL,
-  album_date    DATE,
-  music_id      VARCHAR2(50),
-  music_name    VARCHAR2(200),
-  music_url     VARCHAR2(1000),
-  music_artist  VARCHAR2(200),
-  music_list    CLOB CHECK (music_list IS JSON),
-  ai_analysis   CLOB,
-  created_at    TIMESTAMP WITH TIME ZONE  DEFAULT SYSTIMESTAMP NOT NULL,
+  id              VARCHAR2(36)              NOT NULL,
+  name            VARCHAR2(200)             NOT NULL,
+  album_date      DATE,
+  music_id        VARCHAR2(50),
+  music_name      VARCHAR2(200),
+  music_url       VARCHAR2(1000),
+  music_artist    VARCHAR2(200),
+  music_list      CLOB CHECK (music_list IS JSON),
+  -- 앨범 등록/수정 시 사용자가 고른 대표 이미지. FK 없음 — photos가 삭제돼도
+  -- 클라이언트가 항상 "첫 사진으로 폴백"하므로 dangling id를 그냥 허용.
+  cover_photo_id  VARCHAR2(36),
+  created_at      TIMESTAMP WITH TIME ZONE  DEFAULT SYSTIMESTAMP NOT NULL,
   CONSTRAINT pk_albums PRIMARY KEY (id)
 );
 

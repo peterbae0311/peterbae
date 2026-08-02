@@ -3,6 +3,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { verifyImageSlideshowRequest } from '@/lib/imageSlideshow/auth';
 import { withConnection } from '@/lib/imageSlideshow/oracleDb';
 import { deleteObjects } from '@/lib/imageSlideshow/ociStorage';
+import { handleApiError } from '@/lib/imageSlideshow/apiError';
 
 interface PhotoInput {
   filename: string;
@@ -24,28 +25,32 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: 'albumId와 photos 배열이 필요합니다.' }, { status: 400 });
   }
 
-  const ids = await withConnection(async (conn) => {
-    const inserted: string[] = [];
-    for (const photo of photos) {
-      const id = randomUUID();
-      await conn.execute(
-        `INSERT INTO photos (id, album_id, filename, storage_path, url, sort_order)
-         VALUES (:id, :albumId, :filename, :storagePath, :url, :sortOrder)`,
-        {
-          id,
-          albumId,
-          filename: photo.filename,
-          storagePath: photo.storagePath,
-          url: photo.url,
-          sortOrder: photo.sortOrder ?? 0,
-        }
-      );
-      inserted.push(id);
-    }
-    return inserted;
-  });
+  try {
+    const ids = await withConnection(async (conn) => {
+      const inserted: string[] = [];
+      for (const photo of photos) {
+        const id = randomUUID();
+        await conn.execute(
+          `INSERT INTO photos (id, album_id, filename, storage_path, url, sort_order)
+           VALUES (:id, :albumId, :filename, :storagePath, :url, :sortOrder)`,
+          {
+            id,
+            albumId,
+            filename: photo.filename,
+            storagePath: photo.storagePath,
+            url: photo.url,
+            sortOrder: photo.sortOrder ?? 0,
+          }
+        );
+        inserted.push(id);
+      }
+      return inserted;
+    });
 
-  return NextResponse.json({ ids }, { status: 201 });
+    return NextResponse.json({ ids }, { status: 201 });
+  } catch (err) {
+    return handleApiError(err);
+  }
 }
 
 /** 사진 삭제 — OCI 오브젝트를 먼저 정리(best-effort)한 뒤 행 삭제 */
@@ -60,19 +65,23 @@ export async function DELETE(request: NextRequest) {
     return NextResponse.json({ error: 'ids 배열이 필요합니다.' }, { status: 400 });
   }
 
-  await withConnection(async (conn) => {
-    const bindNames = ids.map((_, i) => `:id${i}`).join(', ');
-    const binds = Object.fromEntries(ids.map((id, i) => [`id${i}`, id]));
+  try {
+    await withConnection(async (conn) => {
+      const bindNames = ids.map((_, i) => `:id${i}`).join(', ');
+      const binds = Object.fromEntries(ids.map((id, i) => [`id${i}`, id]));
 
-    const photoResult = await conn.execute<{ STORAGE_PATH: string }>(
-      `SELECT storage_path FROM photos WHERE id IN (${bindNames})`,
-      binds
-    );
-    const paths = (photoResult.rows ?? []).map((r) => r.STORAGE_PATH);
-    await deleteObjects(paths);
+      const photoResult = await conn.execute<{ STORAGE_PATH: string }>(
+        `SELECT storage_path FROM photos WHERE id IN (${bindNames})`,
+        binds
+      );
+      const paths = (photoResult.rows ?? []).map((r) => r.STORAGE_PATH);
+      await deleteObjects(paths);
 
-    await conn.execute(`DELETE FROM photos WHERE id IN (${bindNames})`, binds);
-  });
+      await conn.execute(`DELETE FROM photos WHERE id IN (${bindNames})`, binds);
+    });
+  } catch (err) {
+    return handleApiError(err);
+  }
 
   return NextResponse.json({ ok: true });
 }

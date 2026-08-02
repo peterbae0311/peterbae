@@ -3,6 +3,7 @@ import oracledb from 'oracledb';
 import { verifyImageSlideshowRequest } from '@/lib/imageSlideshow/auth';
 import { withConnection } from '@/lib/imageSlideshow/oracleDb';
 import { deleteObjects } from '@/lib/imageSlideshow/ociStorage';
+import { handleApiError } from '@/lib/imageSlideshow/apiError';
 
 interface PathParams {
   params: Promise<{ id: string }>;
@@ -15,33 +16,44 @@ export async function PATCH(request: NextRequest, { params }: PathParams) {
 
   const { id } = await params;
   const body = await request.json();
-  const { name, album_date, music_id, music_name, music_url, music_artist, music_list } = body ?? {};
+  const { name, album_date, music_id, music_name, music_url, music_artist, music_list, cover_photo_id } = body ?? {};
 
   if (!name || typeof name !== 'string') {
     return NextResponse.json({ error: 'name은 필수입니다.' }, { status: 400 });
   }
 
-  await withConnection(async (conn) => {
-    await conn.execute(
-      `UPDATE albums SET
-         name = :name,
-         album_date = ${album_date ? `TO_DATE(:album_date, 'YYYY-MM-DD')` : 'NULL'},
-         music_id = :music_id, music_name = :music_name,
-         music_url = :music_url, music_artist = :music_artist,
-         music_list = :music_list
-       WHERE id = :id`,
-      {
-        id,
-        name,
-        ...(album_date ? { album_date } : {}),
-        music_id: music_id ?? null,
-        music_name: music_name ?? null,
-        music_url: music_url ?? null,
-        music_artist: music_artist ?? null,
-        music_list: { val: JSON.stringify(music_list ?? []), type: oracledb.CLOB },
-      }
-    );
-  });
+  // music_id/name/url/artist는 값이 없으면 null인데, node-oracledb는 타입 힌트 없는 순수
+  // JS null만으로는 바인드할 컬럼의 Oracle 타입을 추론하지 못해 NJS-012로 거부한다
+  // (null이어도 항상 STRING이라고 명시해줘야 함).
+  const nullableString = (v: unknown) => ({ val: v ?? null, type: oracledb.STRING });
+
+  try {
+    await withConnection(async (conn) => {
+      await conn.execute(
+        `UPDATE albums SET
+           name = :name,
+           album_date = ${album_date ? `TO_DATE(:album_date, 'YYYY-MM-DD')` : 'NULL'},
+           music_id = :music_id, music_name = :music_name,
+           music_url = :music_url, music_artist = :music_artist,
+           music_list = :music_list,
+           cover_photo_id = :cover_photo_id
+         WHERE id = :id`,
+        {
+          id,
+          name,
+          ...(album_date ? { album_date } : {}),
+          music_id: nullableString(music_id),
+          music_name: nullableString(music_name),
+          music_url: nullableString(music_url),
+          music_artist: nullableString(music_artist),
+          music_list: { val: JSON.stringify(music_list ?? []), type: oracledb.CLOB },
+          cover_photo_id: nullableString(cover_photo_id),
+        }
+      );
+    });
+  } catch (err) {
+    return handleApiError(err);
+  }
 
   return NextResponse.json({ ok: true });
 }
@@ -53,16 +65,20 @@ export async function DELETE(request: NextRequest, { params }: PathParams) {
 
   const { id } = await params;
 
-  await withConnection(async (conn) => {
-    const photoResult = await conn.execute<{ STORAGE_PATH: string }>(
-      `SELECT storage_path FROM photos WHERE album_id = :id`,
-      { id }
-    );
-    const paths = (photoResult.rows ?? []).map((r) => r.STORAGE_PATH);
-    await deleteObjects(paths);
+  try {
+    await withConnection(async (conn) => {
+      const photoResult = await conn.execute<{ STORAGE_PATH: string }>(
+        `SELECT storage_path FROM photos WHERE album_id = :id`,
+        { id }
+      );
+      const paths = (photoResult.rows ?? []).map((r) => r.STORAGE_PATH);
+      await deleteObjects(paths);
 
-    await conn.execute(`DELETE FROM albums WHERE id = :id`, { id });
-  });
+      await conn.execute(`DELETE FROM albums WHERE id = :id`, { id });
+    });
+  } catch (err) {
+    return handleApiError(err);
+  }
 
   return NextResponse.json({ ok: true });
 }
