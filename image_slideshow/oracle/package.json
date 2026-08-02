@@ -1,0 +1,17 @@
+{
+  "name": "image-slideshow-migrate",
+  "private": true,
+  "version": "1.0.0",
+  "description": "Supabase -> Oracle Autonomous DB + OCI Object Storage 1회성 데이터 이관 스크립트",
+  "scripts": {
+    "migrate:dry-run": "node migrate-data.js --dry-run",
+    "migrate": "node migrate-data.js"
+  },
+  "dependencies": {
+    "@supabase/supabase-js": "^2.110.0",
+    "dotenv": "^16.4.5",
+    "oci-common": "^2.138.0",
+    "oci-objectstorage": "^2.138.0",
+    "oracledb": "^7.0.1"
+  }
+}

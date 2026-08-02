@@ -11,7 +11,11 @@
   "dependencies": {
     "@supabase/ssr": "^0.12.0",
     "@supabase/supabase-js": "^2.110.0",
+    "jose": "^6.2.7",
     "next": "^15.2.0",
+    "oci-common": "^2.138.0",
+    "oci-objectstorage": "^2.138.0",
+    "oracledb": "^7.0.1",
     "pretendard": "^1.3.9",
     "react": "^19.0.0",
     "react-dom": "^19.0.0",
@@ -20,6 +24,7 @@
   },
   "devDependencies": {
     "@types/node": "^22.10.7",
+    "@types/oracledb": "^7.0.2",
     "@types/react": "^19.0.0",
     "@types/react-dom": "^19.0.0",
     "autoprefixer": "^10.4.20",

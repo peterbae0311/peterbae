@@ -28,3 +28,10 @@ Thumbs.db
 # 로그
 *.log
 logs/
+
+# Oracle Wallet / API 개인키 (절대 커밋 금지)
+oracle/wallet/
+*.pem
+
+# playwright MCP 임시 세션 파일 (스크린샷, 콘솔 로그, 다운로드)
+.playwright-mcp/

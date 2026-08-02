@@ -10,6 +10,7 @@
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <script src="config.js"></script>
   <link rel="stylesheet" href="style.css">
+  <link rel="stylesheet" href="auth/auth.css">
 </head>
 <body>
 
@@ -21,22 +22,11 @@
         <span class="modal-emoji">⚙️</span>
         <div>
           <h2>API 키 설정</h2>
-          <p class="modal-subtitle">서비스 이용에 필요한 키를 입력해주세요</p>
+          <p class="modal-subtitle">AI 분석에 필요한 키를 입력해주세요 (선택)</p>
         </div>
       </div>
     </div>
     <div class="modal-body">
-      <div class="settings-section">
-        <div class="settings-section-title">📦 Supabase (필수)</div>
-        <div class="form-group">
-          <label>Project URL <span class="req">*</span></label>
-          <input type="url" id="cfg-supabase-url" placeholder="https://xxxx.supabase.co" autocomplete="off">
-        </div>
-        <div class="form-group">
-          <label>Anon Key <span class="req">*</span></label>
-          <input type="password" id="cfg-supabase-key" placeholder="eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..." autocomplete="off">
-        </div>
-      </div>
       <div class="settings-section">
         <div class="settings-section-title">🤖 AI API 키 (이미지 분석)</div>
         <div class="form-group">
@@ -54,7 +44,7 @@
       </div>
     </div>
     <div class="modal-footer">
-      <button id="btn-save-settings" class="btn-primary btn-full">저장 후 시작하기</button>
+      <button id="btn-save-settings" class="btn-primary btn-full">저장</button>
       <button onclick="localStorage.clear(); location.reload();" class="btn-reset-settings">
         설정 초기화 후 새로고침
       </button>
@@ -185,7 +175,7 @@
   <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 18 15 12 9 6"/></svg>
 </button>
 
-<div class="app-container">
+<div id="app" class="app-container" style="display:none;">
 
   <!-- LEFT PANEL 30% -->
   <aside class="left-panel">
@@ -228,6 +218,7 @@
     </div>
 
     <div class="left-bottom">
+      <button class="btn-settings" id="btn-logout" title="로그아웃">🚪 로그아웃</button>
       <button class="btn-settings" id="btn-open-settings" title="설정">⚙️ 설정</button>
     </div>
   </aside>
@@ -350,5 +341,26 @@
 <div id="toast" class="toast"></div>
 
 <script src="app.js"></script>
+<script type="module">
+  import { initAuth } from './auth/auth.js';
+
+  const { supabase, signOut } = await initAuth({
+    supabaseUrl: window.APP_CONFIG.supabaseUrl,
+    supabaseKey: window.APP_CONFIG.supabaseKey,
+    onLogin(user) {
+      window.currentUser = user;
+      document.getElementById('app').style.display = 'flex';
+      window.initApp();
+    },
+    onLogout() {
+      document.getElementById('app').style.display = 'none';
+    },
+  });
+
+  // app.js가 /api/image-slideshow/* 호출 시 Authorization 헤더를 만들 때 재사용
+  window._authSupabase = supabase;
+
+  document.getElementById('btn-logout')?.addEventListener('click', signOut);
+</script>
 </body>
 </html>

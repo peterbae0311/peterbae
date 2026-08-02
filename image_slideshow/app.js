@@ -7,7 +7,7 @@
 // ============================================================
 // 1. STATE
 // ============================================================
-let supabaseClient = null;
+const API_BASE     = '/api/image-slideshow';
 let config         = {};
 let albums         = [];
 let selectedAlbum  = null;
@@ -111,15 +111,8 @@ function saveConfig(obj) {
 }
 
 function openSettings() {
-  // config.js의 APP_CONFIG 값을 우선 병합 (설정 팝업 열 때마다 최신 preset 반영)
-  const preset = window.APP_CONFIG || {};
-  if (preset.supabaseUrl) config.supabaseUrl = preset.supabaseUrl;
-  if (preset.supabaseKey) config.supabaseKey = preset.supabaseKey;
-
   const m = document.getElementById('settings-modal');
   m.style.display = 'flex';
-  document.getElementById('cfg-supabase-url').value  = config.supabaseUrl  || '';
-  document.getElementById('cfg-supabase-key').value  = config.supabaseKey  || '';
   document.getElementById('cfg-openrouter-key').value = config.openrouterKey || '';
   document.getElementById('cfg-groq-key').value       = config.groqKey      || '';
   document.getElementById('cfg-hf-token').value       = config.hfToken      || '';
@@ -130,67 +123,49 @@ function closeSettings() {
 }
 
 // ============================================================
-// 5. SUPABASE INIT & DB HELPERS
+// 5. API CLIENT (hub의 /api/image-slideshow/* — Oracle DB + OCI Storage)
 // ============================================================
-async function initSupabase() {
-  if (!config.supabaseUrl || !config.supabaseKey) return false;
-  try {
-    supabaseClient = window.supabase.createClient(config.supabaseUrl, config.supabaseKey);
-    // 버킷/테이블 확인은 non-fatal — 연결 자체가 되면 true 반환
-    await ensureBucket().catch(e => console.warn('bucket check:', e.message));
-    const ok = await checkTablesExist();
-    return ok;
-  } catch (e) {
-    console.error('Supabase init error:', e);
-    return false;
-  }
-}
-
-function isPgrstTransient(error) {
-  if (!error) return false;
-  return (
-    error.code === 'PGRST002' ||
-    error.status === 503 ||
-    String(error.message).includes('schema cache') ||
-    String(error.message).includes('Service Unavailable') ||
-    String(error.message).includes('503')
-  );
-}
-
-async function checkTablesExist() {
-  const MAX_RETRY = 30;   // 최대 120초 대기 (프로젝트 복원 후 충분히 기다림)
-  const DELAY_MS  = 4000;
-
-  for (let i = 1; i <= MAX_RETRY; i++) {
-    const { error } = await supabaseClient.from('albums').select('id').limit(1);
-
-    if (!error) {
-      hideDbMissingBanner();
-      return true;
-    }
-
-    console.warn(`[${i}/${MAX_RETRY}] albums 접근 오류 (${error.code}): ${error.message}`);
-
-    // PGRST002 / 503 = PostgREST 스키마 캐시 재로딩 중 (일시적) → 계속 재시도
-    if (isPgrstTransient(error)) {
-      showRetryBanner(i, MAX_RETRY);
-      await sleep(DELAY_MS);
-      continue;
-    }
-
-    // relation 오류 등 = 테이블 자체가 없음
-    showDbMissingBanner(error.message);
-    return false;
-  }
-
-  // 재시도 초과 — 그래도 진행 시도
-  console.error('재시도 한도 초과. 앱을 계속 시작합니다.');
-  hideDbMissingBanner();
-  return true;
-}
-
 function sleep(ms) {
   return new Promise(r => setTimeout(r, ms));
+}
+
+async function apiHeaders() {
+  const client = window._authSupabase;
+  if (!client) return {};
+  const { data } = await client.auth.getSession();
+  const token = data?.session?.access_token;
+  return token ? { 'Authorization': `Bearer ${token}` } : {};
+}
+
+async function apiFetch(path, options = {}) {
+  const headers = { ...(await apiHeaders()), ...(options.headers || {}) };
+  if (options.body !== undefined) headers['Content-Type'] = 'application/json';
+
+  let res;
+  try {
+    res = await fetch(API_BASE + path, { ...options, headers });
+  } catch (e) {
+    const err = new Error('네트워크 오류로 서버에 연결할 수 없습니다.');
+    err.transient = true;
+    throw err;
+  }
+
+  if (!res.ok) {
+    let message = `요청 실패 (${res.status})`;
+    try { const body = await res.json(); if (body?.error) message = body.error; } catch {}
+    const err = new Error(message);
+    err.status = res.status;
+    // Oracle Autonomous DB Always Free는 유휴 시 자동 정지되어 첫 요청이 502/503/504로 실패할 수 있음 → 재시도 대상
+    err.transient = [502, 503, 504].includes(res.status);
+    throw err;
+  }
+
+  if (res.status === 204) return null;
+  return res.json();
+}
+
+function isTransientApiError(e) {
+  return !!e?.transient;
 }
 
 function showRetryBanner(attempt, max) {
@@ -209,8 +184,8 @@ function showRetryBanner(attempt, max) {
   banner.innerHTML = `
     <span style="font-size:18px">⏳</span>
     <div style="flex:1">
-      <strong>Supabase 준비 중...</strong>
-      DB 캐시 재로딩 중입니다. 잠시만 기다려주세요.
+      <strong>서버 준비 중...</strong>
+      DB가 깨어나는 중입니다. 잠시만 기다려주세요.
       (${attempt}/${max} 재시도)
     </div>
     <div style="width:120px;height:4px;background:#fde68a;border-radius:4px;overflow:hidden">
@@ -234,13 +209,13 @@ function showDbMissingBanner(detail = '') {
     banner.innerHTML = `
       <span style="font-size:18px">⚠️</span>
       <div style="flex:1">
-        <strong>DB 연결 오류:</strong> ${escHtml(detail)}
-        — Supabase URL/Key를 확인하거나 새로고침 해주세요.
+        <strong>서버 연결 오류:</strong> ${escHtml(detail)}
+        — 잠시 후 새로고침 해주세요.
       </div>
-      <button onclick="localStorage.clear();location.reload();"
+      <button onclick="location.reload();"
         style="background:#ef4444;color:#fff;padding:6px 14px;border-radius:8px;
                font-weight:600;font-size:12px;border:none;cursor:pointer;">
-        초기화 후 재시작
+        새로고침
       </button>
     `;
     document.body.prepend(banner);
@@ -252,50 +227,53 @@ function hideDbMissingBanner() {
   if (b) b.remove();
 }
 
-async function ensureBucket() {
-  // anon 키는 listBuckets 불가 — upload 시도가 실패해도 bucket은 이미 서버에서 생성됨
-  // 아무것도 하지 않음 (버킷은 MCP로 사전 생성 완료)
+async function loadAlbums() {
+  const MAX_RETRY = 30;   // 최대 120초 대기 (Always Free DB 재기동 시간 감안)
+  const DELAY_MS  = 4000;
+
+  for (let i = 1; i <= MAX_RETRY; i++) {
+    try {
+      const { albums: rows } = await apiFetch('/albums');
+      hideDbMissingBanner();
+      albums = (rows || []).map(a => {
+        // Backward compat: synthesize music_list from legacy fields
+        let ml = Array.isArray(a.music_list) ? a.music_list : [];
+        if (ml.length === 0 && a.music_url) {
+          ml = [{ id: a.music_id || null, name: a.music_name || '음악', artist: a.music_artist || '', url: a.music_url, source: a.music_id ? 'ai' : 'file' }];
+        }
+        return { ...a, music_list: ml, photos: (a.photos || []).sort((x, y) => x.sort_order - y.sort_order) };
+      });
+      renderAlbumList();
+      return;
+    } catch (e) {
+      console.warn(`loadAlbums 재시도 ${i}/${MAX_RETRY}:`, e.message);
+      if (isTransientApiError(e) && i < MAX_RETRY) {
+        showRetryBanner(i, MAX_RETRY);
+        await sleep(DELAY_MS);
+        continue;
+      }
+      showDbMissingBanner(e.message);
+      console.error('loadAlbums 오류:', e.message);
+      return;
+    }
+  }
 }
 
-async function loadAlbums() {
-  if (!supabaseClient) return;
-
-  let albumRows = null;
-  for (let i = 1; i <= 5; i++) {
-    const { data, error } = await supabaseClient
-      .from('albums')
-      .select('*, photos(id, filename, url, sort_order)')
-      .order('created_at', { ascending: false });
-
-    if (!error) { albumRows = data; break; }
-
-    console.warn(`loadAlbums 재시도 ${i}/5:`, error.message);
-    if (isPgrstTransient(error)) {
-      await sleep(4000);
-      continue;
-    }
-    console.error('loadAlbums 오류:', error.message);
-    return;
-  }
-
-  albums = (albumRows || []).map(a => {
-    // Backward compat: synthesize music_list from legacy fields
-    let ml = Array.isArray(a.music_list) ? a.music_list : [];
-    if (ml.length === 0 && a.music_url) {
-      ml = [{ id: a.music_id || null, name: a.music_name || '음악', artist: a.music_artist || '', url: a.music_url, source: a.music_id ? 'ai' : 'file' }];
-    }
-    return { ...a, music_list: ml, photos: (a.photos || []).sort((x, y) => x.sort_order - y.sort_order) };
+async function uploadToStorage(objectPath, file) {
+  const { uploadUrl, publicUrl } = await apiFetch('/upload-url', {
+    method: 'POST',
+    body: JSON.stringify({ path: objectPath }),
   });
-  renderAlbumList();
+  const putRes = await fetch(uploadUrl, { method: 'PUT', body: file });
+  if (!putRes.ok) throw new Error('파일 업로드 실패');
+  return publicUrl;
 }
 
 async function uploadMusicFile(albumId, file) {
   const safeName = file.name.replace(/[^a-zA-Z0-9._-]/g, '_');
   const path = `music/${albumId}/${Date.now()}_${safeName}`;
-  const { error } = await supabaseClient.storage.from('photos').upload(path, file, { upsert: false });
-  if (error) throw error;
-  const { data } = supabaseClient.storage.from('photos').getPublicUrl(path);
-  return { url: data.publicUrl, name: file.name.replace(/\.[^.]+$/, '') };
+  const url = await uploadToStorage(path, file);
+  return { url, name: file.name.replace(/\.[^.]+$/, '') };
 }
 
 async function uploadMusicItems(albumId, musicList) {
@@ -317,9 +295,9 @@ async function createAlbum(name, albumDate, musicList, photoFiles) {
   const first = finalMusicList[0] || null;
 
   // 2. Insert album with legacy fields from first track + music_list
-  const { data: album, error: ae } = await supabaseClient
-    .from('albums')
-    .insert({
+  const { id: albumId } = await apiFetch('/albums', {
+    method: 'POST',
+    body: JSON.stringify({
       name,
       album_date:   albumDate || null,
       music_id:     first?.id     || null,
@@ -327,42 +305,47 @@ async function createAlbum(name, albumDate, musicList, photoFiles) {
       music_url:    first?.url    || null,
       music_artist: first?.artist || null,
       music_list:   finalMusicList,
-    })
-    .select().single();
-  if (ae) throw ae;
+    }),
+  });
 
   // 3. Re-upload any file-based music with real albumId
   const reUpload = musicList.filter(m => m._file);
   if (reUpload.length > 0) {
-    const reFixed = await uploadMusicItems(album.id, reUpload);
+    const reFixed = await uploadMusicItems(albumId, reUpload);
     // Merge back into finalMusicList (replace tmp urls)
     let fi = 0;
     for (let i = 0; i < finalMusicList.length; i++) {
       if (musicList[i]?._file) { finalMusicList[i] = reFixed[fi++]; }
     }
     const f0 = finalMusicList[0] || null;
-    await supabaseClient.from('albums').update({
-      music_id: f0?.id || null, music_name: f0?.name || null,
-      music_url: f0?.url || null, music_artist: f0?.artist || null,
-      music_list: finalMusicList,
-    }).eq('id', album.id);
+    await apiFetch(`/albums/${albumId}`, {
+      method: 'PATCH',
+      body: JSON.stringify({
+        name,
+        album_date:   albumDate || null,
+        music_id:     f0?.id     || null,
+        music_name:   f0?.name   || null,
+        music_url:    f0?.url    || null,
+        music_artist: f0?.artist || null,
+        music_list:   finalMusicList,
+      }),
+    });
   }
 
   // 4. Upload photos
-  const photoRows = [];
+  const photos = [];
   for (let i = 0; i < photoFiles.length; i++) {
     const file = photoFiles[i];
-    const path = `${album.id}/${Date.now()}_${i}_${file.name.replace(/[^a-zA-Z0-9._-]/g, '_')}`;
-    const { error: ue } = await supabaseClient.storage.from('photos').upload(path, file, { upsert: false });
-    if (ue) { console.warn('Upload error:', ue); continue; }
-    const { data: urlData } = supabaseClient.storage.from('photos').getPublicUrl(path);
-    photoRows.push({ album_id: album.id, filename: file.name, storage_path: path, url: urlData.publicUrl, sort_order: i });
+    const path = `${albumId}/${Date.now()}_${i}_${file.name.replace(/[^a-zA-Z0-9._-]/g, '_')}`;
+    try {
+      const url = await uploadToStorage(path, file);
+      photos.push({ filename: file.name, storagePath: path, url, sortOrder: i });
+    } catch (e) { console.warn('Upload error:', e); }
   }
-  if (photoRows.length > 0) {
-    const { error: pe } = await supabaseClient.from('photos').insert(photoRows);
-    if (pe) throw pe;
+  if (photos.length > 0) {
+    await apiFetch('/photos', { method: 'POST', body: JSON.stringify({ albumId, photos }) });
   }
-  return album;
+  return { id: albumId };
 }
 
 async function updateAlbum(albumId, name, albumDate, musicList, newPhotoFiles, removedIds) {
@@ -370,57 +353,46 @@ async function updateAlbum(albumId, name, albumDate, musicList, newPhotoFiles, r
   const finalMusicList = await uploadMusicItems(albumId, musicList);
   const first = finalMusicList[0] || null;
 
-  // 2. albums 테이블 업데이트
-  const { error: ue } = await supabaseClient.from('albums').update({
-    name,
-    album_date:   albumDate || null,
-    music_id:     first?.id     || null,
-    music_name:   first?.name   || null,
-    music_url:    first?.url    || null,
-    music_artist: first?.artist || null,
-    music_list:   finalMusicList,
-  }).eq('id', albumId);
-  if (ue) throw ue;
+  // 2. albums 메타데이터 업데이트
+  await apiFetch(`/albums/${albumId}`, {
+    method: 'PATCH',
+    body: JSON.stringify({
+      name,
+      album_date:   albumDate || null,
+      music_id:     first?.id     || null,
+      music_name:   first?.name   || null,
+      music_url:    first?.url    || null,
+      music_artist: first?.artist || null,
+      music_list:   finalMusicList,
+    }),
+  });
 
-  // 2. 삭제 표시된 기존 사진 제거
+  // 3. 삭제 표시된 기존 사진 제거 (서버가 OCI 오브젝트도 함께 정리)
   if (removedIds.length > 0) {
-    const album = albums.find(a => a.id === albumId);
-    const toRemove = (album?.photos || []).filter(p => removedIds.includes(p.id));
-    if (toRemove.length > 0) {
-      await supabaseClient.storage.from('photos').remove(toRemove.map(p => p.storage_path));
-      const { error: de } = await supabaseClient.from('photos').delete().in('id', removedIds);
-      if (de) console.warn('photo delete error:', de.message);
-    }
+    await apiFetch('/photos', { method: 'DELETE', body: JSON.stringify({ ids: removedIds }) });
   }
 
-  // 3. 새 사진 업로드
+  // 4. 새 사진 업로드
   if (newPhotoFiles.length > 0) {
     const existingCount = (albums.find(a => a.id === albumId)?.photos || []).length - removedIds.length;
-    const photoRows = [];
+    const photos = [];
     for (let i = 0; i < newPhotoFiles.length; i++) {
       const file = newPhotoFiles[i];
       const path = `${albumId}/${Date.now()}_${i}_${file.name.replace(/[^a-zA-Z0-9._-]/g, '_')}`;
-      const { error: se } = await supabaseClient.storage.from('photos').upload(path, file, { upsert: false });
-      if (se) { console.warn('Upload error:', se); continue; }
-      const { data: urlData } = supabaseClient.storage.from('photos').getPublicUrl(path);
-      photoRows.push({ album_id: albumId, filename: file.name, storage_path: path, url: urlData.publicUrl, sort_order: existingCount + i });
+      try {
+        const url = await uploadToStorage(path, file);
+        photos.push({ filename: file.name, storagePath: path, url, sortOrder: existingCount + i });
+      } catch (e) { console.warn('Upload error:', e); }
     }
-    if (photoRows.length > 0) {
-      const { error: pe } = await supabaseClient.from('photos').insert(photoRows);
-      if (pe) throw pe;
+    if (photos.length > 0) {
+      await apiFetch('/photos', { method: 'POST', body: JSON.stringify({ albumId, photos }) });
     }
   }
 }
 
 async function deleteAlbum(albumId) {
-  // Delete storage files
-  const album = albums.find(a => a.id === albumId);
-  if (album?.photos?.length) {
-    const paths = album.photos.map(p => p.storage_path);
-    await supabaseClient.storage.from('photos').remove(paths);
-  }
-  const { error } = await supabaseClient.from('albums').delete().eq('id', albumId);
-  if (error) throw error;
+  // 서버가 OCI 오브젝트 정리 + 행 삭제(photos는 FK cascade)를 모두 처리
+  await apiFetch(`/albums/${albumId}`, { method: 'DELETE' });
 }
 
 // ============================================================
@@ -1256,8 +1228,8 @@ async function saveAlbum() {
           await createAlbum(name, albumDate, pendingMusicList, pendingPhotos);
           break;
         } catch (e) {
-          if (isPgrstTransient(e) && attempt < 5) {
-            showToast(`DB 준비 중... 재시도 중 (${attempt}/5)`, 'info');
+          if (isTransientApiError(e) && attempt < 5) {
+            showToast(`서버 준비 중... 재시도 중 (${attempt}/5)`, 'info');
             await sleep(4000);
             continue;
           }
@@ -1269,12 +1241,9 @@ async function saveAlbum() {
       showToast('앨범이 저장되었습니다 ✨', 'success');
     }
   } catch (e) {
-    const isTransient = isPgrstTransient(e);
-    const msg = isTransient
-      ? 'Supabase 준비 중입니다. 잠시 후 다시 시도해주세요 (DB 캐시 로딩)'
-      : e.message?.includes('relation') || e.message?.includes('does not exist')
-        ? 'DB 테이블이 없습니다. supabase-schema.sql을 먼저 실행해주세요'
-        : '저장 실패: ' + e.message;
+    const msg = isTransientApiError(e)
+      ? '서버가 준비 중입니다. 잠시 후 다시 시도해주세요.'
+      : '저장 실패: ' + e.message;
     showToast(msg, 'error');
     console.error(e);
   } finally {
@@ -1697,12 +1666,13 @@ function renderAiPanel(text, model) {
 }
 
 async function saveAiAnalysis(albumId, text) {
-  if (!supabaseClient || !albumId) return;
-  const { error } = await supabaseClient
-    .from('albums')
-    .update({ ai_analysis: text })
-    .eq('id', albumId);
-  if (error) { console.warn('AI 분석 저장 실패:', error.message); return; }
+  if (!albumId) return;
+  try {
+    await apiFetch(`/albums/${albumId}/ai-analysis`, {
+      method: 'PATCH',
+      body: JSON.stringify({ ai_analysis: text }),
+    });
+  } catch (e) { console.warn('AI 분석 저장 실패:', e.message); return; }
   // 로컬 캐시 업데이트
   const album = albums.find(a => a.id === albumId);
   if (album) album.ai_analysis = text;
@@ -1868,14 +1838,8 @@ function escHtml(str) {
 // ============================================================
 function bindEvents() {
   // Settings modal
-  document.getElementById('btn-save-settings').addEventListener('click', async () => {
-    const url = document.getElementById('cfg-supabase-url').value.trim();
-    const key = document.getElementById('cfg-supabase-key').value.trim();
-    if (!url || !key) { showToast('Supabase URL과 Anon Key는 필수입니다', 'error'); return; }
-
+  document.getElementById('btn-save-settings').addEventListener('click', () => {
     config = {
-      supabaseUrl:    url,
-      supabaseKey:    key,
       openrouterKey:  document.getElementById('cfg-openrouter-key').value.trim(),
       groqKey:        document.getElementById('cfg-groq-key').value.trim(),
       hfToken:        document.getElementById('cfg-hf-token').value.trim(),
@@ -1883,10 +1847,6 @@ function bindEvents() {
     try { saveConfig(config); } catch(e) { console.warn('localStorage 저장 실패:', e); }
     closeSettings();
     showToast('설정이 저장되었습니다 ✨', 'success');
-
-    const ok = await initSupabase();
-    if (ok) await loadAlbums();
-    else    showToast('Supabase 연결에 실패했습니다. URL/키를 확인해주세요.', 'error');
   });
 
   document.getElementById('btn-open-settings').addEventListener('click', openSettings);
@@ -1989,7 +1949,7 @@ function bindEvents() {
 
   // Close modals on overlay click
   document.getElementById('settings-modal').addEventListener('click', function (e) {
-    if (e.target === this && config.supabaseUrl) closeSettings();
+    if (e.target === this) closeSettings();
   });
 
   // add-modal: 드래그 중이거나 드래그 직후 클릭은 닫기 무시
@@ -2014,33 +1974,24 @@ function bindEvents() {
 // ============================================================
 // 20. INIT
 // ============================================================
-async function init() {
-  // config.js 의 APP_CONFIG 값을 우선 적용, 없으면 localStorage 사용
+function init() {
+  bindEvents();
+  initDropZone();
+  initPanoDrag();
+}
+
+// auth/auth.js의 onLogin 콜백에서 호출됨 — 로그인 성공 후에만 DB/Storage 접근 시작
+async function initApp() {
   const saved = loadConfig();
-  const preset = window.APP_CONFIG || {};
   config = {
-    supabaseUrl:  preset.supabaseUrl  || saved.supabaseUrl  || '',
-    supabaseKey:  preset.supabaseKey  || saved.supabaseKey  || '',
     openrouterKey: saved.openrouterKey || '',
     groqKey:       saved.groqKey       || '',
     hfToken:       saved.hfToken       || '',
   };
-  // preset 값이 있으면 localStorage도 최신화
-  if (preset.supabaseUrl) saveConfig(config);
-
-  bindEvents();
-  initDropZone();
-  initPanoDrag();
-
-  if (config.supabaseUrl && config.supabaseKey) {
-    document.getElementById('settings-modal').style.display = 'none';
-    const ok = await initSupabase();
-    if (ok) await loadAlbums();
-    else openSettings();
-  } else {
-    openSettings();
-  }
+  document.getElementById('settings-modal').style.display = 'none';
+  await loadAlbums();
 }
+window.initApp = initApp;
 
 // ============================================================
 // 16. 좋은 글
