@@ -2059,16 +2059,14 @@ const GOOD_TEXTS = [
 ];
 
 const GOOD_TEXT_COLORS = [
-  '#6d28d9', // violet — 브랜드 메인
-  '#4f46e5', // indigo — 차분한 깊이
-  '#0e7490', // cyan   — 청아한 느낌
-  '#0f766e', // teal   — 자연스러운 초록
-  '#7c3aed', // violet-light
-  '#1d4ed8', // blue   — 맑고 선명
-  '#9333ea', // purple — 몽환적
-  '#be185d', // pink   — 따뜻한 장미
-  '#334155', // slate  — 절제된 품격
-  '#0369a1', // sky    — 투명한 하늘
+  '#0a0a0a', // ink   — 기본
+  '#2b2b2b', // ink-2 — 톤 변화
+  '#0a0a0a', // ink
+  '#404040', // 중간 회색
+  '#0a0a0a', // ink
+  '#2b2b2b', // ink-2
+  '#0a0a0a', // ink
+  '#404040', // 중간 회색
 ];
 
 function generateGoodTexts() {

@@ -12,7 +12,7 @@ export function injectAuthUI() {
           <div class="field">
             <label for="login-email">이메일</label>
             <div class="input-wrap">
-              <input type="email" id="login-email" name="login-email-field" maxlength="100" autocomplete="off" />
+              <input type="email" id="login-email" name="login-email-field" maxlength="100" autocomplete="off" placeholder="이메일을 입력하세요." />
               <button type="button" class="btn-clear" id="clear-login-email" tabindex="-1">&#10005;</button>
             </div>
           </div>
@@ -22,7 +22,7 @@ export function injectAuthUI() {
               <a class="link-small" id="link-forgot">비밀번호를 잊으셨나요?</a>
             </div>
             <div class="input-wrap">
-              <input type="password" id="login-password" name="login-password-field" maxlength="100" autocomplete="off" />
+              <input type="password" id="login-password" name="login-password-field" maxlength="100" autocomplete="off" placeholder="비밀번호를 입력하세요." />
               <button type="button" class="btn-clear" id="clear-login-password" tabindex="-1">&#10005;</button>
             </div>
           </div>
@@ -30,10 +30,6 @@ export function injectAuthUI() {
           <div class="error-msg" id="login-error"></div>
           <button type="button" class="btn-primary" id="btn-login-submit">로그인</button>
         </form>
-        <div class="auth-footer">
-          계정이 없으신가요?
-          <a id="link-register">계정을 만드세요</a>
-        </div>
       </div>
 
       <div id="screen-register" class="screen">

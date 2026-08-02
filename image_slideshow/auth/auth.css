@@ -1,8 +1,16 @@
+/* ============================================================
+   AUTH SCREEN — matches hub's own /login screen exactly
+   (frosted white card, boxed inputs, neutral-900 button)
+
+   전부 #auth-container 아래로 스코프함 — .btn-primary/.field/.error-msg 등
+   범용 클래스명이 앱의 다른 화면(모달 등)에 새어 들어가는 걸 방지하기 위함
+   (이 파일은 로그인 여부와 무관하게 앱 전체에서 항상 로드됨).
+   ============================================================ */
 #auth-container {
   position: fixed;
   inset: 0;
   z-index: 1000;
-  background: #f0f4ff;
+  background: linear-gradient(135deg, #f5f5f5, #ffffff 50%, #f5f5f5);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -10,27 +18,30 @@
   overflow-y: auto;
 }
 
-.auth-card {
-  background: #ffffff;
+#auth-container .auth-card {
+  background: rgba(255,255,255,.7);
+  backdrop-filter: blur(24px);
+  -webkit-backdrop-filter: blur(24px);
+  border: 1px solid rgba(255,255,255,.5);
   border-radius: 16px;
-  width: 520px;
+  width: 450px;
   max-width: 100%;
-  padding: 56px 52px;
-  box-shadow: 0 4px 24px rgba(0,0,0,0.10), 0 1px 4px rgba(0,0,0,0.06);
+  padding: 40px;
+  box-shadow: 0 1px 20px rgba(0,0,0,.08);
 }
 
-.input-wrap {
+#auth-container .input-wrap {
   position: relative;
   display: flex;
   align-items: center;
 }
 
-.input-wrap input {
+#auth-container .input-wrap input {
   width: 100%;
-  padding-right: 36px;
+  padding-right: 34px;
 }
 
-.btn-clear {
+#auth-container .btn-clear {
   position: absolute;
   right: 10px;
   background: none;
@@ -43,137 +54,148 @@
   line-height: 1;
 }
 
-.btn-clear:hover { color: #374151; }
+#auth-container .btn-clear:hover { color: #171717; }
 
-.pw-hint {
-  font-size: 13px;
-  color: #1d4ed8;
+#auth-container .pw-hint {
+  font-size: 12px;
+  color: #6b7280;
   margin-top: 10px;
   line-height: 1.6;
-  background: #eff6ff;
-  border-left: 3px solid #2563eb;
-  padding: 10px 12px;
-  border-radius: 6px;
+  background: #fafafa;
+  border: 1px solid rgba(229,231,235,.8);
+  padding: 8px 12px;
+  border-radius: 8px;
 }
 
-.screen-title-row h1 { margin-bottom: 0; }
+#auth-container .screen-title-row h1 { margin-bottom: 0; }
 
-.auth-card h1 {
-  font-size: 28px;
-  font-weight: 600;
-  color: #0f172a;
-  margin-bottom: 32px;
+#auth-container .auth-card h1 {
+  font-family: var(--font, 'Pretendard', sans-serif);
+  font-size: 20px;
+  font-weight: 800;
+  color: #171717;
+  letter-spacing: -.025em;
+  margin-bottom: 8px;
   line-height: 1.3;
 }
 
-.auth-subtitle {
+#auth-container .auth-subtitle {
   font-size: 14px;
-  color: #64748b;
-  margin-bottom: 32px;
-  margin-top: -20px;
+  color: #6b7280;
+  margin-bottom: 28px;
+  margin-top: 0;
 }
 
-.screen { display: none; }
-.screen.active { display: block; }
+#auth-container .screen { display: none; }
+#auth-container .screen.active { display: block; }
 
-.field { margin-bottom: 20px; }
+#auth-container .field { margin-bottom: 16px; }
 
-.field-header {
+#auth-container .field-header {
   display: flex;
   align-items: center;
   justify-content: space-between;
   margin-bottom: 6px;
 }
 
-.field label {
+#auth-container .field label {
   display: block;
-  font-size: 15px;
-  font-weight: 500;
+  font-size: 14px;
+  font-weight: 600;
   color: #374151;
   margin-bottom: 6px;
-}
-
-.field-header label { margin-bottom: 0; }
-
-.field-header .link-small {
-  font-size: 13px;
-  font-weight: 500;
-}
-
-.field input {
-  width: 100%;
-  padding: 13px 15px;
-  border: 1.5px solid #cbd5e1;
-  border-radius: 8px;
-  font-size: 15px;
   font-family: inherit;
-  color: #111827;
-  outline: none;
-  transition: border-color 0.15s;
-  background: #fff;
+  text-transform: none;
+  letter-spacing: normal;
 }
 
-.field input:focus { border-color: #2563eb; }
-.field input::placeholder { color: #9ca3af; }
+#auth-container .field-header label { margin-bottom: 0; }
 
-.btn-primary {
+#auth-container .field-header .link-small {
+  font-size: 12px;
+  font-weight: 400;
+  color: #525252;
+  text-decoration: underline;
+}
+#auth-container .field-header .link-small:hover { color: #171717; }
+
+#auth-container .field input {
   width: 100%;
-  padding: 14px;
-  background: #2563eb;
+  padding: 10px 16px;
+  border: 1px solid rgba(229,231,235,.8);
+  border-radius: 8px;
+  font-size: 16px;
+  font-family: inherit;
+  color: #374151;
+  outline: none;
+  background: rgba(255,255,255,.6);
+  transition: border-color 0.15s ease, box-shadow 0.15s ease;
+}
+
+#auth-container .field input:focus { border-color: #737373; box-shadow: 0 0 0 1px #737373; }
+#auth-container .field input::placeholder { color: #9ca3af; }
+
+#auth-container .btn-primary {
+  width: 100%;
+  padding: 10px;
+  background: linear-gradient(to right, #171717, #262626);
   color: #ffffff;
   border: none;
   border-radius: 8px;
   font-size: 16px;
-  font-weight: 500;
+  font-weight: 700;
   font-family: inherit;
   cursor: pointer;
   margin-top: 12px;
-  transition: background 0.15s;
+  box-shadow: 0 8px 20px rgba(0,0,0,.25);
+  transition: box-shadow 0.2s ease, opacity 0.2s ease;
+  justify-content: center;
+  text-align: center;
 }
 
-.btn-primary:hover { background: #1d4ed8; }
-.btn-primary:active { background: #1e40af; }
-.btn-primary:disabled { background: #93c5fd; cursor: not-allowed; }
+#auth-container .btn-primary:hover { box-shadow: 0 10px 28px rgba(0,0,0,.3); }
+#auth-container .btn-primary:active { box-shadow: 0 4px 12px rgba(0,0,0,.25); }
+#auth-container .btn-primary:disabled { opacity: .5; cursor: not-allowed; box-shadow: none; }
 
-a, .link { color: #2563eb; text-decoration: none; cursor: pointer; }
-a:hover, .link:hover { text-decoration: underline; }
+#auth-container a, #auth-container .link { color: #171717; text-decoration: underline; cursor: pointer; }
+#auth-container a:hover, #auth-container .link:hover { color: #000000; }
 
-.auth-footer {
-  margin-top: 28px;
+#auth-container .auth-footer {
+  margin-top: 24px;
   text-align: center;
-  font-size: 15px;
+  font-size: 13.5px;
   color: #6b7280;
 }
 
-.success-msg {
+#auth-container .success-msg {
   color: #16a34a;
   font-size: 14px;
   margin-top: 12px;
   min-height: 20px;
 }
 
-.error-msg {
-  color: #dc2626;
+#auth-container .error-msg {
+  color: #ef4444;
   font-size: 14px;
   margin-top: 12px;
   min-height: 20px;
-  line-height: 1.4;
+  line-height: 1.5;
 }
 
-.confirm-text {
-  font-size: 16px;
+#auth-container .confirm-text {
+  font-size: 15px;
   color: #374151;
-  line-height: 1.8;
+  line-height: 1.85;
   text-align: center;
-  margin-top: 16px;
+  margin-top: 18px;
   white-space: pre-line;
-  padding: 16px;
-  background: #f8fafc;
+  padding: 20px;
+  background: #fafafa;
   border-radius: 8px;
-  border: 1px solid #e2e8f0;
+  border: 1px solid rgba(229,231,235,.8);
 }
 
-.confirm-text .highlight {
-  color: #2563eb;
-  font-weight: 500;
+#auth-container .confirm-text .highlight {
+  color: #171717;
+  font-weight: 700;
 }
