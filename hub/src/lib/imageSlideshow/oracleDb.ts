@@ -67,7 +67,13 @@ export async function withConnection<T>(
 export function formatOracleDate(value: unknown): string | null {
   if (!value) return null;
   const d = value as Date;
-  return d.toISOString().slice(0, 10);
+  // toISOString()은 UTC 기준이라 서버가 UTC+ 시간대(KST 등)에서 돌면 자정 근처 날짜가
+  // 하루 전으로 밀려 보인다. Oracle DATE는 타임존 없는 값을 node-oracledb가 프로세스의
+  // 로컬 시간대로 복원해 담아주므로, 로컬 getter로 읽어야 저장한 날짜와 그대로 맞는다.
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, '0');
+  const day = String(d.getDate()).padStart(2, '0');
+  return `${y}-${m}-${day}`;
 }
 
 /** Oracle TIMESTAMP WITH TIME ZONE(created_at) → ISO 문자열. */

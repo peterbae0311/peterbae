@@ -158,19 +158,9 @@ a { text-decoration: none; color: inherit; }
   overflow: hidden;
 }
 
-/* Thin ink top rule instead of a gradient bar */
-.modal-box::before {
-  content: '';
-  position: absolute;
-  top: 0; left: 0; right: 0;
-  height: 2px;
-  background: var(--ink);
-}
-
 @keyframes slideUp { from { transform:translateY(20px); opacity:0 } to { transform:translateY(0); opacity:1 } }
 
-.settings-box { max-width: 520px; }
-.add-box       { max-width: 640px; }
+.add-box { max-width: 640px; }
 
 .modal-header {
   padding: 30px 30px 20px;
@@ -508,7 +498,7 @@ a { text-decoration: none; color: inherit; }
 
 /* Record cards — 대표 사진(좌) + 정보(우) 가로 배치 */
 .record-card {
-  display: flex; align-items: flex-start; gap: 12px;
+  display: flex; flex-direction: column;
   padding: 14px 4px; border-radius: 0;
   cursor: pointer; transition: all var(--t);
   margin-bottom: 0; border: none; border-bottom: 1px solid var(--line);
@@ -516,6 +506,7 @@ a { text-decoration: none; color: inherit; }
   position: relative;
   box-shadow: none;
 }
+.record-card-main { display: flex; align-items: stretch; gap: 12px; }
 .record-card:hover {
   background: transparent;
   border-color: var(--line);
@@ -536,21 +527,19 @@ a { text-decoration: none; color: inherit; }
   background: var(--ink);
 }
 
-.record-card-thumb-wrap { width: 60px; height: 60px; flex-shrink: 0; }
+.record-card-thumb-wrap { width: 60px; flex-shrink: 0; }
 .record-card-thumb {
   width: 100%; height: 100%; border-radius: var(--r-sm);
   object-fit: cover; border: 1px solid var(--line);
   transition: all var(--t-md);
   box-shadow: none;
-  filter: grayscale(.85) contrast(1.02);
 }
-.record-card:hover .record-card-thumb { filter: grayscale(0); transform: none; box-shadow: none; }
 
 .record-card-body { flex: 1; min-width: 0; }
 
 .record-card-head {
   display: flex; align-items: flex-start; justify-content: space-between;
-  gap: 8px; margin-bottom: 4px;
+  gap: 8px; margin-bottom: 8px;
 }
 .record-card-name {
   font-family: var(--font-serif);
@@ -564,23 +553,46 @@ a { text-decoration: none; color: inherit; }
 .record-card-row {
   font-family: var(--font-mono);
   font-size: 11px; color: var(--text-muted);
-  display: flex; align-items: center; gap: 5px;
+  display: flex; align-items: center; gap: 6px;
   line-height: 1.7;
 }
-.record-card-row-link { transition: color var(--t); }
-.record-card-row-link:hover { color: var(--ink); text-decoration: underline; text-underline-offset: 2px; }
+.record-card-row-label { flex-shrink: 0; }
 
-.record-card-track-play {
+.record-card-row.record-card-track-row { gap: 8px; }
+.record-card-track-controls {
+  display: flex; align-items: center; gap: 4px; flex-shrink: 0;
+}
+
+.record-card-select {
+  font-family: var(--font-mono);
+  font-size: 11px; color: var(--ink); font-weight: 600;
+  background: transparent; border: none; border-bottom: 1px solid var(--line-strong);
+  padding: 0 14px 0 0;
+  cursor: pointer; outline: none;
+  -webkit-appearance: none; appearance: none;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='10' viewBox='0 0 24 24' fill='none' stroke='%23888' stroke-width='2.5' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpolyline points='6 9 12 15 18 9'/%3E%3C/svg%3E");
+  background-repeat: no-repeat; background-position: right center;
+}
+.record-card-select:hover { border-color: var(--ink); }
+
+.record-card-track-play,
+.record-card-track-nav {
   width: 18px; height: 18px; border-radius: var(--r-full);
   border: 1px solid var(--line-strong); background: transparent;
-  color: var(--text-muted); font-size: 8px;
+  color: var(--ink);
   display: inline-flex; align-items: center; justify-content: center;
   flex-shrink: 0; transition: all var(--t);
 }
+.record-card-track-play svg,
+.record-card-track-nav svg { display: block; }
 .record-card-track-play:hover,
 .record-card-track-play.playing { background: var(--ink); color: var(--surface); border-color: var(--ink); }
+.record-card-track-nav:hover { border-color: var(--ink); }
+.record-card-track-nav.active { border-color: var(--ink); background: var(--paper-2); }
+
 .record-card-track-name {
   white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+  flex: 1; min-width: 0;
 }
 
 .record-card-actions {
@@ -678,19 +690,8 @@ a { text-decoration: none; color: inherit; }
 /* Panorama view — 이미지만 표시, 흰색 라운드 카드가 여백을 두고 떠 있는 형태 */
 .panorama-view {
   flex: 1; display: flex; flex-direction: column; overflow: hidden;
-  padding: 20px 24px 24px;
+  padding: 15px 24px;
 }
-
-.pano-ctrl-btn {
-  width: 32px; height: 32px; border-radius: var(--r-full);
-  display: flex; align-items: center; justify-content: center;
-  font-size: 12px; font-weight: 700;
-  color: var(--ink-2); background: transparent;
-  border: 1px solid var(--line-strong);
-  transition: all var(--t);
-  box-shadow: none;
-}
-.pano-ctrl-btn:hover { background: var(--ink); color: var(--surface); border-color: var(--ink); transform: none; box-shadow: none; }
 
 /* ── 슬라이드쇼 스테이지 — 흰색 라운드 카드, 사진이 주인공 ── */
 .pano-strip-wrap {
@@ -718,7 +719,7 @@ a { text-decoration: none; color: inherit; }
 }
 .pano-slide-img {
   display: block;
-  max-width: 88%; max-height: 88%;
+  max-width: 98%; max-height: 98%;
   width: auto; height: auto;
   border-radius: var(--r-xl);
   pointer-events: none;
@@ -768,23 +769,6 @@ a { text-decoration: none; color: inherit; }
   87%  { transform: translateX(-1px);  filter: none; }
   100% { transform: translateX(0);     filter: none; }
 }
-
-/* ============================================================
-   MUSIC PLAYER BAR
-   ============================================================ */
-.pano-volume-slider {
-  width: 74px; height: 2px;
-  -webkit-appearance: none; appearance: none; border-radius: 0;
-  background: linear-gradient(90deg, var(--ink) 70%, var(--line) 70%);
-  cursor: pointer; flex-shrink: 0;
-}
-.pano-volume-slider::-webkit-slider-thumb {
-  -webkit-appearance: none;
-  width: 11px; height: 11px; border-radius: 50%;
-  background: var(--surface); border: 1.5px solid var(--ink);
-  cursor: pointer; transition: transform var(--t);
-}
-.pano-volume-slider::-webkit-slider-thumb:hover { transform: scale(1.15); }
 
 /* ── 음악 소스 탭 (모달 내) — pill 컨테이너 ── */
 .music-source-tabs {
@@ -871,19 +855,13 @@ a { text-decoration: none; color: inherit; }
   width: 100%; height: 100%; object-fit: cover;
   border-radius: var(--r-sm); border: 1px solid var(--line);
   transition: all var(--t);
-  filter: grayscale(.6);
   cursor: pointer;
 }
 .photo-thumb-wrap:hover .photo-thumb {
   border-color: var(--line-strong);
   transform: none;
-  filter: grayscale(0) brightness(.9);
 }
-/* 대표 이미지로 지정된 사진 — 클릭해서 토글 */
-.photo-thumb-wrap.is-cover .photo-thumb {
-  filter: grayscale(0) brightness(1);
-  border: 2px solid var(--ink);
-}
+/* 대표 이미지로 지정된 사진 — 클릭해서 토글, ★ 뱃지만으로 표시 */
 .photo-thumb-star {
   position: absolute; top: 5px; left: 5px;
   width: 22px; height: 22px; border-radius: var(--r-full);
@@ -1078,10 +1056,6 @@ a { text-decoration: none; color: inherit; }
 .modal-section-card .form-group {
   margin-bottom: 0;
 }
-
-/* ── 설정 팝업의 배경 음악 행 (재생/정지 + 볼륨) ── */
-.settings-music-row { display: flex; align-items: center; gap: 12px; }
-.settings-music-row .pano-volume-slider { flex: 1; }
 
 /* ── 모달 헤더 아이콘 ── */
 .add-box .modal-emoji {

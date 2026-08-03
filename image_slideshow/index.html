@@ -19,67 +19,6 @@
 </head>
 <body>
 
-<!-- ===================== APP SETTINGS MODAL ===================== -->
-<div id="app-settings-modal" class="modal-overlay" style="display:none">
-  <div class="modal-box settings-box">
-    <div class="modal-header">
-      <div class="modal-title-group">
-        <span class="modal-emoji">⚙️</span>
-        <div>
-          <h2>설정</h2>
-          <p class="modal-subtitle">슬라이드쇼와 음악을 설정하세요</p>
-        </div>
-      </div>
-      <button class="btn-close" id="btn-close-app-settings">✕</button>
-    </div>
-    <div class="modal-body">
-      <div class="modal-section-card">
-        <div class="modal-section-label">
-          <span class="label-dot"></span>
-          전환 시간
-        </div>
-        <select id="pano-speed-select" class="select-input">
-          <option value="2000">2초</option>
-          <option value="3000" selected>3초</option>
-          <option value="5000">5초</option>
-          <option value="8000">8초</option>
-          <option value="10000">10초</option>
-        </select>
-      </div>
-      <div class="modal-section-card">
-        <div class="modal-section-label">
-          <span class="label-dot"></span>
-          전환 효과
-        </div>
-        <select id="pano-effect-select" class="select-input">
-          <option value="fade">페이드</option>
-          <option value="slide">슬라이드</option>
-          <option value="push">푸시</option>
-          <option value="zoom">줌</option>
-          <option value="zoomout">줌아웃</option>
-          <option value="kenburns">켄번즈</option>
-          <option value="rotate">회전</option>
-          <option value="flip">플립</option>
-          <option value="swing">스윙</option>
-          <option value="wipe">와이프</option>
-          <option value="blur">블러</option>
-          <option value="glitch">글리치</option>
-        </select>
-      </div>
-      <div class="modal-section-card">
-        <div class="modal-section-label">
-          <span class="label-dot"></span>
-          배경 음악
-        </div>
-        <div class="settings-music-row">
-          <button id="cfg-btn-play-stop" class="pano-ctrl-btn" title="재생/정지">▶</button>
-          <input type="range" id="cfg-volume-slider" class="pano-volume-slider" min="0" max="1" step="0.05" value="0.7">
-        </div>
-      </div>
-    </div>
-  </div>
-</div>
-
 <!-- ===================== ADD ALBUM MODAL ===================== -->
 <div id="add-modal" class="modal-overlay" style="display:none">
   <div class="modal-box add-box">

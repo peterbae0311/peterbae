@@ -83,24 +83,9 @@ function saveConfig(obj) {
   localStorage.setItem(CFG_KEY, JSON.stringify(obj));
 }
 
-/** 슬라이드쇼 설정 팝업 — 전환시간/효과/음악 볼륨·재생 (전체 공통, 변경 즉시 자동 저장) */
-function openAppSettings() {
-  document.getElementById('app-settings-modal').style.display = 'flex';
-  document.getElementById('pano-speed-select').value  = String(slideshowSpeed);
-  document.getElementById('pano-effect-select').value = slideshowEffect;
-}
-
-function closeAppSettings() {
-  document.getElementById('app-settings-modal').style.display = 'none';
-}
-
+/** 전환시간/효과 — 전체 공통, 앨범 카드의 인라인 셀렉트에서 변경 즉시 자동 저장 */
 function persistAppSettings(patch) {
   saveConfig({ ...loadConfig(), ...patch });
-}
-
-function syncMusicPlayButtons(isPlaying) {
-  const cfgBtn = document.getElementById('cfg-btn-play-stop');
-  if (cfgBtn) cfgBtn.textContent = isPlaying ? '⏸' : '▶';
 }
 
 // ============================================================
@@ -431,6 +416,35 @@ const EFFECT_LABELS = {
   kenburns: '켄번즈', rotate: '회전', flip: '플립', swing: '스윙', wipe: '와이프',
   blur: '블러', glitch: '글리치',
 };
+const SPEED_OPTIONS = [2000, 3000, 5000, 8000, 10000];
+
+/** 앨범 카드에 매번 새로 그려지는 전환시간/효과 인라인 셀렉트 — 전체 공통값을 반영 */
+function renderInlineSpeedSelect() {
+  const opts = SPEED_OPTIONS.map(v =>
+    `<option value="${v}"${slideshowSpeed === v ? ' selected' : ''}>${v / 1000}초</option>`
+  ).join('');
+  return `<select class="record-card-select" onclick="event.stopPropagation()" onchange="handleCardSpeedChange(event, this.value)">${opts}</select>`;
+}
+function renderInlineEffectSelect() {
+  const opts = Object.entries(EFFECT_LABELS).map(([k, label]) =>
+    `<option value="${k}"${slideshowEffect === k ? ' selected' : ''}>${label}</option>`
+  ).join('');
+  return `<select class="record-card-select" onclick="event.stopPropagation()" onchange="handleCardEffectChange(event, this.value)">${opts}</select>`;
+}
+
+function handleCardSpeedChange(event, value) {
+  event.stopPropagation();
+  slideshowSpeed = parseInt(value, 10);
+  if (slideshowPlaying) { stopSlideshow(); startSlideshow(); }
+  persistAppSettings({ slideSpeed: slideshowSpeed });
+  renderAlbumList();
+}
+function handleCardEffectChange(event, value) {
+  event.stopPropagation();
+  slideshowEffect = value;
+  persistAppSettings({ slideEffect: slideshowEffect });
+  renderAlbumList();
+}
 
 function renderAlbumList() {
   const list = document.getElementById('record-list');
@@ -451,39 +465,59 @@ function renderAlbumList() {
       ? `<img class="record-card-thumb" src="${escHtml(cover.url)}" alt="${escHtml(cover.filename)}">`
       : '';
 
-    const datePfx = album.album_date ? album.album_date.slice(0, 7) + ' / ' : '';
+    const datePfx = album.album_date ? album.album_date + ' / ' : '';
     const trackHtml = album.music_list?.length > 0 ? (() => {
       const names = album.music_list.map(m => m.name || '제목 없음');
       const label = names.length === 1 ? names[0] : `${names[0]} 외 ${names.length - 1}곡`;
       const full  = names.join(', ');
       const disp  = label.length > 18 ? label.slice(0, 18) + '…' : label;
-      const isPlaying = previewingAlbumId === album.id;
-      return `<div class="record-card-row">
-        <button class="record-card-track-play${isPlaying ? ' playing' : ''}" data-album-id="${album.id}"
-                onclick="previewAlbumTrack(event,'${album.id}')" title="미리듣기">${isPlaying ? '⏹' : '▶'}</button>
+      const isSelected = selectedAlbum?.id === album.id;
+      const isSelectedPlaying = isSelected && !!bgAudio && !bgAudio.paused;
+      const isPlaying = isSelectedPlaying || previewingAlbumId === album.id;
+      const btnTitle = isSelected ? (isPlaying ? '정지' : '재생') : '미리듣기';
+      const multi = isSelected && album.music_list.length > 1;
+      const ICONS = {
+        prev: '<svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor"><rect x="4" y="5" width="2.5" height="14"/><polygon points="20 19 9 12 20 5"/></svg>',
+        next: '<svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor"><rect x="17.5" y="5" width="2.5" height="14"/><polygon points="4 5 15 12 4 19"/></svg>',
+        play: '<svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor"><polygon points="6 4 20 12 6 20"/></svg>',
+        pause: '<svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor"><rect x="5" y="4" width="4.5" height="16"/><rect x="14.5" y="4" width="4.5" height="16"/></svg>',
+        shuffle: '<svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.3" stroke-linecap="round" stroke-linejoin="round"><polyline points="16 3 21 3 21 8"/><line x1="4" y1="20" x2="21" y2="3"/><polyline points="21 16 21 21 16 21"/><line x1="15" y1="15" x2="21" y2="21"/><line x1="4" y1="4" x2="9" y2="9"/></svg>',
+      };
+      return `<div class="record-card-row record-card-track-row">
+        <div class="record-card-track-controls">
+          ${multi ? `<button class="record-card-track-nav" onclick="prevBgTrack(event)" title="이전 곡">${ICONS.prev}</button>` : ''}
+          <button class="record-card-track-play${isPlaying ? ' playing' : ''}" data-album-id="${album.id}"
+                  onclick="previewAlbumTrack(event,'${album.id}')" title="${btnTitle}">${isPlaying ? ICONS.pause : ICONS.play}</button>
+          ${multi ? `<button class="record-card-track-nav" onclick="nextBgTrack(event)" title="다음 곡">${ICONS.next}</button>` : ''}
+          ${multi ? `<button class="record-card-track-nav${bgShuffleOn ? ' active' : ''}" onclick="toggleBgShuffle(event)" title="셔플">${ICONS.shuffle}</button>` : ''}
+        </div>
         <span class="record-card-track-name" title="${escHtml(full)}">${escHtml(disp)}</span>
       </div>`;
     })() : '';
 
     return `<div class="record-card${selectedAlbum?.id === album.id ? ' active' : ''}"
                  data-id="${album.id}" onclick="selectAlbum('${album.id}')">
-      <div class="record-card-thumb-wrap">${coverHtml}</div>
-      <div class="record-card-body">
-        <div class="record-card-head">
-          <div class="record-card-name">${escHtml(album.name)}</div>
-          <div class="record-card-actions">
-            <button class="record-card-edit"   onclick="handleEditAlbum(event,'${album.id}')"   title="수정">✏️</button>
-            <button class="record-card-delete" onclick="handleDeleteAlbum(event,'${album.id}')" title="삭제">✕</button>
+      <div class="record-card-head">
+        <div class="record-card-name">${escHtml(album.name)}</div>
+        <div class="record-card-actions">
+          <button class="record-card-edit"   onclick="handleEditAlbum(event,'${album.id}')"   title="수정">✏️</button>
+          <button class="record-card-delete" onclick="handleDeleteAlbum(event,'${album.id}')" title="삭제">✕</button>
+        </div>
+      </div>
+      <div class="record-card-main">
+        <div class="record-card-thumb-wrap">${coverHtml}</div>
+        <div class="record-card-body">
+          <div class="record-card-row">${datePfx}${album.photos.length}장</div>
+          <div class="record-card-row">
+            <span class="record-card-row-label">전환 시간</span>
+            ${renderInlineSpeedSelect()}
           </div>
+          <div class="record-card-row">
+            <span class="record-card-row-label">전환 효과</span>
+            ${renderInlineEffectSelect()}
+          </div>
+          ${trackHtml}
         </div>
-        <div class="record-card-row">${datePfx}${album.photos.length}장</div>
-        <div class="record-card-row record-card-row-link" onclick="event.stopPropagation(); openAppSettings()">
-          전환 시간 · ${Math.round(slideshowSpeed / 1000)}초
-        </div>
-        <div class="record-card-row record-card-row-link" onclick="event.stopPropagation(); openAppSettings()">
-          전환 효과 · ${EFFECT_LABELS[slideshowEffect] || slideshowEffect}
-        </div>
-        ${trackHtml}
       </div>
     </div>`;
   }).join('');
@@ -517,10 +551,11 @@ async function handleDeleteAlbum(event, albumId) {
 // ============================================================
 function selectAlbum(albumId) {
   selectedAlbum = albums.find(a => a.id === albumId) || null;
-  renderAlbumList();
 
-  if (!selectedAlbum) { showEmptyRight(); return; }
+  if (!selectedAlbum) { renderAlbumList(); showEmptyRight(); return; }
   renderPanoramaView();
+  // startBgMusic()가 위에서 이미 끝난 뒤 그려야 카드의 재생 아이콘이 실제 상태와 맞음
+  renderAlbumList();
 }
 
 function showEmptyRight() {
@@ -570,8 +605,8 @@ function _sizeSlideImg(img) {
     requestAnimationFrame(() => _sizeSlideImg(img));
     return;
   }
-  const maxW = wrap.clientWidth  * 0.88;
-  const maxH = wrap.clientHeight * 0.88;
+  const maxW = wrap.clientWidth  * 0.98;
+  const maxH = wrap.clientHeight * 0.98;
   const ratio = dims.w / dims.h;
   let w, h;
   if (dims.w / maxW >= dims.h / maxH) {
@@ -957,14 +992,39 @@ function initPanoDrag() {
 // ============================================================
 // 9. MUSIC PLAYER
 // ============================================================
-let bgTrackList = [];
-let bgTrackIdx  = 0;
+let bgTrackList    = [];
+let bgTrackIdx     = 0;
+let bgShuffleOn    = true; // 기본 셔플 켬 — 화면 로드/앨범 선택 시 곡을 랜덤하게 재생
+let bgShuffleQueue = []; // 셔플 사이클 동안 아직 안 튼 인덱스들
+let musicVolume    = 0.7; // 설정 팝업 제거 후 UI 없이 저장된 값만 사용
+
+function _nextShuffleIdx() {
+  if (bgShuffleQueue.length === 0) {
+    bgShuffleQueue = Array.from({ length: bgTrackList.length }, (_, i) => i)
+      .filter(i => i !== bgTrackIdx);
+    for (let i = bgShuffleQueue.length - 1; i > 0; i--) {
+      const j = Math.floor(Math.random() * (i + 1));
+      [bgShuffleQueue[i], bgShuffleQueue[j]] = [bgShuffleQueue[j], bgShuffleQueue[i]];
+    }
+    if (bgShuffleQueue.length === 0) bgShuffleQueue = [bgTrackIdx];
+  }
+  return bgShuffleQueue.shift();
+}
+
+function _prevShuffleIdx() {
+  const others = Array.from({ length: bgTrackList.length }, (_, i) => i).filter(i => i !== bgTrackIdx);
+  if (others.length === 0) return bgTrackIdx;
+  return others[Math.floor(Math.random() * others.length)];
+}
 
 function startBgMusic(album) {
   stopBgMusic();
-  bgTrackList = album.music_list || [];
+  bgTrackList    = album.music_list || [];
+  bgShuffleQueue = [];
   if (bgTrackList.length === 0) return;
-  bgTrackIdx = 0;
+  bgTrackIdx = bgShuffleOn && bgTrackList.length > 1
+    ? Math.floor(Math.random() * bgTrackList.length)
+    : 0;
   playBgTrack(bgTrackIdx);
 }
 
@@ -974,35 +1034,43 @@ function playBgTrack(idx) {
   if (!track?.url) return;
 
   bgAudio = new Audio(track.url);
-  bgAudio.volume = parseFloat(document.getElementById('cfg-volume-slider').value);
+  bgAudio.volume = musicVolume;
   bgAudio.play().catch(() => {});
 
   bgAudio.addEventListener('ended', () => {
-    bgTrackIdx = (bgTrackIdx + 1) % bgTrackList.length;
+    bgTrackIdx = bgShuffleOn && bgTrackList.length > 1
+      ? _nextShuffleIdx()
+      : (bgTrackIdx + 1) % bgTrackList.length;
     playBgTrack(bgTrackIdx);
+    renderAlbumList();
   });
-
-  syncMusicPlayButtons(true);
 }
 
 function stopBgMusic() {
   if (bgAudio) { bgAudio.pause(); bgAudio = null; }
-  syncMusicPlayButtons(false);
 }
 
-function toggleMusicPlay() {
-  if (!bgAudio) return;
-  if (bgAudio.paused) {
-    bgAudio.play();
-    syncMusicPlayButtons(true);
-  } else {
-    bgAudio.pause();
-    syncMusicPlayButtons(false);
-  }
+function prevBgTrack(event) {
+  event.stopPropagation();
+  if (bgTrackList.length < 2) return;
+  bgTrackIdx = bgShuffleOn ? _prevShuffleIdx() : (bgTrackIdx - 1 + bgTrackList.length) % bgTrackList.length;
+  playBgTrack(bgTrackIdx);
+  renderAlbumList();
 }
 
-function setVolume(val) {
-  if (bgAudio) bgAudio.volume = parseFloat(val);
+function nextBgTrack(event) {
+  event.stopPropagation();
+  if (bgTrackList.length < 2) return;
+  bgTrackIdx = bgShuffleOn ? _nextShuffleIdx() : (bgTrackIdx + 1) % bgTrackList.length;
+  playBgTrack(bgTrackIdx);
+  renderAlbumList();
+}
+
+function toggleBgShuffle(event) {
+  event.stopPropagation();
+  bgShuffleOn = !bgShuffleOn;
+  bgShuffleQueue = [];
+  renderAlbumList();
 }
 
 // ============================================================
@@ -1039,6 +1107,13 @@ function stopMusicPreview() {
 /** 앨범 목록 카드의 "▶ 곡 명칭" 클릭 — 그 자리에서 미리듣기 재생/정지(10초 자동 정지) */
 function previewAlbumTrack(event, albumId) {
   event.stopPropagation();
+  // 현재 선택되어 실제로 배경 재생 중인 앨범이면, 별도 미리듣기를 새로 틀지 않고
+  // 이미 흐르는 배경음악(bgAudio) 자체를 재생/정지 — 안 그러면 같은 곡이 두 번 겹쳐 들림
+  if (selectedAlbum?.id === albumId && bgAudio) {
+    if (bgAudio.paused) bgAudio.play(); else bgAudio.pause();
+    renderAlbumList();
+    return;
+  }
   if (previewingAlbumId === albumId) { stopMusicPreview(); return; }
   const track = albums.find(a => a.id === albumId)?.music_list?.[0];
   if (!track?.url) return;
@@ -1404,16 +1479,6 @@ function escHtml(str) {
 // 19. EVENT BINDING
 // ============================================================
 function bindEvents() {
-  // Settings modal (전환시간/효과/음악 볼륨·재생 — 변경 즉시 자동 저장. 앨범 카드의
-  // "전환 시간"/"전환 효과" 행 클릭으로 열림 — 별도 하단 버튼 없음)
-  document.getElementById('btn-close-app-settings').addEventListener('click', closeAppSettings);
-
-  document.getElementById('cfg-btn-play-stop').addEventListener('click', toggleMusicPlay);
-  document.getElementById('cfg-volume-slider').addEventListener('input', function () {
-    setVolume(this.value);
-    persistAppSettings({ musicVolume: this.value });
-  });
-
   // Add album modal
   document.getElementById('btn-add').addEventListener('click', openAddModal);
   document.getElementById('btn-close-add').addEventListener('click', closeAddModal);
@@ -1451,18 +1516,6 @@ function bindEvents() {
     });
   });
 
-  document.getElementById('pano-speed-select').addEventListener('change', function () {
-    slideshowSpeed = parseInt(this.value, 10);
-    if (slideshowPlaying) { stopSlideshow(); startSlideshow(); }
-    persistAppSettings({ slideSpeed: slideshowSpeed });
-    renderAlbumList();
-  });
-  document.getElementById('pano-effect-select').addEventListener('change', function () {
-    slideshowEffect = this.value;
-    persistAppSettings({ slideEffect: slideshowEffect });
-    renderAlbumList();
-  });
-
   // Left panel collapse toggle
   const leftPanel   = document.querySelector('.left-panel');
   const floatBtn    = document.getElementById('panel-float-btn');
@@ -1482,11 +1535,6 @@ function bindEvents() {
 
   // Music picker sub-modal
   initMusicPickerModal();
-
-  // Close modals on overlay click
-  document.getElementById('app-settings-modal').addEventListener('click', function (e) {
-    if (e.target === this) closeAppSettings();
-  });
 
   // add-modal: 드래그 중이거나 드래그 직후 클릭은 닫기 무시
   let _addModalDragActive = false;
@@ -1521,10 +1569,10 @@ async function initApp() {
   const saved = loadConfig();
   slideshowSpeed  = saved.slideSpeed  || 3000;
   slideshowEffect = saved.slideEffect || 'fade';
-  const musicVolume = saved.musicVolume ?? 0.7;
-  document.getElementById('cfg-volume-slider').value = musicVolume;
-  if (bgAudio) bgAudio.volume = parseFloat(musicVolume);
+  musicVolume     = saved.musicVolume ?? 0.7;
   await loadAlbums();
+  // 화면 로드 시 오른쪽 영역에 첫 앨범(가장 최근 등록) 대표 이미지를 바로 표시
+  if (!selectedAlbum && albums.length > 0) selectAlbum(albums[0].id);
 }
 window.initApp = initApp;
 
