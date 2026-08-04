@@ -22,7 +22,6 @@ export const APPS: AppEntry[] = [
   { key: 'manage_instructor', label: '사내 강사 전문성 확보',    path: '/manage_instructor' },
   { key: 'outside_instructor',label: '사외 강사 관리',          path: '/outside_instructor' },
   { key: 'manage_token',      label: '토큰 관리',              path: '/manage_token' },
-  { key: 'shopping-listapp',  label: '쇼핑 리스트',            path: '/shopping-listapp' },
   { key: 'My-Claude',         label: '퀴즈 마스터',            path: '/My-Claude' },
 ];
 

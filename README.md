@@ -11,7 +11,6 @@ peterbae0311 및 paul-bae 두 GitHub 계정에 흩어져 있던 프로젝트들�
 - image_studio
 - Instructor_Expertise
 - audio_translate
-- shopping-listapp
 - My-Claude
 - us_stock_market
 - expo

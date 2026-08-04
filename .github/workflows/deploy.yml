@@ -34,7 +34,6 @@ jobs:
       course_planning: ${{ steps.filter.outputs.course_planning }}
       manage_instructor: ${{ steps.filter.outputs.manage_instructor }}
       outside_instructor: ${{ steps.filter.outputs.outside_instructor }}
-      shopping-listapp: ${{ steps.filter.outputs['shopping-listapp'] }}
       manage_token: ${{ steps.filter.outputs.manage_token }}
     steps:
       - uses: actions/checkout@v4
@@ -86,9 +85,6 @@ jobs:
               - '.github/workflows/deploy.yml'
             outside_instructor:
               - 'outside_instructor/**'
-              - '.github/workflows/deploy.yml'
-            shopping-listapp:
-              - 'shopping-listapp/**'
               - '.github/workflows/deploy.yml'
             manage_token:
               - 'manage_token/**'
@@ -325,7 +321,6 @@ jobs:
           - course_planning
           - manage_instructor
           - outside_instructor
-          - shopping-listapp
           - manage_token
     steps:
       - uses: actions/checkout@v4
