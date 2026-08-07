@@ -29,6 +29,7 @@ jobs:
       hub: ${{ steps.filter.outputs.hub }}
       image_slideshow: ${{ steps.filter.outputs.image_slideshow }}
       image_studio: ${{ steps.filter.outputs.image_studio }}
+      Instructor_Expertise: ${{ steps.filter.outputs['Instructor_Expertise'] }}
       My-Claude: ${{ steps.filter.outputs['My-Claude'] }}
       audio_translate: ${{ steps.filter.outputs.audio_translate }}
       course_planning: ${{ steps.filter.outputs.course_planning }}
@@ -70,6 +71,9 @@ jobs:
               - '.github/workflows/deploy.yml'
             image_studio:
               - 'image_studio/**'
+              - '.github/workflows/deploy.yml'
+            Instructor_Expertise:
+              - 'Instructor_Expertise/**'
               - '.github/workflows/deploy.yml'
             My-Claude:
               - 'My-Claude/**'
@@ -322,6 +326,7 @@ jobs:
           - manage_instructor
           - outside_instructor
           - manage_token
+          - Instructor_Expertise
     steps:
       - uses: actions/checkout@v4
       - name: Deploy static site
