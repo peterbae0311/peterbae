@@ -96,58 +96,91 @@ async function fetchLottoRound(round: number): Promise<LottoApiResponse | null> 
   return fetchFromNaver(round);
 }
 
+// 회차 하나를 upsert. 실패하면 잠깐 대기 후 최대 2번 더 시도 — 트랜지언트 DB/네트워크
+// 오류로 회차 하나가 통째로 누락되는 걸 줄인다. 그래도 실패하면 명확히 로그를 남긴다.
+async function upsertRound(
+  supabase: ReturnType<typeof createServerClient>,
+  round: number,
+  data: LottoApiResponse,
+): Promise<boolean> {
+  for (let attempt = 1; attempt <= 3; attempt++) {
+    const { error } = await supabase.from('lotto_results').upsert(
+      {
+        round: data.drwNo,
+        draw_date: data.drwNoDate,
+        num1: data.drwtNo1,
+        num2: data.drwtNo2,
+        num3: data.drwtNo3,
+        num4: data.drwtNo4,
+        num5: data.drwtNo5,
+        num6: data.drwtNo6,
+        bonus1: data.bnusNo,
+        bonus2: null,
+        first_prize_winners: data.firstPrzwnerCo,
+        first_prize_amount: data.firstWinamnt,
+      },
+      { onConflict: 'round' }
+    );
+    if (!error) return true;
+    console.error(`[sync] round ${round} upsert 실패 (시도 ${attempt}/3): ${error.message}`);
+    if (attempt < 3) await new Promise(r => setTimeout(r, 300 * attempt));
+  }
+  return false;
+}
+
 export async function GET() {
   const supabase = createServerClient();
 
   try {
-    // Get the maximum round currently stored in DB
-    const { data: maxRow, error: maxErr } = await supabase
+    // DB에 이미 있는 회차 전체 목록 — MAX(round)만 보면 그 이전에 upsert가 실패해
+    // 비어버린 회차(gap)를 다시는 재시도하지 못한다. 매번 1..maxRound 구간의
+    // 결측 회차를 함께 채워 넣어 영구 누락을 방지한다.
+    const { data: existingRows, error: listErr } = await supabase
       .from('lotto_results')
       .select('round')
-      .order('round', { ascending: false })
-      .limit(1)
-      .single();
+      .order('round', { ascending: true });
 
-    const startRound = maxErr || !maxRow ? 1 : (maxRow.round as number) + 1;
+    if (listErr) throw new Error(listErr.message);
+
+    const existingRounds = new Set((existingRows ?? []).map(r => r.round as number));
+    const maxRound = existingRounds.size > 0 ? Math.max(...existingRounds) : 0;
+
+    const missingRounds: number[] = [];
+    for (let r = 1; r <= maxRound; r++) {
+      if (!existingRounds.has(r)) missingRounds.push(r);
+    }
 
     const upserted: number[] = [];
+    const failedRounds: number[] = [];
+
+    // 1) 과거 결측 회차 재시도 (이미 추첨된 회차이므로 fetch 실패해도 다음 회차로 계속 진행)
+    for (const round of missingRounds) {
+      const data = await fetchLottoRound(round);
+      if (!data) { failedRounds.push(round); continue; }
+      if (await upsertRound(supabase, round, data)) upserted.push(round);
+      else failedRounds.push(round);
+    }
+
+    // 2) 최신 회차 이어받기 — fetch가 연속 실패하면 아직 추첨 안 된 미래 회차로 보고 중단
     let consecutiveFailures = 0;
     const MAX_CONSECUTIVE_FAILURES = 3;
 
-    for (let round = startRound; ; round++) {
+    for (let round = maxRound + 1; ; round++) {
       const data = await fetchLottoRound(round);
 
       if (!data) {
         consecutiveFailures++;
-        if (consecutiveFailures >= MAX_CONSECUTIVE_FAILURES) {
-          break;
-        }
+        if (consecutiveFailures >= MAX_CONSECUTIVE_FAILURES) break;
         continue;
       }
-
       consecutiveFailures = 0;
 
-      const { error: upsertErr } = await supabase.from('lotto_results').upsert(
-        {
-          round: data.drwNo,
-          draw_date: data.drwNoDate,
-          num1: data.drwtNo1,
-          num2: data.drwtNo2,
-          num3: data.drwtNo3,
-          num4: data.drwtNo4,
-          num5: data.drwtNo5,
-          num6: data.drwtNo6,
-          bonus1: data.bnusNo,
-          bonus2: null,
-          first_prize_winners: data.firstPrzwnerCo,
-          first_prize_amount: data.firstWinamnt,
-        },
-        { onConflict: 'round' }
-      );
+      if (await upsertRound(supabase, round, data)) upserted.push(round);
+      else failedRounds.push(round);
+    }
 
-      if (!upsertErr) {
-        upserted.push(round);
-      }
+    if (failedRounds.length > 0) {
+      console.error(`[sync] 최종 실패 회차: ${failedRounds.join(', ')}`);
     }
 
     return NextResponse.json({
@@ -155,7 +188,8 @@ export async function GET() {
       data: {
         syncedRounds: upserted.length,
         rounds: upserted,
-        startedFrom: startRound,
+        failedRounds,
+        startedFrom: maxRound + 1,
       },
     });
   } catch (err) {

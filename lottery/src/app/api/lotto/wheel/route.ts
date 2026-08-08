@@ -14,8 +14,9 @@ function comb6(n: number): number {
 export async function POST(req: NextRequest) {
   let body: {
     numbers?: number[];
-    type?: 'full' | 'budget';
+    type?: 'full' | 'budget' | 'topScore';
     budget?: number;
+    count?: number;
     bonusNumbers?: number[];
     topFreqNums?: number[];
   };
@@ -41,6 +42,14 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ success: false, error: '풀 휠링은 최대 12개(924조합)까지 가능합니다' }, { status: 422 });
     }
     combos = generateFullWheel(sorted);
+  } else if (type === 'topScore') {
+    // 다양성 페널티 없이, 풀 안의 모든 조합 중 점수(scoreCombo) 상위 N개만 그대로 반환
+    const count = Math.min(Math.max(Number(body.count ?? 5), 1), 20);
+    combos = generateFullWheel(sorted)
+      .map(c => ({ combo: c, score: scoreCombo(c, bonusNumbers, topFreqNums) }))
+      .sort((a, b) => b.score - a.score)
+      .slice(0, count)
+      .map(s => s.combo);
   } else {
     const b = Math.min(Math.max(Number(budget ?? 10), 1), 50);
     combos = generateBudgetWheel(sorted, b, bonusNumbers, topFreqNums);

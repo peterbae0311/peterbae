@@ -8,6 +8,34 @@ import {
 
 const TIER_ORDER = ['1등', '2등', '3등', '4등', '5등', '낙첨'];
 
+// 전체 회차 캐시 — lotto_results는 주 1회만 늘어나는데 매 백테스트 호출마다
+// 전체 테이블을 재조회하던 것을 캐싱해 반복 호출(생성 버튼 클릭마다) 비용을 없앤다.
+let allResultsCache: { data: LottoRow[]; fetchedAt: number } | null = null;
+const CACHE_TTL_MS = 5 * 60 * 1000;
+
+async function loadAllResults(supabase: ReturnType<typeof createServerClient>): Promise<LottoRow[]> {
+  if (allResultsCache && Date.now() - allResultsCache.fetchedAt < CACHE_TTL_MS) {
+    return allResultsCache.data;
+  }
+  const PAGE = 1000;
+  const allResults: LottoRow[] = [];
+  let from = 0;
+  while (true) {
+    const { data, error } = await supabase
+      .from('lotto_results')
+      .select('round, draw_date, num1, num2, num3, num4, num5, num6, bonus1, first_prize_winners, first_prize_amount')
+      .order('round', { ascending: true })
+      .range(from, from + PAGE - 1);
+    if (error) throw new Error(error.message);
+    if (!data || data.length === 0) break;
+    allResults.push(...(data as LottoRow[]));
+    if (data.length < PAGE) break;
+    from += PAGE;
+  }
+  allResultsCache = { data: allResults, fetchedAt: Date.now() };
+  return allResults;
+}
+
 export async function POST(req: NextRequest) {
   const supabase = createServerClient();
 
@@ -42,21 +70,12 @@ export async function POST(req: NextRequest) {
     minAC: Number(body.minAC ?? 7),
   };
 
-  // 전체 회차 데이터 한 번에 로드
-  const PAGE = 1000;
-  const allResults: LottoRow[] = [];
-  let from = 0;
-  while (true) {
-    const { data, error } = await supabase
-      .from('lotto_results')
-      .select('round, draw_date, num1, num2, num3, num4, num5, num6, bonus1, first_prize_winners, first_prize_amount')
-      .order('round', { ascending: true })
-      .range(from, from + PAGE - 1);
-    if (error) return NextResponse.json({ success: false, error: error.message }, { status: 500 });
-    if (!data || data.length === 0) break;
-    allResults.push(...(data as LottoRow[]));
-    if (data.length < PAGE) break;
-    from += PAGE;
+  // 전체 회차 데이터 로드 (5분 캐시)
+  let allResults: LottoRow[];
+  try {
+    allResults = await loadAllResults(supabase);
+  } catch (err) {
+    return NextResponse.json({ success: false, error: err instanceof Error ? err.message : String(err) }, { status: 500 });
   }
 
   if (allResults.length < 50) {
@@ -117,8 +136,10 @@ export async function POST(req: NextRequest) {
 
     const anchorNums = anchorCount > 0 ? topNums.slice(0, anchorCount) : [];
 
+    // gamesPerRound개만 최종 사용하므로 후보군은 3배만 뽑아 selectExpertPicks가 고르게 한다
+    // (10배는 생성 비용(생성 로직이 count에 비선형으로 스케일링됨)에 비해 과했다)
     const rawCombos = generateCombinations(mode, {
-      count: Math.min(gamesPerRound * 10, 50),
+      count: Math.min(gamesPerRound * 3, 50),
       anchorNumbers: anchorNums,
       bonusNumbers: bonusNums.slice(0, 5),
     });
@@ -159,6 +180,18 @@ export async function POST(req: NextRequest) {
     : 0;
   const roi = calcROI(allTiers);
 
+  // 시뮬레이션 전체 회차에서 앵커로 쓰인 번호의 등장 빈도를 집계 — 가장 자주 앵커로
+  // 선택됐던 상위 anchorCount개를 "백테스트가 추천하는 앵커번호"로 반환 (앵커모드가 아니면 빈 배열)
+  const anchorTally: Record<number, number> = {};
+  for (const r of roundResults) {
+    r.anchorNums.forEach(n => { anchorTally[n] = (anchorTally[n] ?? 0) + 1; });
+  }
+  const recommendedAnchors = Object.entries(anchorTally)
+    .sort((a, b) => b[1] - a[1] || Number(a[0]) - Number(b[0]))
+    .slice(0, anchorCount)
+    .map(([n]) => Number(n))
+    .sort((a, b) => a - b);
+
   return NextResponse.json({
     success: true,
     data: {
@@ -172,6 +205,7 @@ export async function POST(req: NextRequest) {
       hitRate5Plus: Math.round(hitRate5Plus * 10) / 10,
       hitRate3Plus: Math.round(hitRate3Plus * 10) / 10,
       roi: Math.round(roi * 10) / 10,
+      recommendedAnchors,
       // 최근 20회차 상세 결과 (UI 표시용)
       recentResults: roundResults.slice(-20).map(r => ({
         round: r.round,

@@ -38,12 +38,24 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ success: false, error: '저장할 데이터가 없습니다.' }, { status: 422 });
   }
 
+  // 기존 행 ID 수집 (삭제 대상) — 삽입이 실패해도 기존 예측이 남아있도록 삭제보다 먼저 조회
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const { error: delError } = await (supabase as any).from('lotto_predicted').delete().eq('prediction_type', 3);
-  if (delError) return NextResponse.json({ success: false, error: '기존 데이터 삭제 실패: ' + delError.message }, { status: 500 });
+  const { data: existing } = await (supabase as any)
+    .from('lotto_predicted')
+    .select('id')
+    .eq('prediction_type', 3);
+  const oldIds = ((existing ?? []) as { id: number }[]).map(r => r.id);
+
+  // 새 행 삽입 먼저 — 성공해야 이전 데이터 삭제 (실패 시 기존 예측 보존)
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const { error } = await (supabase as any).from('lotto_predicted').insert(rows);
   if (error) return NextResponse.json({ success: false, error: error.message }, { status: 500 });
+
+  if (oldIds.length > 0) {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const { error: delError } = await (supabase as any).from('lotto_predicted').delete().in('id', oldIds);
+    if (delError) console.error('[predicted] 이전 데이터 삭제 실패:', delError.message);
+  }
 
   return NextResponse.json({ success: true, data: { saved: rows.length } });
 }
