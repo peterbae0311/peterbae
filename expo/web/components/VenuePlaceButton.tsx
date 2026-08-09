@@ -102,11 +102,18 @@ function PinIcon({ className }: { className?: string }) {
 type SearchStatus = "loading" | "found" | "not-found" | "error";
 type KakaoPlace = { x: string; y: string; road_address_name: string; address_name: string };
 
+/** "1F", "2층", "지하1층", "동편"처럼 건물 내 위치만 가리키는 토큰. 이런 토큰으로 끝나는 후보로 검색하면
+ * 그 건물과 무관한 업체(예: "여의도 63빌딩 1F" -> "스타벅스 여의도IFC(1F)점")가 우연히 걸리기 쉬우므로
+ * 후보를 만들 때 이런 토큰이 맨 끝에 남는 경우는 건너뛴다. */
+const FLOOR_WING_FILLER = /^([0-9]+(층|[fF])|[bB][0-9]+(층|[fF])?|지하[0-9]*층?|[동서남북]편|[동서남북]측)$/;
+
 /**
  * "서울기록원 2층 제3전시실"처럼 장소명에 층/호실/부속공간명이 붙어 있으면
  * 카카오 장소 검색에 그대로 걸리지 않는 경우가 많다. 괄호 안 상세주소를 먼저 떼고,
  * 그다음 뒤쪽 단어(가장 상세한 부분)부터 하나씩 잘라내며 검색을 재시도할 후보 목록을 만든다.
- * 예) "여의도 63빌딩 1F 동편 로비" -> ["여의도 63빌딩 1F 동편 로비", "여의도 63빌딩 1F 동편", "여의도 63빌딩 1F", "여의도 63빌딩", "여의도"]
+ * 단, 층/동편 같은 위치 수식어가 후보의 마지막 단어로 남는 경우는 건너뛴다 — 건물 이름은 지나쳐 온
+ * 다음 후보에서 이미 시도되고, 이런 수식어만 끝에 붙은 채로는 엉뚱한 업체가 걸리기 쉽다.
+ * 예) "여의도 63빌딩 1F 동편 로비" -> ["여의도 63빌딩 1F 동편 로비", "여의도 63빌딩", "여의도"]
  */
 function buildSearchCandidates(venueName: string): string[] {
   const candidates: string[] = [];
@@ -125,6 +132,7 @@ function buildSearchCandidates(venueName: string): string[] {
 
   const tokens = withoutParens.split(/\s+/).filter(Boolean);
   for (let end = tokens.length - 1; end >= 1; end -= 1) {
+    if (FLOOR_WING_FILLER.test(tokens[end - 1])) continue;
     add(tokens.slice(0, end).join(" "));
   }
 
@@ -143,6 +151,24 @@ function searchKakaoPlace(places: any, query: string): Promise<KakaoPlace | null
   });
 }
 
+/**
+ * "청주"처럼 장소명이 순수 행정구역명뿐이면 키워드(업체명) 검색은 동음이의 지명의
+ * 엉뚱한 업체(예: "청주" -> 청남대 인근 상호)를 1순위로 짚어오기 쉽다.
+ * 주소 검색 결과가 지번/도로명 없이 행정구역 자체로만 떨어지는 경우(address_type "REGION")에는
+ * 그 지역 대표 좌표가 훨씬 안전하므로 키워드 검색보다 우선한다.
+ */
+function searchKakaoRegion(geocoder: any, query: string): Promise<KakaoPlace | null> {
+  return new Promise((resolve) => {
+    geocoder.addressSearch(query, (data: any[], resultStatus: string) => {
+      if (resultStatus === window.kakao.maps.services.Status.OK && data.length > 0 && data[0].address_type === "REGION") {
+        resolve({ x: data[0].x, y: data[0].y, road_address_name: "", address_name: data[0].address_name });
+      } else {
+        resolve(null);
+      }
+    });
+  });
+}
+
 function VenueMapModal({ venueName, onClose }: { venueName: string; onClose: () => void }) {
   const mapContainerRef = useRef<HTMLDivElement>(null);
   const [status, setStatus] = useState<SearchStatus>("loading");
@@ -154,6 +180,21 @@ function VenueMapModal({ venueName, onClose }: { venueName: string; onClose: () 
       .then(async () => {
         if (cancelled) return;
         const places = new window.kakao.maps.services.Places();
+        const geocoder = new window.kakao.maps.services.Geocoder();
+
+        const region = await searchKakaoRegion(geocoder, venueName.trim());
+        if (region) {
+          if (!cancelled) {
+            setPlace({
+              lat: parseFloat(region.y),
+              lng: parseFloat(region.x),
+              address: region.address_name,
+            });
+            setStatus("found");
+          }
+          return;
+        }
+
         for (const candidate of buildSearchCandidates(venueName)) {
           if (cancelled) return;
           const found = await searchKakaoPlace(places, candidate);
