@@ -17,6 +17,7 @@ export const APPS: AppEntry[] = [
   { key: 'expo',              label: '전시·공연 정보',          path: '/expo' },
   { key: 'image_studio',      label: 'AI 이미지 스튜디오',      path: '/image_studio' },
   { key: 'image_slideshow',   label: '이미지 슬라이드쇼',        path: '/image_slideshow' },
+  { key: 'good-words',        label: '좋은글',                path: '/good-words' },
   { key: 'audio_translate',   label: '오디오 번역/요약',        path: '/audio_translate' },
   { key: 'course_planning',   label: '과정 기획 자동화',        path: '/course_planning' },
   { key: 'manage_instructor', label: '사내 강사 전문성 확보',    path: '/manage_instructor' },

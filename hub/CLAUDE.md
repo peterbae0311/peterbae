@@ -14,15 +14,14 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 * `image_slideshow`처럼 원래 독립 정적 사이트였던 앱을 hub 내부로 통합할 때는, 프론트는 정적 파일 그대로 두고 Oracle DB 연동이 필요한 API만 `src/app/api/<app>/` 라우트로 hub에 흡수하는 패턴을 썼다. `good-words`(좋은글)는 처음부터 hub 내부 앱으로 신규 개발하므로 프론트도 `src/app/good-words/`의 정식 Next.js 페이지로 만든다(정적 사이트 이중화 불필요).
 * Oracle DB(`oracledb` 드라이버) 사용 시 `next.config.js`의 `serverExternalPackages: ['oracledb']`가 이미 설정되어 있음 — 안 하면 라우트별로 별도 인스턴스가 번들링되어 NJS-012(invalid bind data type) 오류가 난다.
 
-## good-words (좋은글) 앱 — 개발 예정 기능
+## good-words (좋은글) 앱 — 구현 상태
 
-카테고리별로 좋은 글(위로가 되는 짧은 글)을 제공하는 반응형 웹 앱. hub 내부의 새 앱으로 개발한다 (`shopping-listapp` 저장소를 교체하려던 기존 계획은 폐기 — 해당 폴더는 삭제됨).
+카테고리별로 좋은 글(위로가 되는 짧은 글)을 제공하는 반응형 웹 앱. hub 내부의 새 앱으로 개발했다 (`shopping-listapp` 저장소를 교체하려던 기존 계획은 폐기 — 해당 폴더는 삭제됨).
 
-### 등록 (착수 시 필요)
+**코드는 구현 완료, Oracle DB만 미프로비저닝 상태.** `src/lib/apps.ts`에 등록됨, `src/app/good-words/page.tsx` + `SlideshowViewer.tsx`, `src/app/api/good-words/{route.ts,[id]/route.ts,generate/route.ts}`, `src/lib/goodWords/*` 모두 작성 완료. LLM 생성(`/api/good-words/generate`)은 Oracle 없이도 바로 동작한다 — 환경변수를 LLM용(`env.ts`, 없으면 그 provider만 실패)과 Oracle용(`oracleEnv.ts`, `required()`로 즉시 throw)으로 분리해뒀기 때문. 보관함 조회/저장/삭제(`route.ts`, `[id]/route.ts`)는 Oracle 계정/지갑 발급 후 `.env.local`의 `GOOD_WORDS_ORACLE_*` 5개 값을 채우고 `oracle/good-words-schema.sql`을 실행해야 정상 동작한다 — 그 전까지는 500 에러를 낸다(의도된 동작, image_slideshow의 eager-required() 패턴과 동일).
 
-* `src/lib/apps.ts`의 `APPS`에 `{ key: 'good-words', label: '좋은글', path: '/good-words' }` 추가
-* `src/app/good-words/` 페이지, `src/app/api/good-words/` API 라우트 신설
-* Oracle Cloud DB에 good-words 전용 스키마/계정 신규 프로비저닝 필요 (image_slideshow와 별도 지갑/계정. 아직 발급 전)
+* Oracle 풀은 `poolAlias: 'good-words'`로 분리되어 있음 — image_slideshow의 default 풀과 절대 공유되지 않는다(oracleDb.ts 주석 참고, alias 없이 만들면 NJS-046 충돌로 잘못된 풀을 재사용하게 됨).
+* 콘텐츠 가드레일(`src/lib/goodWords/guardrail.ts`)은 키워드 기반 휴리스틱이다 — 정치/혐오/공격 표현은 대표 키워드 목록으로, "비교 금지"는 명시적 우열·등수 비교 표현만 우선 차단한다(정확한 판단 기준은 아래 미결정 사항 참고).
 
 ### 기능
 
@@ -63,5 +62,5 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 ### 미결정 사항 (Open Questions)
 
 * 정량적 목표(사용 목표 등), 타겟 사용자 페르소나 상세
-* 슬라이드쇼 자동 넘김 기본 시간값 및 설정 범위
-* "비교" 금지 표현의 정확한 판단 기준 (타인과의 비교만인지, 모든 비유적 비교 포함인지)
+* ~~슬라이드쇼 자동 넘김 기본 시간값 및 설정 범위~~ → 구현 시 기본 8초, 3~30초 슬라이더로 잠정 결정(`SlideshowViewer.tsx`). 필요시 조정.
+* "비교" 금지 표현의 정확한 판단 기준 (타인과의 비교만인지, 모든 비유적 비교 포함인지) — 현재는 휴리스틱으로 명시적 우열/등수 비교만 차단 중(`guardrail.ts`)
