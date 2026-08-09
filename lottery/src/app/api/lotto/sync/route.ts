@@ -135,14 +135,28 @@ export async function GET() {
     // DB에 이미 있는 회차 전체 목록 — MAX(round)만 보면 그 이전에 upsert가 실패해
     // 비어버린 회차(gap)를 다시는 재시도하지 못한다. 매번 1..maxRound 구간의
     // 결측 회차를 함께 채워 넣어 영구 누락을 방지한다.
-    const { data: existingRows, error: listErr } = await supabase
-      .from('lotto_results')
-      .select('round')
-      .order('round', { ascending: true });
+    // PostgREST 기본 응답 상한(보통 1000행)에 걸리지 않도록 페이지네이션으로 전체를 가져온다 —
+    // 안 그러면 회차가 1000개를 넘는 순간부터 maxRound가 실제보다 작게 계산돼, 최신 회차를
+    // 못 가져오고 이미 있는 회차들만 매번 헛되이 재처리하게 된다.
+    const existingRoundsList: number[] = [];
+    {
+      const PAGE = 1000;
+      let from = 0;
+      while (true) {
+        const { data, error } = await supabase
+          .from('lotto_results')
+          .select('round')
+          .order('round', { ascending: true })
+          .range(from, from + PAGE - 1);
+        if (error) throw new Error(error.message);
+        if (!data || data.length === 0) break;
+        existingRoundsList.push(...data.map(r => r.round as number));
+        if (data.length < PAGE) break;
+        from += PAGE;
+      }
+    }
 
-    if (listErr) throw new Error(listErr.message);
-
-    const existingRounds = new Set((existingRows ?? []).map(r => r.round as number));
+    const existingRounds = new Set(existingRoundsList);
     const maxRound = existingRounds.size > 0 ? Math.max(...existingRounds) : 0;
 
     const missingRounds: number[] = [];
