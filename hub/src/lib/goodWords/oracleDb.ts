@@ -1,9 +1,11 @@
 /**
  * good-words용 Oracle Autonomous DB 커넥션 풀.
- * image_slideshow(src/lib/imageSlideshow/oracleDb.ts)와 같은 프로세스 안에서 oracledb
- * 모듈 인스턴스를 공유하므로(next.config.js의 serverExternalPackages), poolAlias를 명시하지
- * 않으면 두 풀이 똑같이 "default" alias를 놓고 충돌한다(NJS-046) — good-words는 반드시
- * 별도 poolAlias('good-words')를 써서 image_slideshow의 지갑/자격증명과 섞이지 않게 한다.
+ * image_slideshow와 같은 eungmomoa-db 인스턴스/지갑을 공유하지만(oracleEnv.ts 참고),
+ * 접속 계정(스키마)은 서로 다르므로 풀은 반드시 따로 둬야 한다 — image_slideshow
+ * (src/lib/imageSlideshow/oracleDb.ts)와 같은 프로세스 안에서 oracledb 모듈 인스턴스를
+ * 공유하므로(next.config.js의 serverExternalPackages), poolAlias를 명시하지 않으면 두 풀이
+ * 똑같이 "default" alias를 놓고 충돌한다(NJS-046) — good-words는 반드시 별도
+ * poolAlias('good-words')를 써서 image_slideshow의 자격증명과 섞이지 않게 한다.
  */
 import 'server-only';
 import oracledb from 'oracledb';

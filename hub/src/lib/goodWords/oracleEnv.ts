@@ -1,8 +1,14 @@
 /**
  * good-words Oracle Autonomous DB 전용 서버 환경변수 — oracleDb.ts만 이 파일을 import한다.
- * LLM 키(env.ts)와 분리한 이유는 env.ts의 주석 참고. 아직 계정/지갑 미발급 상태라
- * (hub/CLAUDE.md 참고) 이 파일을 import하는 라우트(보관함 조회/저장/삭제)는 지갑이
- * 준비되기 전까지 required()가 던지는 500 에러를 그대로 낸다 — 의도된 동작.
+ * LLM 키(env.ts)와 분리한 이유는 env.ts의 주석 참고.
+ *
+ * image_slideshow가 쓰는 eungmomoa-db 인스턴스를 그대로 공유하기로 결정했다(별도 Always
+ * Free 슬롯을 새로 쓰지 않고, 지갑 파일도 하나만 관리하기 위함 — hub/CLAUDE.md 참고).
+ * 그래서 connectString/지갑 값은 IMAGE_SLIDESHOW_ORACLE_* 키를 그대로 재사용하고,
+ * good-words가 실제로 새로 발급받는 값은 이 DB 안의 전용 스키마 계정(GOOD_WORDS_ORACLE_USER/
+ * PASSWORD) 뿐이다. imageSlideshowEnv를 통째로 import하지 않는 이유는, 그러면 good-words와
+ * 무관한 OCI Object Storage 키까지 필수값으로 끌려들어와 두 기능의 장애가 서로 옮는다 —
+ * 이 파일 안에서 필요한 3개 키만 직접 읽는다.
  *
  * 값을 일반 속성이 아니라 getter로 노출하는 이유: `next build`의 "Collecting page data"
  * 단계는 정적 분석을 위해 모든 라우트 모듈을 실제로 import/평가한다 — 값이 일반 속성이면
@@ -24,9 +30,12 @@ function required(key: string): string {
 }
 
 export const goodWordsOracleEnv = {
-  get oracleUser()           { return required('GOOD_WORDS_ORACLE_USER'); },
-  get oraclePassword()       { return required('GOOD_WORDS_ORACLE_PASSWORD'); },
-  get oracleConnectString()  { return required('GOOD_WORDS_ORACLE_CONNECT_STRING'); },
-  get oracleWalletLocation() { return required('GOOD_WORDS_ORACLE_WALLET_LOCATION'); },
-  get oracleWalletPassword() { return required('GOOD_WORDS_ORACLE_WALLET_PASSWORD'); },
+  // good-words 전용으로 새로 발급하는 값 — eungmomoa-db 안의 별도 스키마 계정.
+  get oracleUser()     { return required('GOOD_WORDS_ORACLE_USER'); },
+  get oraclePassword() { return required('GOOD_WORDS_ORACLE_PASSWORD'); },
+
+  // image_slideshow와 같은 인스턴스/지갑을 공유하므로 그 쪽 키를 그대로 재사용.
+  get oracleConnectString()  { return required('IMAGE_SLIDESHOW_ORACLE_CONNECT_STRING'); },
+  get oracleWalletLocation() { return required('IMAGE_SLIDESHOW_ORACLE_WALLET_LOCATION'); },
+  get oracleWalletPassword() { return required('IMAGE_SLIDESHOW_ORACLE_WALLET_PASSWORD'); },
 };

@@ -1,7 +1,8 @@
 -- ============================================================
 -- good-words(좋은글): Oracle Autonomous DB schema
--- image_slideshow와 별도 지갑/계정(hub/CLAUDE.md 참고) — 계정 발급 후 이 스크립트를 실행할 것.
--- 로그인은 hub의 기존 Supabase Auth를 그대로 쓰므로 auth 테이블 없음.
+-- image_slideshow와 같은 eungmomoa-db 인스턴스를 공유하되, 별도 스키마 계정(goodwords)으로
+-- 접속해 이 스크립트를 실행할 것 — image_slideshow의 albums/photos에는 권한이 없다
+-- (hub/CLAUDE.md 참고). 로그인은 hub의 기존 Supabase Auth를 그대로 쓰므로 auth 테이블 없음.
 -- 저장된 글은 사용자별로 격리되지 않는 전체 공유 보관함 — created_by는 감사(audit) 기록용.
 -- ============================================================
 
