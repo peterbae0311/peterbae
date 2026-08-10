@@ -48,15 +48,22 @@ function LoginPageInner() {
   const [error, setError] = useState('');
   const [notice, setNotice] = useState('');
   const [cooldown, setCooldown] = useState(0);
+  // "이미 발송된 코드가 아직 유효함" 상태 — 메시지에 남은 초를 매번 새로 박아넣지 않고
+  // cooldown이 줄어들 때마다 같이 줄어들다가 0이 되면 자동으로 사라지게 하기 위한 플래그.
+  const [rateLimited, setRateLimited] = useState(false);
 
   useEffect(() => {
-    if (cooldown <= 0) return;
+    if (cooldown <= 0) {
+      setRateLimited(false);
+      return;
+    }
     const timer = setInterval(() => setCooldown(c => Math.max(0, c - 1)), 1000);
     return () => clearInterval(timer);
   }, [cooldown]);
 
   async function sendCode(targetEmail: string) {
     setError('');
+    setRateLimited(false);
     setSending(true);
 
     // 등록되지 않은 이메일로는 계정이 새로 만들어지지 않도록 차단 — 오픈 셀프가입 방지.
@@ -68,6 +75,16 @@ function LoginPageInner() {
     setSending(false);
 
     if (otpError) {
+      // Supabase가 같은 이메일로의 재발송 자체를 서버에서 막는 경우 — 새 코드가 온 게 아니라
+      // 직전에 보낸 코드가 아직 유효하다는 뜻이므로, "등록 안 된 이메일" 오류와 구분해서 보여준다.
+      if (otpError.code === 'over_email_send_rate_limit') {
+        const waitSec = Number(otpError.message.match(/(\d+)\s*seconds/)?.[1]) || RESEND_COOLDOWN_SEC;
+        setNotice('');
+        setRateLimited(true);
+        setCooldown(waitSec);
+        setStep('code');
+        return;
+      }
       setError('인증코드 발송에 실패했습니다. 등록된 이메일인지 확인해주세요.');
       return;
     }
@@ -119,6 +136,7 @@ function LoginPageInner() {
     setCode('');
     setError('');
     setNotice('');
+    setRateLimited(false);
     setCooldown(0);
   }
 
@@ -181,7 +199,10 @@ function LoginPageInner() {
               <p className="text-xs text-gray-500 mt-1.5">{email}로 발송됨</p>
             </div>
 
-            {notice && !error && <p className="text-sm text-green-600">{notice}</p>}
+            {rateLimited && cooldown > 0 && (
+              <p className="text-sm text-amber-600">이미 발송된 인증코드가 아직 유효합니다. {cooldown}초 후에 다시 요청해주세요.</p>
+            )}
+            {notice && !error && !rateLimited && <p className="text-sm text-green-600">{notice}</p>}
             {error && <p className="text-sm text-red-500">{error}</p>}
 
             <button
