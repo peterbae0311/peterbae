@@ -67,3 +67,60 @@
 결정: image_slideshow처럼 hub 내부로 통합.
 
 shopping-listapp 폴더(기존 쇼핑 리스트 앱)는 삭제하고, hub/apps.ts와 .github/workflows/deploy.yml의 shopping-listapp 항목도 함께 정리함. .env.local의 LLM 키(OpenRouter/Groq/HF)는 hub/.env.local로 이전 (GOOD_WORDS_ 접두사). 상세 스펙은 hub/CLAUDE.md에 정리됨.
+
+==========================================================
+
+❯ 만약, 좋은글 외에 다른 앱을 추가할때도 이 방식이 적용되나?
+
+아니요, 자동으로 적용되는 규칙은 아닙니다. 이 모노레포에는 실제로 3가지 패턴이 공존하고 있고, 앱마다 성격에 따라 골라 쓰는 방식입니다.
+
+1. 독립 Next.js 앱 (career, lottery, newsclip, us_stock_market, expo) — 자기 package.json/next.config.js, deploy.yml에 별도 job, 서버에서 별도 PM2 프로세스로 자기 포트에서 돌아감.
+2. 정적 사이트 (image_studio, My-Claude, audio_translate, course_planning, manage_instructor, outside_instructor, manage_token) — 빌드 없이 nginx로 rsync. 백엔드/DB가 필요 없는 앱.
+3. hub 내부 통합 (image_slideshow, 그리고 계획대로면 good-words) — 새 프로세스를 안 띄우고 hub의 기존 페이지/API 라우트로 흡수.
+
+새 앱을 추가할 때 어느 쪽을 고를지는 이 기준으로 판단하면 됩니다.
+
+- 백엔드/DB가 전혀 필요 없는 정적 페이지라면 → 2번(정적 사이트)이 제일 간단합니다.
+- Oracle DB 연동이나 hub의 로그인/권한을 그대로 쓰면 되는 가벼운 기능이라면 → 3번(hub 내부 통합)이 유리합니다. 서버가 물리 RAM 500MB짜리 무료 인스턴스라, 새 PM2 프로세스를 띄우지 않고 기존 hub 프로세스에 라우트만 얹는 게 메모리 부담이 훨씨 적습니다.
+- 자체 의존성이 무겁거나, hub와 배포/장애를 분리하고 싶은 독립적인 서비스라면 → 1번(독립 앱)이 맞습니다. hub가 죽어도 같이 죽지 않는 격리 장점이 있지만, RAM을 그만큼 더 씁니다.
+
+good-words는 "가볍고, hub의 로그인·Oracle 설정을 그대로 재사용 가능"이라 3번을 골랐던 거고, 다음에 추가할 앱은 그 앱의 무게/의존성/DB 필요 여부를 보고 다시 판단하시면 됩니다.
+
+> good-words 페이지/API 라우트 구현 시작해줘
+
+==========================================================
+
+내일 다른 PC에서 이어서 하려면 아래 순서면 됩니다.
+
+이 PC에서 지금 할 것
+1. git push — 방금 커밋(a9eea15)이 아직 로컬에만 있고 GitHub(origin/main)에는 안 올라가 있습니다. 푸시해야 다른 PC에서 받을 수 있습니다.
+
+다른 PC에서
+2. 저장소 클론(처음이면) 또는 git pull(이미 클론해둔 상태면).
+3. hub 폴더에서 npm install — node_modules는 git에 안 올라가 있어서(.gitignore) 새로 설치해야 합니다.
+4. hub/.env.local을 직접 복사해서 만들어야 합니다. 이 파일은 .gitignore에 걸려 있어서(.env*.local) git으로는 절대 넘어가지 않습니다 — Supabase 키, Oracle 지갑 비밀번호, 그리고 오늘 추가한 GOOD_WORDS_OPENROUTER_API_KEY/GROQ_API_KEY/HF_TOKEN이 다 여기 있습니다. hub/.env.local.example이 어떤 키가 필요한지 참고 양식이니, 값은 비밀번호 관리자나 암호화된 채널로 직접 옮기시고 이메일/메신저에 평문으로 붙여넣진 마세요.
+5. good-words는 아직 Oracle 계정/지갑이 없는 상태라(hub/CLAUDE.md에 적어둔 대로), Oracle wallet 파일까지는 지금 당장 옮길 필요 없습니다. image_slideshow도 같이 테스트하려면 그건 별도로 옮겨야 합니다(image_slideshow/oracle/wallet, 마찬가지로 git에 없음).
+6. hub 폴더에서 claude 실행 — hub/CLAUDE.md와 hub/좋은글 기능개발.txt가 커밋되어 있으니 새 PC의 Claude Code가 오늘 대화 내용을 몰라도 이 두 파일로 맥락을 다시 잡을 수 있습니다.
+
+지금 1번(git push)부터 해드릴까요?
+
+
+❯ 응, 푸시해줘
+
+  Pushed to main
+
+푸시 완료했습니다 (2211f6d..a9eea15). 다른 PC에서 git pull 받으면 hub/CLAUDE.md, hub/좋은글 기능개발.txt, apps.ts/deploy.yml 정리 내용이 그대로 반영됩니다. hub/.env.local만 별도로 옮기시면 바로 이어서 작업하실 수 있습니다.
+
+✻ Crunched for 13s
+
+❯ .env.local 파일을 작업할 PC에 복사하면돼?
+
+네, hub/.env.local 파일 하나를 그대로 복사해서 새 PC의 같은 경로(hub/.env.local)에 넣으면 됩니다. 몇 가지만 주의하세요.
+
+- 전달 방법: 이메일/카톡/클라우드 동기화 폴더처럼 평문으로 남는 경로는 피하시고, USB로 직접 옮기거나 비밀번호 관리자의 파일 첨부 기능, 또는 두 PC가 같은 네트워크에 있으면 scp로 직접 옮기는 걸 추천합니다. 이 파일에는 Supabase 서비스 롤 키, Oracle 지갑 비밀번호, OCI private key, 방금 추가한 LLM 키들이 실제 값으로 들어있습니다.
+- 경로: hub/.env.local.example이 아니라 hub/.env.local이라는 파일명으로 저장해야 Next.js가 읽습니다.
+- git에는 손댈 필요 없음: .gitignore에 이미 걸려 있어서 실수로 커밋될 위험은 없습니다.
+
+이 파일만 옮기면 로그인(Supabase)과 good-words LLM 생성 테스트는 바로 가능합니다. image_slideshow의 Oracle 지갑 파일(image_slideshow/oracle/wallet)까지 필요한 경우에만 그것도 별도로 옮기면 됩니다.
+
+> good-words 페이지랑 API 라우트 구현 시작해줘
