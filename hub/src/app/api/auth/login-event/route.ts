@@ -39,7 +39,7 @@ export async function POST(request: NextRequest) {
     session_id: result === 'success' ? body.sessionId ?? null : null,
     login_id: email,
     result,
-    fail_reason: result === 'fail' ? body.failReason ?? '이메일 또는 비밀번호 불일치' : null,
+    fail_reason: result === 'fail' ? body.failReason ?? '인증코드 불일치 또는 만료' : null,
     ip_address: ip,
     region_country: regionCountry,
     os: ua.os.name ? `${ua.os.name} ${ua.os.version ?? ''}`.trim() : null,

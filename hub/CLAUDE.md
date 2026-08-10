@@ -7,7 +7,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 `hub`는 `peterbae.duckdns.org` 전체의 SSO 게이트 겸 앱 허브다.
 
 * nginx가 모든 요청 앞단에서 `auth_request`로 `hub`의 `/api/auth/verify`(`src/app/api/auth/verify/route.ts`)를 호출해 로그인 여부와 앱별 접근 권한을 확인한다. `X-Original-URI` 헤더의 첫 path segment를 app_key로 판별한다.
-* 로그인은 Supabase Auth 기반 이메일/비밀번호(`src/app/login/page.tsx`). 앱별 접근 권한은 Supabase `app_access` 테이블(email + app_key)로 관리.
+* 로그인은 Supabase Auth 기반 이메일 OTP(`src/app/login/page.tsx`) — 비밀번호 없음. 이메일 입력 → `signInWithOtp({shouldCreateUser:false})`로 8자리 코드 발송(미등록 이메일은 계정이 새로 만들어지지 않고 차단) → `verifyOtp({email, token, type:'email'})`로 검증. 코드 자릿수(8자리)·만료 시간(60초)은 Supabase Dashboard의 Auth > Emails 설정값이 기준이며 코드로 제어할 수 없다. **주의**: Supabase가 로컬파트에 "test"가 포함된 이메일(`testing@gmail.com`, `testing2@gmail.com` 등)을 스팸 방지용으로 자동 차단해 "email is invalid" 오류를 낸다(실측 확인) — 이 두 계정은 OTP 로그인이 원천적으로 안 되므로 QA 계정이 필요하면 다른 이름으로 새로 만들 것. 앱별 접근 권한은 Supabase `app_access` 테이블(email + app_key)로 관리.
 * `SUPER_ADMIN_EMAIL`(`src/lib/apps.ts`, `peter.bae0311@gmail.com`)은 모든 앱/모든 검사를 통과하는 전역 관리자 계정.
 * 앱 목록은 `src/lib/apps.ts`의 `APPS` 배열에 등록. key는 nginx location의 첫 path segment와 반드시 일치해야 한다.
 * 배포: GitHub Actions에서 빌드(서버가 물리 RAM 500MB라 서버에서 직접 `next build`하면 OOM) → SSH로 산출물 전송 → `deploy/remote-swap.sh`가 새 디렉토리 준비 후 원자적 `mv` 교체 → `pm2 reload`. 인프라는 Oracle Cloud 컴퓨트 인스턴스(무료 티어) + DuckDNS.
