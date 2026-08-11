@@ -355,7 +355,7 @@ export async function initAuth({ supabaseUrl, supabaseKey, onLogin, onLogout }) 
 
       if (result.data?.session) {
         _signupSuccess = true;
-        await _supabase.auth.signOut();
+        await _supabase.auth.signOut({ scope: 'local' });
         return;
       }
 
@@ -437,7 +437,7 @@ export async function initAuth({ supabaseUrl, supabaseKey, onLogin, onLogout }) 
         const h1 = document.querySelector('#screen-new-password h1');
         if (h1) h1.textContent = '새 비밀번호를 설정하세요.';
         // 비밀번호 변경 완료 → 로그아웃 → 로그인 화면 오픈
-        await _supabase.auth.signOut();
+        await _supabase.auth.signOut({ scope: 'local' });
         _isChangingPassword = false;
         showAuthUI();
         showScreen('screen-login');
@@ -467,7 +467,7 @@ export async function initAuth({ supabaseUrl, supabaseKey, onLogin, onLogout }) 
         _recoveryEmail  = null;
         const cpField = document.getElementById('current-password')?.closest?.('.field');
         if (cpField) cpField.style.display = '';
-        await _supabase.auth.signOut();
+        await _supabase.auth.signOut({ scope: 'local' });
         _isChangingPassword = false;
         showAuthUI();
         showScreen('screen-login');
@@ -514,7 +514,7 @@ export async function initAuth({ supabaseUrl, supabaseKey, onLogin, onLogout }) 
       }
 
       // N-2: signOut 완료 후 플래그 해제 — updateUser가 SIGNED_IN 이벤트를 유발해도 차단 유지
-      await _supabase.auth.signOut();
+      await _supabase.auth.signOut({ scope: 'local' });
       _isChangingPassword = false;
 
       // U-1: 비밀번호 변경 성공 메시지
@@ -538,7 +538,7 @@ export async function initAuth({ supabaseUrl, supabaseKey, onLogin, onLogout }) 
   if (_isEmailConfirmRedirect) {
     history.replaceState(null, '', window.location.pathname);
     const r = await _supabase.auth.getSession();
-    if (r.data?.session) await _supabase.auth.signOut();
+    if (r.data?.session) await _supabase.auth.signOut({ scope: 'local' });
     _isEmailConfirmRedirect = false;
     showAuthUI();
     showScreen('screen-login');

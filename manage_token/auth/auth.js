@@ -314,7 +314,7 @@ window.initAuth = async function initAuth({ supabaseUrl, supabaseKey, onLogin, o
       }
 
       // N-2: signOut 완료 후 플래그 해제 — updateUser가 SIGNED_IN 이벤트를 유발해도 차단 유지
-      await _supabase.auth.signOut();
+      await _supabase.auth.signOut({ scope: 'local' });
       _isChangingPassword = false;
 
       // U-1: 비밀번호 변경 성공 메시지
@@ -338,7 +338,7 @@ window.initAuth = async function initAuth({ supabaseUrl, supabaseKey, onLogin, o
   if (_isEmailConfirmRedirect) {
     history.replaceState(null, '', window.location.pathname);
     const r = await _supabase.auth.getSession();
-    if (r.data?.session) await _supabase.auth.signOut();
+    if (r.data?.session) await _supabase.auth.signOut({ scope: 'local' });
     _isEmailConfirmRedirect = false;
     showAuthUI();
     showScreen('screen-login');
