@@ -17,12 +17,6 @@ function required(key: string): string {
 }
 
 export const imageSlideshowEnv = {
-  // image_slideshow 전용 Supabase 프로젝트(pnudzuajpuvhcyhxjwva) URL.
-  // 이 프로젝트는 이미 비대칭 JWT 서명 키(ECC P-256)로 전환되어 있어(레거시 HS256 공유비밀키는
-  // "이전 키"로만 남아있음), 고정 비밀키가 아니라 /auth/v1/.well-known/jwks.json의 공개키로
-  // access_token 서명을 검증한다 (auth.ts 참고).
-  supabaseUrl: required('IMAGE_SLIDESHOW_SUPABASE_URL'),
-
   // Oracle Autonomous DB (node-oracledb thin mode) — Always Free 등급은 mTLS(지갑) 접속이 강제라
   // 지갑 디렉터리 경로가 반드시 필요함. 지갑 파일 자체는 git에 올리지 않으므로(oracle/wallet/은
   // .gitignore 처리) 배포 서버의 고정 경로(예: ~/apps/oracle-wallet)에 별도로 올려두고 그 경로를 가리킬 것.

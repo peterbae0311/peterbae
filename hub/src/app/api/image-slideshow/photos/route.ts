@@ -1,6 +1,6 @@
 import { randomUUID } from 'crypto';
 import { NextRequest, NextResponse } from 'next/server';
-import { verifyImageSlideshowRequest } from '@/lib/imageSlideshow/auth';
+import { createServerSupabaseClient } from '@/lib/supabaseServer';
 import { withConnection } from '@/lib/imageSlideshow/oracleDb';
 import { deleteObjects } from '@/lib/imageSlideshow/ociStorage';
 import { handleApiError } from '@/lib/imageSlideshow/apiError';
@@ -14,7 +14,8 @@ interface PhotoInput {
 
 /** OCI 업로드가 끝난 사진들을 albums 하위 photos 행으로 등록 (album_id는 이미 생성된 앨범이어야 함) */
 export async function POST(request: NextRequest) {
-  const user = await verifyImageSlideshowRequest(request);
+  const supabase = await createServerSupabaseClient();
+  const { data: { user } } = await supabase.auth.getUser();
   if (!user) return NextResponse.json({ error: '인증이 필요합니다.' }, { status: 401 });
 
   const body = await request.json();
@@ -55,7 +56,8 @@ export async function POST(request: NextRequest) {
 
 /** 사진 삭제 — OCI 오브젝트를 먼저 정리(best-effort)한 뒤 행 삭제 */
 export async function DELETE(request: NextRequest) {
-  const user = await verifyImageSlideshowRequest(request);
+  const supabase = await createServerSupabaseClient();
+  const { data: { user } } = await supabase.auth.getUser();
   if (!user) return NextResponse.json({ error: '인증이 필요합니다.' }, { status: 401 });
 
   const body = await request.json();

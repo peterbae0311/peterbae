@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import oracledb from 'oracledb';
-import { verifyImageSlideshowRequest } from '@/lib/imageSlideshow/auth';
+import { createServerSupabaseClient } from '@/lib/supabaseServer';
 import { withConnection } from '@/lib/imageSlideshow/oracleDb';
 import { deleteObjects } from '@/lib/imageSlideshow/ociStorage';
 import { handleApiError } from '@/lib/imageSlideshow/apiError';
@@ -11,7 +11,8 @@ interface PathParams {
 
 /** 앨범 메타데이터 수정 (사진 추가/삭제는 /photos 라우트가 담당) */
 export async function PATCH(request: NextRequest, { params }: PathParams) {
-  const user = await verifyImageSlideshowRequest(request);
+  const supabase = await createServerSupabaseClient();
+  const { data: { user } } = await supabase.auth.getUser();
   if (!user) return NextResponse.json({ error: '인증이 필요합니다.' }, { status: 401 });
 
   const { id } = await params;
@@ -60,7 +61,8 @@ export async function PATCH(request: NextRequest, { params }: PathParams) {
 
 /** 앨범 삭제 — 사진 오브젝트를 OCI에서 먼저 정리(best-effort)한 뒤 행 삭제(photos는 FK cascade) */
 export async function DELETE(request: NextRequest, { params }: PathParams) {
-  const user = await verifyImageSlideshowRequest(request);
+  const supabase = await createServerSupabaseClient();
+  const { data: { user } } = await supabase.auth.getUser();
   if (!user) return NextResponse.json({ error: '인증이 필요합니다.' }, { status: 401 });
 
   const { id } = await params;

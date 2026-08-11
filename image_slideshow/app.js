@@ -95,16 +95,8 @@ function sleep(ms) {
   return new Promise(r => setTimeout(r, ms));
 }
 
-async function apiHeaders() {
-  const client = window._authSupabase;
-  if (!client) return {};
-  const { data } = await client.auth.getSession();
-  const token = data?.session?.access_token;
-  return token ? { 'Authorization': `Bearer ${token}` } : {};
-}
-
-async function apiFetch(path, options = {}, _isRetry = false) {
-  const headers = { ...(await apiHeaders()), ...(options.headers || {}) };
+async function apiFetch(path, options = {}) {
+  const headers = { ...(options.headers || {}) };
   if (options.body !== undefined) headers['Content-Type'] = 'application/json';
 
   let res;
@@ -113,21 +105,6 @@ async function apiFetch(path, options = {}, _isRetry = false) {
   } catch (e) {
     const err = new Error('네트워크 오류로 서버에 연결할 수 없습니다.');
     err.transient = true;
-    throw err;
-  }
-
-  // 탭이 백그라운드에 있는 동안 Supabase의 자동 토큰 갱신 타이머가 멈춰서
-  // 만료된 토큰으로 요청이 나가는 경우 — 한 번 갱신 후 재시도, 실패하면 로그인 화면으로.
-  if (res.status === 401 && !_isRetry) {
-    const client = window._authSupabase;
-    if (client) {
-      const { data } = await client.auth.refreshSession();
-      if (data?.session) return apiFetch(path, options, true);
-      await client.auth.signOut({ scope: 'local' });
-    }
-    const err = new Error('세션이 만료되어 다시 로그인해야 합니다.');
-    err.status = 401;
-    err.authExpired = true;
     throw err;
   }
 
@@ -233,7 +210,6 @@ async function loadAlbums() {
         await sleep(DELAY_MS);
         continue;
       }
-      if (e.authExpired) return; // signOut()이 이미 로그인 화면을 띄웠음
       showDbMissingBanner(e.message);
       console.error('loadAlbums 오류:', e.message);
       return;
@@ -1580,7 +1556,7 @@ function init() {
   initPanoDrag();
 }
 
-// auth/auth.js의 onLogin 콜백에서 호출됨 — 로그인 성공 후에만 DB/Storage 접근 시작
+// index.html의 인라인 스크립트에서 페이지 로드 시 바로 호출됨 (hub SSO만으로 접근 통제)
 async function initApp() {
   const saved = loadConfig();
   slideshowSpeed  = saved.slideSpeed  || 3000;

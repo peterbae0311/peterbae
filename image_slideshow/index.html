@@ -12,10 +12,7 @@
   <link rel="preconnect" href="https://cdn.jsdelivr.net" crossorigin>
   <link rel="stylesheet" as="style" crossorigin
         href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/static/pretendard.css">
-  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-  <script src="config.js"></script>
   <link rel="stylesheet" href="style.css">
-  <link rel="stylesheet" href="auth/auth.css">
 </head>
 <body>
 
@@ -171,9 +168,6 @@
       </div>
     </div>
 
-    <div class="left-bottom">
-      <button class="btn-settings" id="btn-logout" title="로그아웃">🚪 로그아웃</button>
-    </div>
   </aside>
 
   <!-- RIGHT PANEL 70% -->
@@ -209,26 +203,11 @@
 <div id="toast" class="toast"></div>
 
 <script src="app.js"></script>
-<script type="module">
-  import { initAuth } from './auth/auth.js';
-
-  const { supabase, signOut } = await initAuth({
-    supabaseUrl: window.APP_CONFIG.supabaseUrl,
-    supabaseKey: window.APP_CONFIG.supabaseKey,
-    onLogin(user) {
-      window.currentUser = user;
-      document.getElementById('app').style.display = 'flex';
-      window.initApp();
-    },
-    onLogout() {
-      document.getElementById('app').style.display = 'none';
-    },
-  });
-
-  // app.js가 /api/image-slideshow/* 호출 시 Authorization 헤더를 만들 때 재사용
-  window._authSupabase = supabase;
-
-  document.getElementById('btn-logout')?.addEventListener('click', signOut);
+<script>
+  // 이 앱 자체 로그인은 없음 — nginx가 도메인 전체에 hub SSO 게이트를 걸어두므로
+  // 이 페이지에 도달했다면 이미 로그인된 상태다.
+  document.getElementById('app').style.display = 'flex';
+  window.initApp();
 </script>
 </body>
 </html>

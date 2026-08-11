@@ -1,7 +1,7 @@
 import { randomUUID } from 'crypto';
 import { NextRequest, NextResponse } from 'next/server';
 import oracledb from 'oracledb';
-import { verifyImageSlideshowRequest } from '@/lib/imageSlideshow/auth';
+import { createServerSupabaseClient } from '@/lib/supabaseServer';
 import { withConnection, formatOracleDate, formatOracleTimestamp } from '@/lib/imageSlideshow/oracleDb';
 import { handleApiError } from '@/lib/imageSlideshow/apiError';
 
@@ -47,8 +47,9 @@ function serializeAlbum(row: AlbumRow, photos: PhotoRow[]) {
 }
 
 /** 앨범 전체 + 각 앨범의 사진 목록 (기존 Supabase의 albums.select('*, photos(...)')와 동일한 응답 모양) */
-export async function GET(request: NextRequest) {
-  const user = await verifyImageSlideshowRequest(request);
+export async function GET() {
+  const supabase = await createServerSupabaseClient();
+  const { data: { user } } = await supabase.auth.getUser();
   if (!user) return NextResponse.json({ error: '인증이 필요합니다.' }, { status: 401 });
 
   try {
@@ -73,7 +74,8 @@ export async function GET(request: NextRequest) {
 
 /** 앨범 메타데이터만 생성 — 사진/음악 파일은 /upload-url로 먼저 업로드 후 /photos로 별도 등록 */
 export async function POST(request: NextRequest) {
-  const user = await verifyImageSlideshowRequest(request);
+  const supabase = await createServerSupabaseClient();
+  const { data: { user } } = await supabase.auth.getUser();
   if (!user) return NextResponse.json({ error: '인증이 필요합니다.' }, { status: 401 });
 
   const body = await request.json();
