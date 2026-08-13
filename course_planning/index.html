@@ -3057,8 +3057,10 @@ const API_KEY = localStorage.getItem('openrouter_api_key') || '';
 const API_URL = 'https://openrouter.ai/api/v1/chat/completions';
 
 /* ── Supabase ── */
-const SUPABASE_URL      = 'https://mcshhvttsvfurrkpcbdf.supabase.co';
-const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im1jc2hodnR0c3ZmdXJya3BjYmRmIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzM5ODI5MDgsImV4cCI6MjA4OTU1ODkwOH0.FRlSXHknfnYoZ4i4-_up8QvppoKHGo50koK9yDkXPUQ';
+// hub 자신의 Supabase 프로젝트를 그대로 씀 — 별도 로그인 없이 hub SSO만으로 접근 가능
+// (mcshhvttsvfurrkpcbdf 프로젝트에서 이전, 2026-08-13).
+const SUPABASE_URL      = 'https://trduvbgyfbzdkopdcana.supabase.co';
+const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InRyZHV2Ymd5ZmJ6ZGtvcGRjYW5hIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzYyNjI3MjksImV4cCI6MjA5MTgzODcyOX0.b9P15zvzWbJw4KVS_Iz4ipoLttMlHXmj5I-kGrIm-A0';
 const supabaseClient    = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
 const FREE_MODELS = [
