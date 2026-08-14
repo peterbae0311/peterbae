@@ -1103,9 +1103,21 @@
 <div id="toast" role="status" aria-live="polite" aria-atomic="true"></div>
 
 <!-- =====================================================
-     Supabase CDN
+     Supabase — hub과 동일한 @supabase/ssr 쿠키 기반 클라이언트를 써서
+     hub SSO 로그인 세션(JWT)을 그대로 재사용한다. tokens 테이블 RLS가
+     auth.jwt()의 email 클레임을 검사하므로, 별도 로그인 없이 hub 세션이
+     그대로 있어야 데이터가 보인다 (버전은 hub/package-lock.json과 일치).
 ===================================================== -->
-<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
+<script type="module">
+  import { createBrowserClient } from 'https://esm.sh/@supabase/ssr@0.12.4';
+  const client = createBrowserClient(
+    'https://trduvbgyfbzdkopdcana.supabase.co',
+    'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InRyZHV2Ymd5ZmJ6ZGtvcGRjYW5hIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzYyNjI3MjksImV4cCI6MjA5MTgzODcyOX0.b9P15zvzWbJw4KVS_Iz4ipoLttMlHXmj5I-kGrIm-A0',
+    { cookieOptions: { path: '/' } }
+  );
+  await client.auth.getSession();
+  window.dispatchEvent(new CustomEvent('sb-client-ready', { detail: client }));
+</script>
 
 <script>
 /*
@@ -1141,13 +1153,10 @@ const SUPABASE_URL      = 'https://trduvbgyfbzdkopdcana.supabase.co';
 const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InRyZHV2Ymd5ZmJ6ZGtvcGRjYW5hIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzYyNjI3MjksImV4cCI6MjA5MTgzODcyOX0.b9P15zvzWbJw4KVS_Iz4ipoLttMlHXmj5I-kGrIm-A0';
 
 let sbClient;
-try {
-  if (!window.supabase) throw new Error('Supabase CDN 스크립트 로드 실패');
-  sbClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
-} catch (initErr) {
-  document.getElementById('key-list-tbody').innerHTML =
-    `<tr class="list-state"><td colspan="3">⚠️ Supabase 초기화 오류: ${initErr.message}</td></tr>`;
-}
+window.addEventListener('sb-client-ready', (e) => {
+  sbClient = e.detail;
+  if (typeof loadTokens === 'function') loadTokens();
+});
 
 // --------------------------------------------------
 // State
@@ -1775,9 +1784,8 @@ document.querySelectorAll('.tab-btn').forEach(btn => {
   });
 });
 
-// hub SSO만으로 접근 가능 — 자체 로그인 없이 바로 로드 (mcshhvttsvfurrkpcbdf 마이그레이션 계열
-// 앱들과 동일 패턴이지만, 여긴 원래부터 hub 자신의 Supabase 프로젝트를 썼으므로 데이터 이전은 불필요).
-if (typeof loadTokens === 'function') loadTokens();
+// hub SSO만으로 접근 가능 — loadTokens()는 위 sb-client-ready 리스너에서 호출됨
+// (tokens 테이블 RLS가 auth.jwt() email을 검사하므로 hub 세션이 준비된 뒤에만 조회 가능).
 </script>
 
 </body>
