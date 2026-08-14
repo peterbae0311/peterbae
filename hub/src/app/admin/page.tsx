@@ -24,7 +24,7 @@ interface LoginHistoryRow {
   created_at: string;
 }
 
-const PAGE_SIZE = 50;
+const PAGE_SIZE = 15;
 
 function formatDateTime(value: string | null): string {
   if (!value) return '-';
@@ -58,8 +58,8 @@ export default function AdminPage() {
   }
 
   return (
-    <div className="min-h-screen px-4 py-10">
-      <div className="max-w-[1500px] mx-auto space-y-6">
+    <div className={tab === 'history' ? 'min-h-screen px-[10px] py-10' : 'min-h-screen px-4 py-10'}>
+      <div className={tab === 'history' ? 'space-y-6' : 'max-w-[1500px] mx-auto space-y-6'}>
         <div className="flex items-center justify-between">
           <h1 className="text-2xl font-black tracking-tighter text-neutral-900">Admin</h1>
           <a href="/dashboard" className="text-xs text-gray-600 border border-gray-200/80 rounded-lg px-3 py-2 hover:border-neutral-500 hover:text-neutral-900 hover:bg-neutral-100/60 transition-colors">
@@ -311,17 +311,17 @@ function LoginHistoryTab() {
         <table className="w-full text-sm whitespace-nowrap">
           <thead>
             <tr className="border-b border-gray-200 text-left text-xs text-gray-500">
-              <th className="px-4 py-3 font-semibold">접속 ID</th>
-              <th className="px-4 py-3 font-semibold">로그인 일시</th>
-              <th className="px-4 py-3 font-semibold">로그아웃 일시</th>
-              <th className="px-4 py-3 font-semibold">접속결과</th>
-              <th className="px-4 py-3 font-semibold">실패사유</th>
-              <th className="px-4 py-3 font-semibold">IP주소</th>
-              <th className="px-4 py-3 font-semibold">접속지역/국가</th>
-              <th className="px-4 py-3 font-semibold">OS</th>
-              <th className="px-4 py-3 font-semibold">브라우저</th>
-              <th className="px-4 py-3 font-semibold">디바이스</th>
-              <th className="px-4 py-3 font-semibold">생성일시</th>
+              <th className="sticky top-0 z-10 bg-white px-4 py-3 font-semibold">접속 ID</th>
+              <th className="sticky top-0 z-10 bg-white px-4 py-3 font-semibold">로그인 일시</th>
+              <th className="sticky top-0 z-10 bg-white px-4 py-3 font-semibold">로그아웃 일시</th>
+              <th className="sticky top-0 z-10 bg-white px-4 py-3 font-semibold">접속결과</th>
+              <th className="sticky top-0 z-10 bg-white px-4 py-3 font-semibold">실패사유</th>
+              <th className="sticky top-0 z-10 bg-white px-4 py-3 font-semibold">IP주소</th>
+              <th className="sticky top-0 z-10 bg-white px-4 py-3 font-semibold">접속지역/국가</th>
+              <th className="sticky top-0 z-10 bg-white px-4 py-3 font-semibold">OS</th>
+              <th className="sticky top-0 z-10 bg-white px-4 py-3 font-semibold">브라우저</th>
+              <th className="sticky top-0 z-10 bg-white px-4 py-3 font-semibold">디바이스</th>
+              <th className="sticky top-0 z-10 bg-white px-4 py-3 font-semibold">생성일시</th>
             </tr>
           </thead>
           <tbody>
