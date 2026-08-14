@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState, useCallback } from 'react';
+import { useEffect, useState, useCallback, useRef } from 'react';
 import Link from 'next/link';
 import { supabase } from '@/lib/supabase';
 import { APPS, SUPER_ADMIN_EMAIL, fullUrl } from '@/lib/apps';
@@ -30,6 +30,17 @@ export default function DashboardPage() {
   const [orderedCards, setOrderedCards] = useState<CardData[] | null>(null);
   const [dragKey, setDragKey] = useState<string | null>(null);
   const [dragOverKey, setDragOverKey] = useState<string | null>(null);
+  const [dragPos, setDragPos] = useState<{ x: number; y: number } | null>(null);
+  const draggedCardRef = useRef<CardData | null>(null);
+  // 브라우저 기본 드래그 고스트 이미지를 완전히 숨기기 위한 투명 1x1 이미지
+  // (기본 고스트는 브라우저가 반투명하게 렌더링해서 잘 안 보이므로, 아래 커스텀
+  // 미리보기 div로 대체한다).
+  const blankDragImageRef = useRef<HTMLImageElement | null>(null);
+  useEffect(() => {
+    const img = new Image();
+    img.src = 'data:image/gif;base64,R0lGODlhAQABAAAAACH5BAEKAAEALAAAAAABAAEAAAICTAEAOw==';
+    blankDragImageRef.current = img;
+  }, []);
 
   const loadOverrides = useCallback(async (userEmail: string) => {
     const { data } = await supabase
@@ -185,16 +196,22 @@ export default function DashboardPage() {
               <div
                 key={card.key}
                 draggable
-                onDragStart={() => setDragKey(card.key)}
+                onDragStart={e => {
+                  if (blankDragImageRef.current) e.dataTransfer.setDragImage(blankDragImageRef.current, 0, 0);
+                  draggedCardRef.current = card;
+                  setDragKey(card.key);
+                  setDragPos({ x: e.clientX, y: e.clientY });
+                }}
+                onDrag={e => setDragPos({ x: e.clientX, y: e.clientY })}
                 onDragEnter={() => setDragOverKey(card.key)}
                 onDragOver={e => e.preventDefault()}
                 onDrop={e => { e.preventDefault(); handleCardDrop(card.key); }}
-                onDragEnd={() => { setDragKey(null); setDragOverKey(null); }}
+                onDragEnd={() => { setDragKey(null); setDragOverKey(null); setDragPos(null); draggedCardRef.current = null; }}
                 onClick={() => window.open(card.path, '_blank', 'noopener,noreferrer')}
                 className={
                   'group w-full sm:w-[350px] flex flex-col rounded-xl border px-5 py-4 transition-all duration-200 cursor-pointer active:cursor-grabbing '
                   + (dragKey === card.key
-                    ? 'bg-white border-neutral-900 ring-2 ring-neutral-900 shadow-lg scale-[1.03] '
+                    ? 'bg-neutral-100/70 border-dashed border-neutral-400 '
                     : dragOverKey === card.key
                       ? 'bg-white/70 backdrop-blur-xl shadow-glass border-neutral-500 ring-2 ring-neutral-300 '
                       : 'bg-white/70 hover:bg-white backdrop-blur-xl shadow-glass hover:shadow-lg hover:-translate-y-1 border-white/60 hover:border-neutral-300 ')
@@ -228,6 +245,20 @@ export default function DashboardPage() {
           onSaved={async () => { await loadOverrides(email); setSettingsOpen(false); }}
           onClose={() => setSettingsOpen(false)}
         />
+      )}
+
+      {dragKey && dragPos && draggedCardRef.current && (
+        <div
+          className="fixed z-[999] pointer-events-none w-[280px] rounded-xl border-2 border-neutral-900 bg-white shadow-2xl px-4 py-3"
+          style={{ left: dragPos.x + 16, top: dragPos.y + 16 }}
+        >
+          <span className="font-bold text-neutral-900 truncate block">
+            {draggedCardRef.current.label}
+          </span>
+          <p className="text-xs text-gray-500 mt-1 line-clamp-1">
+            {draggedCardRef.current.description}
+          </p>
+        </div>
       )}
     </div>
   );
