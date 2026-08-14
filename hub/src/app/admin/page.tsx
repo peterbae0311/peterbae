@@ -235,7 +235,7 @@ function AccountsTab() {
           value={form.name}
           onChange={e => setForm(f => ({ ...f, name: e.target.value }))}
           placeholder="이름을 입력하세요"
-          className="w-full mb-4 px-4 py-2.5 border border-gray-200/80 bg-white/60 rounded-lg text-base text-gray-700 focus:outline-none focus:border-neutral-500 focus:ring-1 focus:ring-neutral-500 transition-colors"
+          className="w-full mb-4 px-4 py-2.5 border border-gray-200/80 bg-white/60 rounded-lg text-base text-gray-700 placeholder:text-xs placeholder:text-gray-400 focus:outline-none focus:border-neutral-500 focus:ring-1 focus:ring-neutral-500 transition-colors"
         />
 
         <label className="text-sm font-semibold text-gray-700 mb-1.5 block">이메일</label>
@@ -244,7 +244,7 @@ function AccountsTab() {
           value={form.email}
           onChange={e => setForm(f => ({ ...f, email: e.target.value }))}
           placeholder="email@example.com"
-          className="w-full mb-4 px-4 py-2.5 border border-gray-200/80 bg-white/60 rounded-lg text-base text-gray-700 focus:outline-none focus:border-neutral-500 focus:ring-1 focus:ring-neutral-500 transition-colors"
+          className="w-full mb-4 px-4 py-2.5 border border-gray-200/80 bg-white/60 rounded-lg text-base text-gray-700 placeholder:text-xs placeholder:text-gray-400 focus:outline-none focus:border-neutral-500 focus:ring-1 focus:ring-neutral-500 transition-colors"
         />
 
         <label className="text-sm font-semibold text-gray-700 mb-1.5 block">비고</label>
@@ -252,9 +252,11 @@ function AccountsTab() {
           type="text"
           value={form.note}
           onChange={e => setForm(f => ({ ...f, note: e.target.value }))}
-          placeholder="비고 (선택)"
-          className="w-full mb-5 px-4 py-2.5 border border-gray-200/80 bg-white/60 rounded-lg text-base text-gray-700 focus:outline-none focus:border-neutral-500 focus:ring-1 focus:ring-neutral-500 transition-colors"
+          placeholder="추가 사항 입력"
+          className="w-full mb-5 px-4 py-2.5 border border-gray-200/80 bg-white/60 rounded-lg text-base text-gray-700 placeholder:text-xs placeholder:text-gray-400 focus:outline-none focus:border-neutral-500 focus:ring-1 focus:ring-neutral-500 transition-colors"
         />
+
+        <hr className="border-gray-200 mb-5" />
 
         <p className="text-sm font-semibold text-gray-700 mb-2">접근 허용할 모노레포</p>
         <div className="grid grid-cols-3 gap-2 mb-5">
