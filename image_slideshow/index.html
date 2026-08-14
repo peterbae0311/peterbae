@@ -83,6 +83,12 @@
         <div id="save-spinner" class="spinner" style="display:none"></div>
       </button>
     </div>
+
+    <!-- 사진 확대 미리보기 — add-box 범위 안에서만 표시 -->
+    <div id="photo-zoom-overlay" class="photo-zoom-overlay" style="display:none">
+      <button class="photo-zoom-close" id="btn-close-photo-zoom" aria-label="닫기">✕</button>
+      <img id="photo-zoom-img" class="photo-zoom-img" src="" alt="">
+    </div>
   </div>
 </div>
 
@@ -131,12 +137,6 @@
       </div>
     </div>
   </div>
-</div>
-
-<!-- ===================== PHOTO ZOOM OVERLAY ===================== -->
-<div id="photo-zoom-overlay" class="photo-zoom-overlay" style="display:none">
-  <button class="photo-zoom-close" id="btn-close-photo-zoom" aria-label="닫기">✕</button>
-  <img id="photo-zoom-img" class="photo-zoom-img" src="" alt="">
 </div>
 
 <!-- ===================== MAIN APP ===================== -->

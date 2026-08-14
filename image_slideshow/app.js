@@ -1289,7 +1289,7 @@ function renderExistingPhotoThumb(photo) {
   wrap.dataset.photoId = photo.id;
   wrap.innerHTML = `<img class="photo-thumb" src="${escHtml(photo.url)}" alt="${escHtml(photo.filename)}" title="클릭하여 대표 이미지로 지정">
     <span class="photo-thumb-star">★</span>
-    <button class="photo-thumb-zoom" title="확대해서 보기">🔍</button>
+    <button class="photo-thumb-zoom" title="확대해서 보기"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M8 3H5a2 2 0 0 0-2 2v3m18 0V5a2 2 0 0 0-2-2h-3m0 18h3a2 2 0 0 0 2-2v-3M3 16v3a2 2 0 0 0 2 2h3"/></svg></button>
     <button class="photo-thumb-del" title="삭제">✕</button>`;
   wrap.querySelector('.photo-thumb-zoom').addEventListener('click', e => {
     e.stopPropagation();
@@ -1312,7 +1312,7 @@ function renderPhotoThumb(file, dataUrl) {
   wrap.className = 'photo-thumb-wrap';
   wrap.innerHTML = `<img class="photo-thumb" src="${dataUrl}" alt="${escHtml(file.name)}" title="클릭하여 대표 이미지로 지정">
     <span class="photo-thumb-star">★</span>
-    <button class="photo-thumb-zoom" title="확대해서 보기">🔍</button>
+    <button class="photo-thumb-zoom" title="확대해서 보기"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M8 3H5a2 2 0 0 0-2 2v3m18 0V5a2 2 0 0 0-2-2h-3m0 18h3a2 2 0 0 0 2-2v-3M3 16v3a2 2 0 0 0 2 2h3"/></svg></button>
     <button class="photo-thumb-del" title="삭제">✕</button>`;
   wrap.querySelector('.photo-thumb-zoom').addEventListener('click', e => {
     e.stopPropagation();
