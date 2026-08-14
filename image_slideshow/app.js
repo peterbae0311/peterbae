@@ -1289,7 +1289,12 @@ function renderExistingPhotoThumb(photo) {
   wrap.dataset.photoId = photo.id;
   wrap.innerHTML = `<img class="photo-thumb" src="${escHtml(photo.url)}" alt="${escHtml(photo.filename)}" title="클릭하여 대표 이미지로 지정">
     <span class="photo-thumb-star">★</span>
+    <button class="photo-thumb-zoom" title="확대해서 보기">🔍</button>
     <button class="photo-thumb-del" title="삭제">✕</button>`;
+  wrap.querySelector('.photo-thumb-zoom').addEventListener('click', e => {
+    e.stopPropagation();
+    openPhotoZoom(photo.url, photo.filename);
+  });
   wrap.querySelector('.photo-thumb-del').addEventListener('click', () => {
     removedPhotoIds.push(photo.id);
     if (coverPhotoRef?.type === 'existing' && coverPhotoRef.id === photo.id) coverPhotoRef = null;
@@ -1307,7 +1312,12 @@ function renderPhotoThumb(file, dataUrl) {
   wrap.className = 'photo-thumb-wrap';
   wrap.innerHTML = `<img class="photo-thumb" src="${dataUrl}" alt="${escHtml(file.name)}" title="클릭하여 대표 이미지로 지정">
     <span class="photo-thumb-star">★</span>
+    <button class="photo-thumb-zoom" title="확대해서 보기">🔍</button>
     <button class="photo-thumb-del" title="삭제">✕</button>`;
+  wrap.querySelector('.photo-thumb-zoom').addEventListener('click', e => {
+    e.stopPropagation();
+    openPhotoZoom(dataUrl, file.name);
+  });
   wrap.querySelector('.photo-thumb-del').addEventListener('click', () => {
     pendingPhotos = pendingPhotos.filter(f => f !== file);
     if (coverPhotoRef?.type === 'pending' && coverPhotoRef.file === file) coverPhotoRef = null;
@@ -1316,6 +1326,35 @@ function renderPhotoThumb(file, dataUrl) {
   wrap.querySelector('.photo-thumb').addEventListener('click', () => toggleThumbCover(wrap, { type: 'pending', file }));
   grid.appendChild(wrap);
 }
+
+// ============================================================
+// PHOTO ZOOM OVERLAY
+// ============================================================
+
+function openPhotoZoom(src, alt) {
+  const overlay = document.getElementById('photo-zoom-overlay');
+  const img     = document.getElementById('photo-zoom-img');
+  img.src = src;
+  img.alt = alt || '';
+  overlay.style.display = 'flex';
+}
+
+function closePhotoZoom() {
+  const overlay = document.getElementById('photo-zoom-overlay');
+  const img     = document.getElementById('photo-zoom-img');
+  overlay.style.display = 'none';
+  img.src = '';
+}
+
+document.getElementById('photo-zoom-overlay').addEventListener('click', e => {
+  if (e.target.id === 'photo-zoom-overlay') closePhotoZoom();
+});
+document.getElementById('btn-close-photo-zoom').addEventListener('click', closePhotoZoom);
+document.addEventListener('keydown', e => {
+  if (e.key === 'Escape' && document.getElementById('photo-zoom-overlay').style.display !== 'none') {
+    closePhotoZoom();
+  }
+});
 
 // ============================================================
 // 13. MUSIC SELECTION — MODAL LIST + PICKER SUB-MODAL
