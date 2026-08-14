@@ -196,17 +196,36 @@ function AccountsTab() {
   }
 
   return (
-    <div className="grid grid-cols-1 lg:grid-cols-[500px_1fr] gap-6 items-start">
+    <div className="grid grid-cols-1 lg:grid-cols-[40%_60%] gap-6 items-start">
       {/* 생성/수정 폼 */}
       <section className="rounded-2xl border border-white/60 bg-white/70 backdrop-blur-xl shadow-glass p-6">
-        {isEditing ? (
+        <div className="flex items-center justify-between gap-3 mb-4">
+          <h2 className="text-sm font-bold text-gray-700">
+            {isEditing ? '계정 수정' : '신규 계정 생성'}
+          </h2>
+          <div className="flex items-center gap-2">
+            <button
+              onClick={saveAccount}
+              disabled={saving || !form.email.trim()}
+              className="px-3 py-2 text-xs text-gray-600 border border-gray-200/80 rounded-lg hover:border-neutral-500 hover:text-neutral-900 hover:bg-neutral-100/60 disabled:opacity-50 transition-colors"
+            >
+              {saving ? '저장 중...' : isEditing ? '수정 저장' : '계정 생성'}
+            </button>
+            {isEditing && (
+              <button
+                onClick={resetForm}
+                className="px-3 py-2 text-xs text-gray-600 border border-gray-200/80 rounded-lg hover:border-neutral-500 hover:text-neutral-900 hover:bg-neutral-100/60 transition-colors"
+              >
+                취소
+              </button>
+            )}
+          </div>
+        </div>
+
+        {isEditing && (
           <div className="mb-4 flex items-center gap-2 text-sm font-semibold text-amber-800 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2">
             <span className="w-2 h-2 rounded-full bg-amber-500 shrink-0" />
             지금 수정 중: {form.email}
-          </div>
-        ) : (
-          <div className="mb-4 flex items-center gap-2 text-sm font-semibold text-neutral-700 bg-neutral-100 border border-gray-200 rounded-lg px-3 py-2">
-            새 계정 생성
           </div>
         )}
 
@@ -238,7 +257,7 @@ function AccountsTab() {
         />
 
         <p className="text-sm font-semibold text-gray-700 mb-2">접근 허용할 모노레포</p>
-        <div className="grid grid-cols-2 gap-2 mb-5">
+        <div className="grid grid-cols-3 gap-2 mb-5">
           {APPS.map(app => (
             <label
               key={app.key}
@@ -256,26 +275,8 @@ function AccountsTab() {
         </div>
 
         {notice && (
-          <p className={`text-sm mb-3 ${noticeIsError ? 'text-red-500' : 'text-green-600'}`}>{notice}</p>
+          <p className={`text-sm ${noticeIsError ? 'text-red-500' : 'text-green-600'}`}>{notice}</p>
         )}
-
-        <div className="flex items-center gap-2">
-          <button
-            onClick={saveAccount}
-            disabled={saving || !form.email.trim()}
-            className="px-3 py-2 text-xs text-gray-600 border border-gray-200/80 rounded-lg hover:border-neutral-500 hover:text-neutral-900 hover:bg-neutral-100/60 disabled:opacity-50 transition-colors"
-          >
-            {saving ? '저장 중...' : isEditing ? '수정 저장' : '계정 생성'}
-          </button>
-          {isEditing && (
-            <button
-              onClick={resetForm}
-              className="px-3 py-2 text-xs text-gray-600 border border-gray-200/80 rounded-lg hover:border-neutral-500 hover:text-neutral-900 hover:bg-neutral-100/60 transition-colors"
-            >
-              취소 (새 계정 생성으로)
-            </button>
-          )}
-        </div>
       </section>
 
       {/* 계정 목록 */}
@@ -291,10 +292,11 @@ function AccountsTab() {
             {accounts.map(account => (
               <li
                 key={account.id}
-                className={`flex items-center justify-between gap-3 rounded-xl border backdrop-blur-xl shadow-glass px-5 py-3 transition-colors ${
+                onClick={() => loadAccountIntoForm(account)}
+                className={`flex items-center justify-between gap-3 rounded-xl border backdrop-blur-xl shadow-glass px-5 py-3 transition-colors cursor-pointer ${
                   account.id === form.id
                     ? 'border-amber-300 bg-amber-50/80 ring-1 ring-amber-300'
-                    : 'border-white/60 bg-white/70'
+                    : 'border-white/60 bg-white/70 hover:border-neutral-300'
                 }`}
               >
                 <div className="min-w-0">
@@ -310,13 +312,13 @@ function AccountsTab() {
                 </div>
                 <div className="shrink-0 flex items-center gap-2">
                   <button
-                    onClick={() => loadAccountIntoForm(account)}
+                    onClick={e => { e.stopPropagation(); loadAccountIntoForm(account); }}
                     className="text-xs text-gray-600 border border-gray-200/80 rounded-lg px-3 py-2 hover:border-neutral-500 hover:text-neutral-900 hover:bg-neutral-100/60 transition-colors"
                   >
                     수정
                   </button>
                   <button
-                    onClick={() => deleteAccount(account)}
+                    onClick={e => { e.stopPropagation(); deleteAccount(account); }}
                     className="text-xs text-gray-600 border border-gray-200/80 rounded-lg px-3 py-2 hover:border-red-400 hover:text-red-500 hover:bg-red-50/60 transition-colors"
                   >
                     삭제
