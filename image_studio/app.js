@@ -9,8 +9,9 @@
    1. SUPABASE INIT
    ============================================================ */
 // Supabase anon key는 클라이언트 공개 키 — git 노출 허용
-const SUPABASE_URL      = window.APP_CONFIG?.SUPABASE_URL      ?? 'https://mcshhvttsvfurrkpcbdf.supabase.co';
-const SUPABASE_ANON_KEY = window.APP_CONFIG?.SUPABASE_ANON_KEY ?? 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im1jc2hodnR0c3ZmdXJya3BjYmRmIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzM5ODI5MDgsImV4cCI6MjA4OTU1ODkwOH0.FRlSXHknfnYoZ4i4-_up8QvppoKHGo50koK9yDkXPUQ';
+// hub 자신의 Supabase 프로젝트를 그대로 씀 (mcshhvttsvfurrkpcbdf 프로젝트에서 이전, 2026-08-14).
+const SUPABASE_URL      = window.APP_CONFIG?.SUPABASE_URL      ?? 'https://trduvbgyfbzdkopdcana.supabase.co';
+const SUPABASE_ANON_KEY = window.APP_CONFIG?.SUPABASE_ANON_KEY ?? 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InRyZHV2Ymd5ZmJ6ZGtvcGRjYW5hIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzYyNjI3MjksImV4cCI6MjA5MTgzODcyOX0.b9P15zvzWbJw4KVS_Iz4ipoLttMlHXmj5I-kGrIm-A0';
 
 let supabaseClient = null;
 try {
