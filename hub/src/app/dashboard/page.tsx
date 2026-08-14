@@ -27,6 +27,9 @@ export default function DashboardPage() {
   const [overrides, setOverrides] = useState<Record<string, CardOverride>>({});
   const [copiedKey, setCopiedKey] = useState<string | null>(null);
   const [settingsOpen, setSettingsOpen] = useState(false);
+  const [orderedCards, setOrderedCards] = useState<CardData[] | null>(null);
+  const [dragKey, setDragKey] = useState<string | null>(null);
+  const [dragOverKey, setDragOverKey] = useState<string | null>(null);
 
   const loadOverrides = useCallback(async (userEmail: string) => {
     const { data } = await supabase
@@ -96,6 +99,39 @@ export default function DashboardPage() {
     })
     .sort((a, b) => a.sortOrder - b.sortOrder);
 
+  // allowedKeys/overrides가 새로 로드될 때만 드래그 순서를 다시 씌운다 —
+  // 드래그 중 리렌더로 orderedCards가 튀지 않도록 별도 state로 분리.
+  useEffect(() => {
+    if (allowedKeys === null) return;
+    setOrderedCards(cards);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [allowedKeys, overrides]);
+
+  async function persistCardOrder(next: CardData[]) {
+    if (!email) return;
+    const payload = next.map((c, i) => ({
+      email,
+      app_key: c.key,
+      custom_label: c.label.trim() || null,
+      custom_description: c.description.trim() || null,
+      sort_order: i,
+    }));
+    await supabase.from('dashboard_cards').upsert(payload, { onConflict: 'email,app_key' });
+    await loadOverrides(email);
+  }
+
+  function handleCardDrop(targetKey: string) {
+    if (!orderedCards || !dragKey || dragKey === targetKey) return;
+    const from = orderedCards.findIndex(c => c.key === dragKey);
+    const to = orderedCards.findIndex(c => c.key === targetKey);
+    if (from === -1 || to === -1) return;
+    const next = [...orderedCards];
+    const [moved] = next.splice(from, 1);
+    next.splice(to, 0, moved);
+    setOrderedCards(next);
+    persistCardOrder(next);
+  }
+
   return (
     <div className="min-h-screen px-4 py-10">
       <div className="max-w-[1500px] mx-auto">
@@ -130,26 +166,36 @@ export default function DashboardPage() {
           </div>
         </div>
 
-        {allowedKeys === null ? (
+        {allowedKeys === null || orderedCards === null ? (
           <p className="text-sm text-gray-400">불러오는 중...</p>
-        ) : cards.length === 0 ? (
+        ) : orderedCards.length === 0 ? (
           <div className="rounded-2xl border border-white/60 bg-white/70 backdrop-blur-xl shadow-glass p-10 text-center text-gray-400 text-sm">
             아직 접근 권한이 부여된 항목이 없습니다.<br />관리자에게 문의하세요.
           </div>
         ) : (
           <div
             className={
-              cards.length <= 3
+              orderedCards.length <= 3
                 ? 'flex flex-wrap justify-center gap-x-[33px] gap-y-4'
                 : 'grid gap-x-[33px] gap-y-4'
             }
-            style={cards.length <= 3 ? undefined : { gridTemplateColumns: 'repeat(4, 350px)' }}
+            style={orderedCards.length <= 3 ? undefined : { gridTemplateColumns: 'repeat(4, 350px)' }}
           >
-            {cards.map(card => (
+            {orderedCards.map(card => (
               <div
                 key={card.key}
+                draggable
+                onDragStart={() => setDragKey(card.key)}
+                onDragEnter={() => setDragOverKey(card.key)}
+                onDragOver={e => e.preventDefault()}
+                onDrop={e => { e.preventDefault(); handleCardDrop(card.key); }}
+                onDragEnd={() => { setDragKey(null); setDragOverKey(null); }}
                 onClick={() => window.open(card.path, '_blank', 'noopener,noreferrer')}
-                className="group w-full sm:w-[350px] flex flex-col rounded-xl border border-white/60 hover:border-neutral-300 bg-white/70 hover:bg-white backdrop-blur-xl shadow-glass hover:shadow-lg hover:-translate-y-1 px-5 py-4 transition-all duration-200 cursor-pointer"
+                className={
+                  'group w-full sm:w-[350px] flex flex-col rounded-xl border bg-white/70 hover:bg-white backdrop-blur-xl shadow-glass hover:shadow-lg hover:-translate-y-1 px-5 py-4 transition-all duration-200 cursor-pointer active:cursor-grabbing '
+                  + (dragKey === card.key ? 'opacity-40 border-white/60 ' : '')
+                  + (dragOverKey === card.key && dragKey !== card.key ? 'border-neutral-500 ring-2 ring-neutral-300 ' : 'border-white/60 hover:border-neutral-300 ')
+                }
               >
                 <span className="font-bold text-neutral-900 group-hover:underline truncate">
                   {card.label}
@@ -175,7 +221,7 @@ export default function DashboardPage() {
       {settingsOpen && email && (
         <CardSettingsModal
           email={email}
-          cards={cards}
+          cards={orderedCards ?? cards}
           onSaved={async () => { await loadOverrides(email); setSettingsOpen(false); }}
           onClose={() => setSettingsOpen(false)}
         />
