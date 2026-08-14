@@ -192,9 +192,12 @@ export default function DashboardPage() {
                 onDragEnd={() => { setDragKey(null); setDragOverKey(null); }}
                 onClick={() => window.open(card.path, '_blank', 'noopener,noreferrer')}
                 className={
-                  'group w-full sm:w-[350px] flex flex-col rounded-xl border bg-white/70 hover:bg-white backdrop-blur-xl shadow-glass hover:shadow-lg hover:-translate-y-1 px-5 py-4 transition-all duration-200 cursor-pointer active:cursor-grabbing '
-                  + (dragKey === card.key ? 'opacity-40 border-white/60 ' : '')
-                  + (dragOverKey === card.key && dragKey !== card.key ? 'border-neutral-500 ring-2 ring-neutral-300 ' : 'border-white/60 hover:border-neutral-300 ')
+                  'group w-full sm:w-[350px] flex flex-col rounded-xl border px-5 py-4 transition-all duration-200 cursor-pointer active:cursor-grabbing '
+                  + (dragKey === card.key
+                    ? 'bg-white border-neutral-900 ring-2 ring-neutral-900 shadow-lg scale-[1.03] '
+                    : dragOverKey === card.key
+                      ? 'bg-white/70 backdrop-blur-xl shadow-glass border-neutral-500 ring-2 ring-neutral-300 '
+                      : 'bg-white/70 hover:bg-white backdrop-blur-xl shadow-glass hover:shadow-lg hover:-translate-y-1 border-white/60 hover:border-neutral-300 ')
                 }
               >
                 <span className="font-bold text-neutral-900 group-hover:underline truncate">
