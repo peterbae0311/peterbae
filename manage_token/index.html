@@ -7,7 +7,6 @@
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@400;500;600;700&display=swap" rel="stylesheet" />
-  <link rel="stylesheet" href="auth/auth.css" />
 
   <style>
     /* ===================================================
@@ -77,29 +76,6 @@
     }
 
     .tab-bar-spacer { flex: 1; }
-
-    .btn-logout {
-      display: inline-flex;
-      align-items: center;
-      gap: 5px;
-      margin-bottom: 6px;
-      padding: 7px 16px;
-      border: 1.5px solid var(--border);
-      border-radius: 50px;
-      background: #fff;
-      color: var(--text-sub);
-      font-family: inherit;
-      font-size: 13px;
-      font-weight: 500;
-      cursor: pointer;
-      transition: all var(--transition);
-    }
-
-    .btn-logout:hover {
-      border-color: var(--coral-btn);
-      color: var(--coral-btn);
-      background: #fde8e8;
-    }
 
     .tab-btn {
       padding: 10px 28px;
@@ -875,7 +851,7 @@
 </head>
 
 <body>
-<div id="app" role="application" style="display:none">
+<div id="app" role="application" style="display:flex; flex-direction:column">
 
   <!-- Tab Bar -->
   <nav class="tab-bar" role="tablist" aria-label="메인 탭">
@@ -888,7 +864,6 @@
       data-tab="tokens"
     >Key 관리</button>
     <span class="tab-bar-spacer"></span>
-    <button class="btn-logout" id="btn-logout">⏻ 로그아웃</button>
   </nav>
 
   <!-- Tab Content -->
@@ -1800,39 +1775,9 @@ document.querySelectorAll('.tab-btn').forEach(btn => {
   });
 });
 
-// loadTokens는 auth 모듈의 onLogin 콜백에서 호출됨
-</script>
-
-<!-- Auth 모듈 초기화 -->
-<script src="auth/auth-ui.js"></script>
-<script src="auth/auth.js"></script>
-<script>
-  (async () => {
-    const { signOut } = await window.initAuth({
-      supabaseUrl: SUPABASE_URL,
-      supabaseKey: SUPABASE_ANON_KEY,
-      onLogin: () => {
-        const app = document.getElementById('app');
-        if (app) { app.style.display = 'flex'; app.style.flexDirection = 'column'; }
-        if (typeof loadTokens === 'function') loadTokens();
-      },
-      onLogout: () => {
-        const app = document.getElementById('app');
-        if (app) app.style.display = 'none';
-      },
-    });
-
-    const btnLogout = document.getElementById('btn-logout');
-    if (btnLogout) {
-      btnLogout.addEventListener('click', async () => {
-        btnLogout.disabled = true;
-        btnLogout.textContent = '로그아웃 중...';
-        await signOut();
-        btnLogout.disabled = false;
-        btnLogout.textContent = '⏻ 로그아웃';
-      });
-    }
-  })();
+// hub SSO만으로 접근 가능 — 자체 로그인 없이 바로 로드 (mcshhvttsvfurrkpcbdf 마이그레이션 계열
+// 앱들과 동일 패턴이지만, 여긴 원래부터 hub 자신의 Supabase 프로젝트를 썼으므로 데이터 이전은 불필요).
+if (typeof loadTokens === 'function') loadTokens();
 </script>
 
 </body>
