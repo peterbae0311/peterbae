@@ -10,7 +10,10 @@ import { getTokenKeyValue } from '@/lib/tokenStore';
  * 판단해 프록시 대상에 포함했다. Pollinations 폴백은 키가 필요 없는 공개 API라
  * 클라이언트가 계속 직접 호출한다.
  */
-const HF_IMAGE_URL = 'https://router.huggingface.co/hf-inference/models/black-forest-labs/FLUX.1-schnell';
+// 실측(2026-08-15): black-forest-labs/FLUX.1-schnell은 hf-inference provider로는
+// 410(deprecated)을 반환한다 — HF 모델 카드의 inferenceProviderMapping 기준 현재
+// 살아있는 provider(together/fal-ai/nscale/replicate/wavespeed) 중 together로 라우팅.
+const HF_IMAGE_URL = 'https://router.huggingface.co/together/models/black-forest-labs/FLUX.1-schnell';
 
 export async function POST(request: NextRequest) {
   const supabase = await createServerSupabaseClient();
