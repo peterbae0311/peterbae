@@ -579,10 +579,12 @@ async function generateImage(prompt, width, height) {
   try {
     return await generateImageWithHF(prompt, width, height);
   } catch (hfErr) {
-    const code = hfErr.status;
-    // 402(크레딧 소진), 429(요청 초과), 503(서비스 불가) → Pollinations로 폴백
-    if (code === 402 || code === 429 || code === 503 || code === 500) {
-      console.warn(`[HF] ${code} 오류 — Pollinations 폴백`, hfErr.message);
+    // HF의 provider/모델 가용성이 자주 바뀌어(실측: 410 deprecated, 400 unsupported 등
+    // 다양한 실패 사례 확인) 특정 코드만 골라 폴백하면 계속 새 케이스를 놓친다.
+    // 403(토큰 권한 부족)만 관리자가 직접 고쳐야 할 설정 문제라 예외로 남기고,
+    // 그 외에는 전부 Pollinations로 넘어간다.
+    if (hfErr.status !== 403) {
+      console.warn(`[HF] ${hfErr.status ?? 'unknown'} 오류 — Pollinations 폴백`, hfErr.message);
       return generateImageWithPollinations(prompt, width, height);
     }
     throw hfErr;

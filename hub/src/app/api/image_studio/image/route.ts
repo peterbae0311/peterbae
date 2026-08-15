@@ -11,9 +11,12 @@ import { getTokenKeyValue } from '@/lib/tokenStore';
  * 클라이언트가 계속 직접 호출한다.
  */
 // 실측(2026-08-15): black-forest-labs/FLUX.1-schnell은 hf-inference provider로는
-// 410(deprecated)을 반환한다 — HF 모델 카드의 inferenceProviderMapping 기준 현재
-// 살아있는 provider(together/fal-ai/nscale/replicate/wavespeed) 중 together로 라우팅.
-const HF_IMAGE_URL = 'https://router.huggingface.co/together/models/black-forest-labs/FLUX.1-schnell';
+// 410(deprecated)을 반환한다. inferenceProviderMapping상 together/fal-ai 등으로는
+// 아직 살아있지만, 각 provider가 { inputs, parameters } 형식이 아닌 자기 고유의
+// 요청 스펙을 요구해서(실측: together는 400 "Model not supported") 단순 URL 치환으로
+// 안 끝난다 — provider별 스펙을 새로 맞추는 건 범위 밖이라 원래 엔드포인트를 유지하고,
+// 클라이언트의 Pollinations 폴백이 HF 실패 시(어떤 이유든) 항상 받아주도록 넓혀뒀다.
+const HF_IMAGE_URL = 'https://router.huggingface.co/hf-inference/models/black-forest-labs/FLUX.1-schnell';
 
 export async function POST(request: NextRequest) {
   const supabase = await createServerSupabaseClient();
