@@ -13,7 +13,9 @@ const PROVIDERS = {
     keyName: 'OPENROUTER_API_KEY',
     extraHeaders: {
       'HTTP-Referer': 'https://peterbae.duckdns.org/course_planning',
-      'X-Title': '과정 기획 자동화',
+      // Fetch API 헤더 값은 ByteString(Latin1)만 허용 — 한글을 넣으면 Node의 fetch(undici)가
+      // "Cannot convert argument to a ByteString" 오류를 던진다(실측 확인). ASCII로만 표기.
+      'X-Title': 'Course Planning Automation',
     },
   },
   groq: {
