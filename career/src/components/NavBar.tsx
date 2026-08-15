@@ -5,9 +5,6 @@ import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { supabase, NavTab, NavTabBuiltinKey } from '@/lib/supabase';
 
-// hub 앱(별도 배포)의 최고관리자 계정과 반드시 동일한 값이어야 함.
-const SUPER_ADMIN_EMAIL = 'peter.bae0311@gmail.com';
-
 // hub의 src/lib/jwt.ts와 동일 — 로그인 이력(login_history)을 짝짓는 session_id 추출용.
 // 서명 검증 없음, 상관관계 키로만 사용.
 function decodeSessionId(accessToken: string): string | null {
@@ -171,14 +168,6 @@ export default function NavBar() {
 
         {/* 로그인 계정 + 로그아웃 */}
         <div className="ml-auto flex items-center gap-3 px-4">
-          {email === SUPER_ADMIN_EMAIL && (
-            <a
-              href="/admin"
-              className="text-xs text-gray-600 border border-gray-200/80 rounded-md px-3 py-1.5 hover:border-neutral-500 hover:text-neutral-900 hover:bg-neutral-100/60 transition-colors"
-            >
-              Admin
-            </a>
-          )}
           {email && <span className="text-xs text-gray-500">{email}</span>}
           <button
             onClick={handleLogout}

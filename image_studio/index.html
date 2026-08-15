@@ -23,7 +23,6 @@
     <p class="app-subtitle">교육 콘텐츠를 위한 AI 이미지 생성 &amp; 보정 플랫폼</p>
     <div class="app-header-spacer"></div>
     <div class="app-header-actions">
-      <a href="/admin" class="btn-header-link" id="admin-link" style="display:none">Admin</a>
       <span class="app-user-email" id="user-email"></span>
       <button type="button" class="btn-header-link" id="btn-logout">로그아웃</button>
     </div>
@@ -451,8 +450,6 @@
   <script type="module">
     import { createBrowserClient } from 'https://esm.sh/@supabase/ssr@0.12.4';
 
-    const SUPER_ADMIN_EMAIL = 'peter.bae0311@gmail.com';
-
     function decodeSessionId(accessToken) {
       try {
         const payload = accessToken.split('.')[1];
@@ -474,9 +471,6 @@
     const { data: { user } } = await authClient.auth.getUser();
     const email = user?.email || '';
     document.getElementById('user-email').textContent = email;
-    if (email === SUPER_ADMIN_EMAIL) {
-      document.getElementById('admin-link').style.display = '';
-    }
 
     document.getElementById('btn-logout').addEventListener('click', async () => {
       const { data: { session } } = await authClient.auth.getSession();
