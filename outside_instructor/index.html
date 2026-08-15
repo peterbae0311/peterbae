@@ -472,6 +472,11 @@
         </div>
       </div>
     </div>
+
+    <div class="auth-user-info">
+      <span class="user-email" id="header-user-email"></span>
+      <button type="button" class="auth-logout-btn" id="btn-logout">로그아웃</button>
+    </div>
   </nav>
 
   <!-- ═══ RIGHT PANEL ══════════════════════════════════════════ -->
@@ -484,6 +489,47 @@
     </div>
   </main>
 </div>
+
+<!-- 좌측 하단 계정 표시 / 로그아웃 — hub SSO 세션 쿠키를 읽기 위한 별도 클라이언트.
+     아래 본문의 db(anon-key, 데이터 조회용)와는 완전히 분리 — image_studio/manage_token과 동일 패턴. -->
+<script type="module">
+  import { createBrowserClient } from 'https://esm.sh/@supabase/ssr@0.12.4';
+
+  function decodeSessionId(accessToken) {
+    try {
+      const payload = accessToken.split('.')[1];
+      if (!payload) return null;
+      const base64 = payload.replace(/-/g, '+').replace(/_/g, '/');
+      const claims = JSON.parse(atob(base64));
+      return claims.session_id || null;
+    } catch {
+      return null;
+    }
+  }
+
+  const authClient = createBrowserClient(
+    'https://trduvbgyfbzdkopdcana.supabase.co',
+    'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InRyZHV2Ymd5ZmJ6ZGtvcGRjYW5hIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzYyNjI3MjksImV4cCI6MjA5MTgzODcyOX0.b9P15zvzWbJw4KVS_Iz4ipoLttMlHXmj5I-kGrIm-A0',
+    { cookieOptions: { path: '/' } }
+  );
+
+  const { data: { user } } = await authClient.auth.getUser();
+  document.getElementById('header-user-email').textContent = user?.email || '';
+
+  document.getElementById('btn-logout').addEventListener('click', async () => {
+    const { data: { session } } = await authClient.auth.getSession();
+    const sessionId = session ? decodeSessionId(session.access_token) : null;
+    if (sessionId) {
+      await fetch('/api/auth/logout-event', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ sessionId }),
+      }).catch(() => {});
+    }
+    await authClient.auth.signOut();
+    window.location.href = '/login';
+  });
+</script>
 
 <script>
 'use strict';
