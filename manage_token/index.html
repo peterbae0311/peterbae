@@ -913,7 +913,7 @@
     <div class="app-header-spacer"></div>
     <div class="app-header-actions">
       <span class="app-user-email" id="user-email"></span>
-      <button type="button" class="btn-header-link" id="btn-logout">로그아웃</button>
+      <button type="button" class="btn-header-link" id="btn-logout">닫기</button>
     </div>
   </header>
 
@@ -1199,22 +1199,10 @@ window.addEventListener('sb-client-ready', (e) => {
 });
 
 // --------------------------------------------------
-// App Header — 로그인 이메일 표시 / Admin 링크 / 로그아웃
+// App Header — 로그인 이메일 표시 / 닫기
 // (career의 NavBar와 동일한 패턴 — hub SSO 세션을 그대로 재사용)
 // --------------------------------------------------
 const SUPER_ADMIN_EMAIL = 'peter.bae0311@gmail.com';
-
-function decodeSessionId(accessToken) {
-  try {
-    const payload = accessToken.split('.')[1];
-    if (!payload) return null;
-    const base64 = payload.replace(/-/g, '+').replace(/_/g, '/');
-    const claims = JSON.parse(atob(base64));
-    return claims.session_id || null;
-  } catch {
-    return null;
-  }
-}
 
 async function initHeader() {
   const { data: { user } } = await sbClient.auth.getUser();
@@ -1222,18 +1210,12 @@ async function initHeader() {
   document.getElementById('user-email').textContent = email;
 }
 
-document.getElementById('btn-logout').addEventListener('click', async () => {
-  const { data: { session } } = await sbClient.auth.getSession();
-  const sessionId = session ? decodeSessionId(session.access_token) : null;
-  if (sessionId) {
-    await fetch('/api/auth/logout-event', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ sessionId }),
-    }).catch(() => {});
-  }
-  await sbClient.auth.signOut();
-  window.location.href = '/login';
+// hub 대시보드가 서브앱을 window.open(..., '_blank')으로 열기 때문에 close()가 통한다.
+// 대시보드를 거치지 않고 URL을 직접 열었을 때(닫기 실패)는 대시보드로 이동시킨다.
+// hub 세션 자체를 끝내는 게 아니므로 signOut은 호출하지 않는다.
+document.getElementById('btn-logout').addEventListener('click', () => {
+  window.close();
+  setTimeout(() => { window.location.href = '/dashboard'; }, 300);
 });
 
 // --------------------------------------------------
