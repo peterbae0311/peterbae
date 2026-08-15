@@ -70,7 +70,8 @@ export async function POST(request: NextRequest) {
         max_tokens: typeof body?.max_tokens === 'number' ? body.max_tokens : 2000,
       }),
     });
-  } catch {
+  } catch (err) {
+    console.error(`[course_planning/llm] ${provider} fetch failed:`, err);
     return NextResponse.json({ error: `${provider} 호출 중 네트워크 오류가 발생했습니다.` }, { status: 502 });
   }
 
