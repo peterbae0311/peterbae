@@ -427,26 +427,36 @@
     .form-grid {
       display: grid;
       grid-template-columns: 1fr 1fr;
-      gap: 20px 20px;
+      gap: 10px 24px;
     }
 
     .span-full { grid-column: 1 / -1; }
 
     .detail-field {
       display: flex;
-      flex-direction: column;
-      gap: 5px;
+      flex-direction: row;
+      align-items: center;
+      gap: 10px;
+      min-height: 32px;
+    }
+
+    /* 여러 줄 필드(textarea/rich text)는 레이블을 값 상단에 맞춰 정렬 */
+    .detail-field.align-top {
+      align-items: flex-start;
+    }
+
+    .detail-field.align-top > .detail-label {
+      padding-top: 8px;
     }
 
     .detail-label {
+      flex: 0 0 92px;
       font-size: 10.5px;
       font-weight: 700;
       color: var(--lavender);
       letter-spacing: 0.07em;
       text-transform: uppercase;
-      padding-bottom: 3px;
-      border-bottom: 1.5px solid var(--lavender-mid);
-      margin-bottom: 1px;
+      white-space: nowrap;
     }
 
     .detail-label .required {
@@ -454,20 +464,10 @@
       margin-left: 2px;
     }
 
-    .detail-label-row {
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-      gap: 8px;
-      padding-bottom: 3px;
-      border-bottom: 1.5px solid var(--lavender-mid);
-      margin-bottom: 1px;
-    }
-
-    .detail-label-row .detail-label {
-      border-bottom: none;
-      padding-bottom: 0;
-      margin-bottom: 0;
+    .detail-field > .detail-input {
+      flex: 1 1 0%;
+      width: auto;
+      min-width: 0;
     }
 
     .copy-btn {
@@ -919,6 +919,10 @@
       flex: 1;
     }
 
+    .date-pair-cell .detail-label {
+      flex-basis: 46px;
+    }
+
     /* ===================================================
        Responsive (mobile stacked)
     =================================================== */
@@ -1048,11 +1052,9 @@
                   <input class="detail-input" id="d-key-name" type="text" maxlength="100" readonly />
                 </div>
                 <div class="detail-field">
-                  <span class="detail-label-row">
-                    <span class="detail-label">사용 계정 <span class="required">*</span></span>
-                    <button type="button" class="copy-btn" data-copy-target="d-account" title="복사" aria-label="사용 계정 복사"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect width="14" height="14" x="8" y="8" rx="2" ry="2"></rect><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"></path></svg></button>
-                  </span>
+                  <span class="detail-label">사용 계정 <span class="required">*</span></span>
                   <input class="detail-input" id="d-account" type="text" maxlength="100" readonly />
+                  <button type="button" class="copy-btn" data-copy-target="d-account" title="복사" aria-label="사용 계정 복사"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect width="14" height="14" x="8" y="8" rx="2" ry="2"></rect><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"></path></svg></button>
                 </div>
 
                 <!-- Row 2: KEY 유형 | URL -->
@@ -1068,11 +1070,9 @@
                   </select>
                 </div>
                 <div class="detail-field">
-                  <span class="detail-label-row">
-                    <span class="detail-label">URL <span class="required">*</span></span>
-                    <button type="button" class="copy-btn" data-copy-target="d-url" title="복사" aria-label="URL 복사"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect width="14" height="14" x="8" y="8" rx="2" ry="2"></rect><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"></path></svg></button>
-                  </span>
+                  <span class="detail-label">URL <span class="required">*</span></span>
                   <input class="detail-input detail-input-url" id="d-url" type="text" maxlength="200" readonly />
+                  <button type="button" class="copy-btn" data-copy-target="d-url" title="복사" aria-label="URL 복사"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect width="14" height="14" x="8" y="8" rx="2" ry="2"></rect><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"></path></svg></button>
                 </div>
 
                 <!-- Row 3: 프로젝트명 | 프로젝트 URL -->
@@ -1081,33 +1081,27 @@
                   <input class="detail-input" id="d-project-name" type="text" maxlength="100" readonly />
                 </div>
                 <div class="detail-field">
-                  <span class="detail-label-row">
-                    <span class="detail-label">프로젝트 URL</span>
-                    <button type="button" class="copy-btn" data-copy-target="d-project-url" title="복사" aria-label="프로젝트 URL 복사"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect width="14" height="14" x="8" y="8" rx="2" ry="2"></rect><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"></path></svg></button>
-                  </span>
+                  <span class="detail-label">프로젝트 URL</span>
                   <input class="detail-input detail-input-url" id="d-project-url" type="text" maxlength="200" readonly />
+                  <button type="button" class="copy-btn" data-copy-target="d-project-url" title="복사" aria-label="프로젝트 URL 복사"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect width="14" height="14" x="8" y="8" rx="2" ry="2"></rect><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"></path></svg></button>
                 </div>
 
                 <!-- Row 4: Key (전체) -->
-                <div class="detail-field span-full">
-                  <span class="detail-label-row">
-                    <span class="detail-label">Key</span>
-                    <button type="button" class="copy-btn" data-copy-target="d-key-value" title="복사" aria-label="Key 복사"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect width="14" height="14" x="8" y="8" rx="2" ry="2"></rect><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"></path></svg></button>
-                  </span>
+                <div class="detail-field span-full align-top">
+                  <span class="detail-label">Key</span>
                   <textarea class="detail-input detail-input-key" id="d-key-value" maxlength="1000" readonly></textarea>
+                  <button type="button" class="copy-btn" data-copy-target="d-key-value" title="복사" aria-label="Key 복사"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect width="14" height="14" x="8" y="8" rx="2" ry="2"></rect><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"></path></svg></button>
                 </div>
 
                 <!-- Row 5: MCP 등록 방법 (전체) -->
-                <div class="detail-field span-full">
-                  <span class="detail-label-row">
-                    <span class="detail-label">MCP 등록 방법</span>
-                    <button type="button" class="copy-btn" data-copy-target="d-mcp-registration" title="복사" aria-label="MCP 등록 방법 복사"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect width="14" height="14" x="8" y="8" rx="2" ry="2"></rect><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"></path></svg></button>
-                  </span>
+                <div class="detail-field span-full align-top">
+                  <span class="detail-label">MCP 등록 방법</span>
                   <textarea class="detail-input detail-input-multiline" id="d-mcp-registration" maxlength="2000" readonly></textarea>
+                  <button type="button" class="copy-btn" data-copy-target="d-mcp-registration" title="복사" aria-label="MCP 등록 방법 복사"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect width="14" height="14" x="8" y="8" rx="2" ry="2"></rect><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"></path></svg></button>
                 </div>
 
                 <!-- Row 6: Key 생성 방법 (전체) -->
-                <div class="detail-field span-full">
+                <div class="detail-field span-full align-top">
                   <span class="detail-label">Key 생성 방법</span>
                   <textarea class="detail-input detail-input-multiline" id="d-key-creation" maxlength="2000" readonly></textarea>
                 </div>
@@ -1139,7 +1133,7 @@
                 </div>
 
                 <!-- Row 8: 설명 (전체) — rich text contenteditable -->
-                <div class="detail-field span-full">
+                <div class="detail-field span-full align-top">
                   <span class="detail-label">설명</span>
                   <div class="detail-input detail-input-rich" id="d-description" contenteditable="false"></div>
                 </div>
