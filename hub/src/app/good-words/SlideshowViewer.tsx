@@ -1,12 +1,17 @@
 'use client';
 
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { categoryLabel } from '@/lib/goodWords/categories';
 
 export interface SlideshowItem {
   id: string;
   category: string;
   content: string;
+  source: string | null;
+}
+
+interface SlideshowCategory {
+  id: string;
+  label: string;
 }
 
 const INTERVAL_STORAGE_KEY = 'good-words:slideshow-interval-sec';
@@ -15,7 +20,17 @@ const DEFAULT_INTERVAL_SEC = 8;
 const MIN_INTERVAL_SEC = 3;
 const MAX_INTERVAL_SEC = 30;
 
-export default function SlideshowViewer({ items, onClose }: { items: SlideshowItem[]; onClose: () => void }) {
+export default function SlideshowViewer({
+  items, categories, onClose,
+}: {
+  items: SlideshowItem[];
+  categories: SlideshowCategory[];
+  onClose: () => void;
+}) {
+  function categoryLabel(id: string): string {
+    return categories.find((c) => c.id === id)?.label ?? id;
+  }
+
   const [index, setIndex] = useState(0);
   const [intervalSec, setIntervalSec] = useState(DEFAULT_INTERVAL_SEC);
   const [muted, setMuted] = useState(false);
@@ -109,6 +124,9 @@ export default function SlideshowViewer({ items, onClose }: { items: SlideshowIt
         <p className="text-2xl sm:text-3xl leading-relaxed font-medium text-white whitespace-pre-wrap">
           {current.content}
         </p>
+        {current.source && (
+          <p className="text-xs text-white/40 mt-6">{`< 출처 : ${current.source} >`}</p>
+        )}
       </div>
 
       <div className="absolute bottom-8 left-1/2 -translate-x-1/2 flex flex-wrap items-center justify-center gap-4 text-white/70 text-xs">

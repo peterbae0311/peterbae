@@ -5,8 +5,8 @@
  * hub/CLAUDE.md에 미결정 사항으로 남아 있어, 우선 "명시적 우열/등수 비교" 표현만 걸러낸다.
  */
 
-const MIN_LENGTH = 150;
-const MAX_LENGTH = 200;
+export const MIN_LENGTH = 80;
+export const MAX_LENGTH = 150;
 
 const POLITICAL_KEYWORDS = [
   '대통령', '국회', '정당', '여당', '야당', '총선', '대선', '탄핵', '정치인',
