@@ -605,6 +605,94 @@
       border-color: var(--mint);
     }
 
+    /* Key 값 목록 — NAME/VALUE 행 반복 + 추가/삭제 */
+    .key-values-list {
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+      flex: 1 1 0%;
+      min-width: 0;
+    }
+
+    .kv-row {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .kv-row .kv-name {
+      flex: 0 0 220px;
+      font-family: monospace;
+      font-size: 12px;
+      background: var(--mint-light);
+      border-color: var(--mint-mid);
+    }
+
+    .kv-row .kv-name:not([readonly]) {
+      background: #ffffff;
+      border-color: var(--mint);
+    }
+
+    .kv-row .kv-value {
+      flex: 1 1 0%;
+      min-width: 0;
+      font-family: monospace;
+      font-size: 12px;
+      background: var(--mint-light);
+      border-color: var(--mint-mid);
+    }
+
+    .kv-row .kv-value:not([readonly]) {
+      background: #ffffff;
+      border-color: var(--mint);
+    }
+
+    .kv-remove-btn,
+    .kv-add-btn {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      flex-shrink: 0;
+      border: 1.5px solid var(--border);
+      background: #fff;
+      border-radius: var(--radius-sm);
+      cursor: pointer;
+      color: var(--text-sub);
+      transition: all var(--transition);
+    }
+
+    .kv-remove-btn {
+      width: 24px;
+      height: 24px;
+      font-size: 16px;
+      line-height: 1;
+    }
+
+    .kv-remove-btn:hover {
+      border-color: var(--coral-btn);
+      color: var(--coral-btn);
+    }
+
+    .kv-add-btn {
+      align-self: flex-start;
+      width: auto;
+      padding: 5px 12px;
+      font-size: 12px;
+      font-weight: 700;
+    }
+
+    .kv-add-btn:hover {
+      border-color: var(--mint);
+      color: var(--text-main);
+      background: var(--mint-light);
+    }
+
+    .kv-empty-hint {
+      font-size: 12px;
+      color: var(--text-light);
+      padding: 4px 0;
+    }
+
     /* ===================================================
        Buttons
     =================================================== */
@@ -1033,11 +1121,10 @@
                   <button type="button" class="copy-btn" data-copy-target="d-project-url" title="복사" aria-label="프로젝트 URL 복사"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect width="14" height="14" x="8" y="8" rx="2" ry="2"></rect><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"></path></svg></button>
                 </div>
 
-                <!-- Row 4: Key (전체) -->
+                <!-- Row 4: Key (전체) — 이름 붙은 값 목록(NAME/VALUE), 여러 개 추가/삭제 가능 -->
                 <div class="detail-field span-full align-top">
                   <span class="detail-label">Key</span>
-                  <textarea class="detail-input detail-input-key" id="d-key-value" maxlength="1000" readonly></textarea>
-                  <button type="button" class="copy-btn" data-copy-target="d-key-value" title="복사" aria-label="Key 복사"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect width="14" height="14" x="8" y="8" rx="2" ry="2"></rect><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"></path></svg></button>
+                  <div class="key-values-list" id="d-key-values"></div>
                 </div>
 
                 <!-- Row 5: MCP 등록 방법 (전체) -->
@@ -1168,7 +1255,8 @@
  *   url                 varchar(200)  NOT NULL
  *   project_name        varchar(100)
  *   project_url         varchar(200)
- *   key_value           varchar(1000) NOT NULL
+ *   key_value           varchar(1000)         -- deprecated, key_values로 대체(과거 데이터 보존용, 앱에서 더 이상 쓰지 않음)
+ *   key_values          jsonb NOT NULL DEFAULT '[]'  -- [{name, value}, ...] — 항목 하나가 여러 개의 이름 붙은 값을 가질 수 있음(예: Supabase ANON/SERVICE_ROLE)
  *   usage_period        varchar(100)
  *   expiry_date         date
  *   key_creation_method varchar(2000)
@@ -1227,6 +1315,7 @@ let currentDetailRecord = null;
 let tokensCache        = [];
 let initialLoadApplied = false;     // 화면 최초 로드 시 기본값 적용은 1회만
 let pendingDeleteId    = null;
+let currentKeyValues   = [];        // 현재 폼에 표시 중인 Key 값 목록 [{name, value}, ...]
 
 // Detail field IDs → DB column names
 const FIELD_MAP = {
@@ -1236,7 +1325,6 @@ const FIELD_MAP = {
   'd-url':             'url',
   'd-project-name':    'project_name',
   'd-project-url':     'project_url',
-  'd-key-value':       'key_value',
   'd-usage-period':    'usage_period',
   'd-expiry-date':     'expiry_date',
   'd-key-creation':    'key_creation_method',
@@ -1246,8 +1334,8 @@ const FIELD_MAP = {
 };
 
 const ALL_FIELD_IDS    = Object.keys(FIELD_MAP);
-const AUTO_RESIZE_IDS  = ['d-key-value', 'd-key-creation', 'd-mcp-registration'];
-const REQUIRED_IDS     = ['d-key-name', 'd-account', 'd-url', 'd-key-value'];
+const AUTO_RESIZE_IDS  = ['d-key-creation', 'd-mcp-registration'];
+const REQUIRED_IDS     = ['d-key-name', 'd-account', 'd-url'];
 const URL_FIELD_IDS    = ['d-url', 'd-project-url'];
 
 // --------------------------------------------------
@@ -1482,6 +1570,97 @@ function setPanelMode(mode) {
   btnDetailSave.style.display   = (mode === 'new' || mode === 'edit') ? '' : 'none';
 
   setDetailReadonly(mode === 'view');
+  renderKeyValues(currentKeyValues, mode === 'view');
+}
+
+// --------------------------------------------------
+// Key 값 목록 (NAME/VALUE) — 항목 하나가 여러 개의 이름 붙은 값을 가질 수 있음
+// --------------------------------------------------
+const keyValuesContainer = document.getElementById('d-key-values');
+
+function makeKeyValueRow(name, value, readonly) {
+  const row = document.createElement('div');
+  row.className = 'kv-row';
+
+  const nameInput = document.createElement('input');
+  nameInput.className   = 'detail-input kv-name';
+  nameInput.type        = 'text';
+  nameInput.placeholder = 'NAME';
+  nameInput.value       = name || '';
+  nameInput.readOnly    = readonly;
+
+  const valueInput = document.createElement('input');
+  valueInput.className   = 'detail-input kv-value';
+  valueInput.type        = 'text';
+  valueInput.placeholder = 'VALUE';
+  valueInput.value       = value || '';
+  valueInput.readOnly    = readonly;
+
+  const copyBtn = document.createElement('button');
+  copyBtn.type = 'button';
+  copyBtn.className = 'copy-btn';
+  copyBtn.title = '복사';
+  copyBtn.setAttribute('aria-label', '값 복사');
+  copyBtn.innerHTML = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect width="14" height="14" x="8" y="8" rx="2" ry="2"></rect><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"></path></svg>';
+  copyBtn.addEventListener('click', async () => {
+    const text = valueInput.value || '';
+    if (!text.trim()) { showToast('복사할 내용이 없습니다.', 'error'); return; }
+    try {
+      await navigator.clipboard.writeText(text);
+      showToast('복사되었습니다.', 'success');
+    } catch (e) {
+      showToast('복사 실패: ' + e.message, 'error');
+    }
+  });
+
+  row.appendChild(nameInput);
+  row.appendChild(valueInput);
+  row.appendChild(copyBtn);
+
+  if (!readonly) {
+    const removeBtn = document.createElement('button');
+    removeBtn.type = 'button';
+    removeBtn.className = 'kv-remove-btn';
+    removeBtn.title = '삭제';
+    removeBtn.setAttribute('aria-label', '값 삭제');
+    removeBtn.textContent = '−';
+    removeBtn.addEventListener('click', () => row.remove());
+    row.appendChild(removeBtn);
+  }
+
+  return row;
+}
+
+function renderKeyValues(list, readonly) {
+  keyValuesContainer.innerHTML = '';
+  (list || []).forEach(kv => {
+    keyValuesContainer.appendChild(makeKeyValueRow(kv.name, kv.value, readonly));
+  });
+
+  if (!readonly) {
+    const addBtn = document.createElement('button');
+    addBtn.type = 'button';
+    addBtn.className = 'kv-add-btn';
+    addBtn.textContent = '+ 값 추가';
+    addBtn.addEventListener('click', () => {
+      keyValuesContainer.insertBefore(makeKeyValueRow('', '', false), addBtn);
+    });
+    keyValuesContainer.appendChild(addBtn);
+  } else if (!list || list.length === 0) {
+    const hint = document.createElement('div');
+    hint.className = 'kv-empty-hint';
+    hint.textContent = '등록된 값이 없습니다.';
+    keyValuesContainer.appendChild(hint);
+  }
+}
+
+function collectKeyValues() {
+  return [...keyValuesContainer.querySelectorAll('.kv-row')]
+    .map(row => {
+      const inputs = row.querySelectorAll('input');
+      return { name: inputs[0].value.trim(), value: inputs[1].value.trim() };
+    })
+    .filter(kv => kv.name || kv.value);
 }
 
 function setDetailReadonly(readonly) {
@@ -1511,13 +1690,13 @@ function showDetail(rec) {
   document.getElementById('d-url').value             = rec.url                 || '';
   document.getElementById('d-project-name').value    = rec.project_name        || '';
   document.getElementById('d-project-url').value     = rec.project_url         || '';
-  document.getElementById('d-key-value').value       = rec.key_value           || '';
   document.getElementById('d-usage-period').value    = rec.usage_period        || '';
   document.getElementById('d-expiry-date').value     = rec.expiry_date ? rec.expiry_date.slice(0, 10) : '';
   document.getElementById('d-renewal-date').value    = rec.renewal_date ? rec.renewal_date.slice(0, 10) : '';
   document.getElementById('d-key-creation').value    = rec.key_creation_method || '';
   document.getElementById('d-mcp-registration').value= rec.mcp_registration    || '';
   document.getElementById('d-description').innerHTML = rec.description         || '';
+  currentKeyValues = rec.key_values || [];
 
   setPanelMode('view');
   autoResizeAll();
@@ -1550,6 +1729,8 @@ function clearForm() {
     const el = document.getElementById(id);
     if (el) el.onclick = null;
   });
+  currentKeyValues = [];
+  keyValuesContainer.innerHTML = '';
 }
 
 // --------------------------------------------------
@@ -1595,13 +1776,13 @@ function startNewFromTemplate(rec) {
   document.getElementById('d-url').value              = rec.url                 || '';
   document.getElementById('d-project-name').value     = rec.project_name        || '';
   document.getElementById('d-project-url').value      = rec.project_url         || '';
-  document.getElementById('d-key-value').value        = rec.key_value           || '';
   document.getElementById('d-usage-period').value     = rec.usage_period        || '';
   document.getElementById('d-expiry-date').value      = rec.expiry_date ? rec.expiry_date.slice(0, 10) : '';
   document.getElementById('d-key-creation').value     = rec.key_creation_method || '';
   document.getElementById('d-mcp-registration').value = rec.mcp_registration    || '';
   document.getElementById('d-description').innerHTML  = rec.description         || '';
   document.getElementById('d-renewal-date').value     = todayStr();
+  currentKeyValues = rec.key_values || [];
   setPanelMode('new');
   autoResizeAll();
   document.getElementById('d-key-name').focus();
@@ -1688,7 +1869,6 @@ async function handleSave() {
   const keyName  = document.getElementById('d-key-name').value.trim();
   const account  = document.getElementById('d-account').value.trim();
   const url      = document.getElementById('d-url').value.trim();
-  const keyValue = document.getElementById('d-key-value').value.trim();
 
   if (!keyName)  { document.getElementById('d-key-name').focus();  showToast('Key 명칭은 필수입니다.', 'error'); return; }
   if (!account)  { document.getElementById('d-account').focus();   showToast('사용 계정은 필수입니다.', 'error'); return; }
@@ -1701,7 +1881,7 @@ async function handleSave() {
     url,
     project_name:        document.getElementById('d-project-name').value.trim()      || null,
     project_url:         document.getElementById('d-project-url').value.trim()       || null,
-    key_value:           keyValue,
+    key_values:          collectKeyValues(),
     usage_period:        document.getElementById('d-usage-period').value.trim()      || null,
     expiry_date:         document.getElementById('d-expiry-date').value              || null,
     renewal_date:        todayStr(),
