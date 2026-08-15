@@ -685,7 +685,7 @@
       <div class="form-group">
         <label class="form-label">OpenRouter API Key</label>
         <input class="form-input" id="sOrKey" type="password" placeholder="sk-or-v1-…">
-        <div class="form-hint">① 무료 AI 모델 텍스트 변환 · 요약 (1순위)</div>
+        <div class="form-hint">현재 사용되지 않음 — 요약은 hub Key 관리의 키로 자동 처리됩니다.</div>
       </div>
       <div class="form-group">
         <label class="form-label">Hugging Face Token</label>
@@ -728,6 +728,11 @@ const CFG = {
   HF:     'https://router.huggingface.co',
   GLADIA: 'https://api.gladia.io/v2',
 };
+
+// 텍스트 요약(OpenRouter/Groq/HuggingFace)은 hub 프록시가 대행 — 키는 hub의 Key 관리에
+// 저장돼 있고 브라우저로는 내려오지 않는다. 음성 인식(STT)은 오디오 바이너리를 그대로
+// 보내야 해서 범위 밖 — 위 CFG의 groq/hf/gladia 키는 STT 용도로 계속 그대로 쓰인다.
+const LLM_PROXY_URL = '/api/audio_translate/llm';
 
 /* HF 음성→텍스트 모델 (순서대로 시도) */
 const HF_WHISPER_MODELS = [
@@ -1121,21 +1126,12 @@ function orReferer() {
 }
 
 /* ─── OPENROUTER — FETCH FREE MODELS ────────────────────── */
+// 모델 목록 조회는 OpenRouter의 공개 엔드포인트라 키 없이도 호출 가능 — 요약 자체는
+// hub 프록시가 대행하므로 이 목록만 있으면 충분하다.
 async function fetchFreeModels() {
-  if (!CFG.orKey) return [];
   try {
     modelBar('무료 AI 모델 목록 가져오는 중…');
-    const r = await fetch(`${CFG.OR}/models`, {
-      headers: {
-        Authorization: `Bearer ${CFG.orKey}`,
-        'HTTP-Referer': orReferer(),
-      }
-    });
-    if (r.status === 401) {
-      toast('OpenRouter API 키 인증 실패. ⚙️ 설정에서 키를 확인해 주세요.', 'err');
-      setTimeout(openSettings, 800);
-      return [];
-    }
+    const r = await fetch(`${CFG.OR}/models`);
     if (!r.ok) return [];
     const d = await r.json();
     const free = (d.data || []).filter(m => {
@@ -1164,15 +1160,11 @@ function showModelsPanel(models) {
 async function tryBatchSum(models, text) {
   for (const m of models) {
     try {
-      const r = await fetch(`${CFG.OR}/chat/completions`, {
+      const r = await fetch(LLM_PROXY_URL, {
         method: 'POST',
-        headers: {
-          Authorization:  `Bearer ${CFG.orKey}`,
-          'Content-Type': 'application/json',
-          'HTTP-Referer': orReferer(),
-          'X-Title':      'AudioAI',
-        },
+        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
+          provider: 'openrouter',
           model: m.id,
           messages: [
             { role:'system', content:'당신은 한국어 텍스트 요약 전문가입니다. 반드시 원문보다 훨씬 짧게 핵심만 압축하여 요약문을 작성하세요. 원문을 그대로 반복하거나 타임스탬프를 포함하지 마세요.' },
@@ -1182,12 +1174,6 @@ async function tryBatchSum(models, text) {
         }),
         signal: AbortSignal.timeout(20000),
       });
-      // 401 = key invalid → stop trying OR models
-      if (r.status === 401) {
-        toast('OpenRouter API 키 인증 실패. ⚙️ 설정에서 키를 갱신해 주세요.', 'err');
-        setTimeout(openSettings, 800);
-        return 'AUTH_FAIL';
-      }
       if (r.status === 429) continue;
       if (!r.ok) continue;
       const d = await r.json();
@@ -1292,31 +1278,23 @@ async function hfWhisper(buf, fileName, fileType) {
 
 /* ─── HUGGING FACE — LLM SUMMARIZATION ──────────────────── */
 async function hfSummarize(text) {
-  if (!CFG.hfKey) return null;
   const prompt = `다음 텍스트를 한국어로 500자 이내의 간결한 요약문으로 작성해주세요. 원문을 반복하지 말고 핵심 내용만 압축하세요. 요약문만 출력하세요.\n\n${text}`;
 
   for (const model of HF_LLM_MODELS) {
     try {
       const shortName = model.split('/').pop();
       modelBar(`HuggingFace ${shortName} 요약 중…`);
-      const r = await fetch(`${CFG.HF}/v1/chat/completions`, {
+      const r = await fetch(LLM_PROXY_URL, {
         method:  'POST',
-        headers: {
-          Authorization:  `Bearer ${CFG.hfKey}`,
-          'Content-Type': 'application/json',
-        },
+        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
+          provider: 'huggingface',
           model,
           messages:   [{ role: 'user', content: prompt }],
           max_tokens: 900,
         }),
         signal: AbortSignal.timeout(30000),  // 30s
       });
-      if (r.status === 401) {
-        toast('HuggingFace 토큰 인증 실패. ⚙️ 설정에서 HF Token을 확인해 주세요.', 'err');
-        setTimeout(openSettings, 800);
-        return null;
-      }
       if (r.status === 402) {
         toast('HuggingFace 무료 크레딧 소진. Groq으로 전환합니다.', 'info');
         return null;
@@ -1428,13 +1406,11 @@ async function gladiaWhisper(buf, fileName, fileType) {
 
 /* ─── GROQ — LLM SUMMARY FALLBACK ───────────────────────── */
 async function groqSummarize(text) {
-  const r = await fetch(`${CFG.GROQ}/chat/completions`, {
+  const r = await fetch(LLM_PROXY_URL, {
     method: 'POST',
-    headers: {
-      Authorization:  `Bearer ${CFG.groqKey}`,
-      'Content-Type': 'application/json',
-    },
+    headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({
+      provider: 'groq',
       model: 'llama-3.3-70b-versatile',
       messages: [
         { role:'system', content:'당신은 한국어 텍스트 요약 전문가입니다. 원문보다 훨씬 짧게 핵심만 압축하여 요약문을 작성하세요. 타임스탬프나 원문을 그대로 반복하지 마세요.' },
@@ -1444,11 +1420,6 @@ async function groqSummarize(text) {
     }),
     signal: AbortSignal.timeout(30000),
   });
-  if (r.status === 401) {
-    toast('Groq API 키 인증 실패. ⚙️ 설정에서 키를 확인해 주세요.', 'err');
-    setTimeout(openSettings, 800);
-    return null;
-  }
   if (!r.ok) return null;
   const d = await r.json();
   const t = d.choices?.[0]?.message?.content?.trim() || '';
@@ -1463,8 +1434,10 @@ async function reqConvert(id) {
   try { await _doConvert(id); } finally { _converting.delete(id); }
 }
 async function _doConvert(id) {
-  if (!CFG.orKey && !CFG.hfKey && !CFG.groqKey) {
-    toast('API 키를 먼저 설정해 주세요. (⚙️ 우측 상단)', 'err');
+  // 요약(OpenRouter/Groq/HuggingFace)은 hub 프록시가 대행하므로 별도 키가 필요 없다 —
+  // 음성 인식(STT)에 쓰이는 키(Groq/HF/Gladia) 중 하나는 여전히 있어야 변환이 가능하다.
+  if (!CFG.groqKey && !CFG.hfKey && !CFG.gladiaKey) {
+    toast('음성 인식용 API 키를 먼저 설정해 주세요. (⚙️ 우측 상단)', 'err');
     openSettings();
     return;
   }
@@ -1486,7 +1459,6 @@ async function _doConvert(id) {
 
     let txText  = null;
     let txModel = '';
-    let orAuthFailed = false;
 
     // 2a) Groq Whisper (turbo → v3, 300s timeout)
     if (!txText && CFG.groqKey) {
@@ -1527,7 +1499,8 @@ async function _doConvert(id) {
     const cleanTx = cleanForSummary(txText);  // 타임스탬프·Caption 제거 후 요약 입력
 
     // 3a) Try OpenRouter free text models in batches of 10
-    if (CFG.orKey && freeModels.length) {
+    // (요약은 hub 프록시가 대행하므로 로컬 키 여부와 무관하게 항상 시도한다)
+    if (freeModels.length) {
       const textModels = freeModels
         .filter(m => {
           const modality = (m.architecture?.modality || '').toLowerCase();
@@ -1539,33 +1512,25 @@ async function _doConvert(id) {
         const batch = textModels.slice(i, i + 10);
         modelBar(`요약 생성 중… (모델 ${i+1}~${Math.min(i+10, textModels.length)} / ${textModels.length}개 시도)`);
         const res = await tryBatchSum(batch, cleanTx);
-        if (res === 'AUTH_FAIL') { orAuthFailed = true; break; }
         if (res) { sumText = res.text; sumModel = res.model; break; }
       }
     }
 
     // 3b) Fallback: Hugging Face LLM
-    if (!sumText && CFG.hfKey) {
+    if (!sumText) {
       const res = await hfSummarize(cleanTx);
       if (res) { sumText = res.text; sumModel = res.model; }
     }
 
     // 3c) Final fallback: Groq LLM
-    if (!sumText && CFG.groqKey) {
+    if (!sumText) {
       modelBar('Groq AI로 요약 생성 중…');
       const groqSum = await groqSummarize(cleanTx);
       if (groqSum) { sumText = groqSum; sumModel = 'groq/llama-3.3-70b'; }
     }
 
     if (!sumText) {
-      if (!orAuthFailed) {
-        const missing = [];
-        if (!CFG.hfKey)   missing.push('HuggingFace');
-        if (!CFG.groqKey) missing.push('Groq');
-        const hint = missing.length ? `(미설정: ${missing.join(', ')})` : '';
-        toast(`요약 생성 실패 ${hint}. ⚙️ 설정에서 API 키를 확인해 주세요.`, 'err');
-        setTimeout(openSettings, 800);
-      }
+      toast('요약 생성 실패. 잠시 후 다시 시도해 주세요.', 'err');
       throw new Error('요약 생성에 실패했습니다.');
     }
 
@@ -1796,9 +1761,9 @@ async function init() {
   await openDB();
   await loadRecords();
 
-  if (!CFG.orKey && !CFG.hfKey && !CFG.groqKey) {
+  if (!CFG.groqKey && !CFG.hfKey && !CFG.gladiaKey) {
     setTimeout(() => {
-      toast('API 키를 설정해 주세요. (우측 상단 ⚙️)', 'info');
+      toast('음성 인식용 API 키를 설정해 주세요. (우측 상단 ⚙️)', 'info');
       openSettings();
     }, 600);
   }
