@@ -19,24 +19,26 @@
     }
 
     :root {
-      --mint:           #6dd5c2;
-      --mint-light:     #e8faf7;
-      --mint-mid:       #b2ece3;
-      --lavender:       #b8a9e8;
-      --lavender-light: #f0eeff;
-      --lavender-mid:   #d6cff5;
-      --blue-soft:      #7ab8f5;
-      --blue-btn:       #5ba4e8;
-      --green-btn:      #5cc8a0;
-      --coral-btn:      #f07a7a;
-      --text-main:      #3a3a5c;
-      --text-sub:       #7a7a9a;
-      --text-light:     #b0b0cc;
-      --bg-page:        #f6f4ff;
+      /* career/hub과 동일한 뉴트럴 팔레트로 교체(2026-08-15) — 변수명은 유지하되
+         파스텔 민트/라벤더 대신 뉴트럴 그레이 + 표준 blue/green/red 포인트만 사용 */
+      --mint:           #737373;
+      --mint-light:     #fafafa;
+      --mint-mid:       #d4d4d4;
+      --lavender:       #6b7280;
+      --lavender-light: #f5f5f5;
+      --lavender-mid:   #e5e7eb;
+      --blue-soft:      #2563eb;
+      --blue-btn:       #2563eb;
+      --green-btn:      #16a34a;
+      --coral-btn:      #dc2626;
+      --text-main:      #171717;
+      --text-sub:       #6b7280;
+      --text-light:     #9ca3af;
+      --bg-page:        #fafafa;
       --bg-card:        #ffffff;
-      --border:         #e2dff5;
-      --shadow-sm:      0 2px 8px rgba(120,100,200,0.08);
-      --shadow-md:      0 4px 20px rgba(120,100,200,0.15);
+      --border:         #e5e7eb;
+      --shadow-sm:      0 1px 3px rgba(0,0,0,0.06);
+      --shadow-md:      0 4px 16px rgba(0,0,0,0.10);
       --radius-sm:      8px;
       --radius-md:      14px;
       --radius-lg:      20px;
@@ -46,7 +48,7 @@
     html, body {
       height: 100%;
       font-family: 'Noto Sans KR', system-ui, -apple-system, sans-serif;
-      background: var(--bg-page);
+      background: linear-gradient(135deg, #f5f5f5, #ffffff 50%, #f5f5f5);
       color: var(--text-main);
       font-size: 14px;
       line-height: 1.6;
@@ -63,44 +65,121 @@
     }
 
     /* ===================================================
+       App Header (career NavBar와 동일 패턴)
+    =================================================== */
+    .app-header {
+      display: flex;
+      align-items: center;
+      height: 56px;
+      background: rgba(255,255,255,0.6);
+      backdrop-filter: blur(20px);
+      -webkit-backdrop-filter: blur(20px);
+      border-bottom: 1px solid rgba(255,255,255,0.5);
+      box-shadow: 0 1px 20px rgba(0,0,0,0.08);
+      flex-shrink: 0;
+      position: sticky;
+      top: 0;
+      z-index: 20;
+    }
+
+    .app-logo {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      height: 100%;
+      padding: 0 16px;
+      border-right: 1px solid rgba(255,255,255,0.5);
+      text-decoration: none;
+    }
+
+    .app-logo-icon {
+      width: 32px;
+      height: 32px;
+      border-radius: 8px;
+      flex-shrink: 0;
+      background: linear-gradient(135deg, #171717, #262626);
+      color: #fff;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+
+    .app-title {
+      font-size: 15px;
+      font-weight: 900;
+      letter-spacing: -0.03em;
+      color: var(--text-main);
+    }
+
+    .app-header-spacer { flex: 1; }
+
+    .app-header-actions {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      padding: 0 16px;
+    }
+
+    .app-user-email {
+      font-size: 12px;
+      color: var(--text-sub);
+    }
+
+    .btn-header-link {
+      display: inline-block;
+      font-size: 12px;
+      font-family: inherit;
+      color: #4b5563;
+      background: #fff;
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 6px 12px;
+      text-decoration: none;
+      cursor: pointer;
+      transition: all var(--transition);
+    }
+
+    .btn-header-link:hover {
+      border-color: #a3a3a3;
+      color: var(--text-main);
+      background: #f5f5f5;
+    }
+
+    /* ===================================================
        Tab Bar
     =================================================== */
     .tab-bar {
       display: flex;
-      align-items: flex-end;
+      align-items: center;
       gap: 4px;
-      padding: 16px 24px 0;
-      background: linear-gradient(135deg, #ede9ff 0%, #e4f9f6 100%);
-      border-bottom: 2px solid var(--border);
+      padding: 8px 20px;
+      background: transparent;
+      border-bottom: 1px solid var(--border);
       flex-shrink: 0;
     }
 
     .tab-bar-spacer { flex: 1; }
 
     .tab-btn {
-      padding: 10px 28px;
-      border: 2px solid transparent;
-      border-bottom: none;
-      border-radius: var(--radius-sm) var(--radius-sm) 0 0;
-      background: rgba(255,255,255,0.5);
+      padding: 8px 16px;
+      border: none;
+      border-radius: 8px;
+      background: transparent;
       color: var(--text-sub);
       font-size: 14px;
-      font-weight: 500;
+      font-weight: 800;
+      letter-spacing: -0.01em;
       font-family: inherit;
       cursor: pointer;
       transition: all var(--transition);
-      position: relative;
-      bottom: -2px;
     }
 
-    .tab-btn:hover { background: rgba(255,255,255,0.8); color: var(--text-main); }
+    .tab-btn:hover { background: #f5f5f5; color: var(--text-main); }
 
     .tab-btn.active {
-      background: var(--bg-card);
+      background: linear-gradient(to right, rgba(23,23,23,0.08), rgba(38,38,38,0.08));
       color: var(--text-main);
-      font-weight: 700;
-      border-color: var(--border);
-      border-bottom-color: var(--bg-card);
+      font-weight: 800;
     }
 
     /* ===================================================
@@ -200,7 +279,7 @@
       flex: 1;
       min-width: 0;
       padding: 6px 28px 6px 10px;
-      background: #fff url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23b8a9e8' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpolyline points='6 9 12 15 18 9'%3E%3C/polyline%3E%3C/svg%3E") no-repeat right 8px center / 13px;
+      background: #fff url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%236b7280' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpolyline points='6 9 12 15 18 9'%3E%3C/polyline%3E%3C/svg%3E") no-repeat right 8px center / 13px;
       border: 1.5px solid var(--border);
       border-radius: var(--radius-sm);
       font-size: 12.5px;
@@ -211,7 +290,7 @@
       transition: border-color var(--transition);
     }
 
-    .filter-select:focus { border-color: var(--mint); box-shadow: 0 0 0 3px rgba(109,213,194,0.18); }
+    .filter-select:focus { border-color: var(--mint); box-shadow: 0 0 0 3px rgba(115,115,115,0.18); }
 
     /* ===================================================
        Key List Table
@@ -246,7 +325,7 @@
       cursor: pointer;
     }
 
-    .key-list-table tbody tr:nth-child(even) { background: #fbfaff; }
+    .key-list-table tbody tr:nth-child(even) { background: #fafafa; }
     .key-list-table tbody tr:last-child { border-bottom: none; }
     .key-list-table tbody tr:hover { background: var(--mint-light); }
 
@@ -435,7 +514,7 @@
     select.detail-input:not(:disabled) {
       cursor: pointer;
       border-color: var(--lavender-mid);
-      background: #fff url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23b8a9e8' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpolyline points='6 9 12 15 18 9'%3E%3C/polyline%3E%3C/svg%3E") no-repeat right 10px center / 14px;
+      background: #fff url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%236b7280' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpolyline points='6 9 12 15 18 9'%3E%3C/polyline%3E%3C/svg%3E") no-repeat right 10px center / 14px;
     }
 
     select.detail-input:disabled {
@@ -464,7 +543,7 @@
       transition: border-color var(--transition), background var(--transition), box-shadow var(--transition);
     }
 
-    /* readonly: 흰색 배경 + 연한 라벤더 테두리로 패널 배경(#f6f4ff)과 명확히 구분 */
+    /* readonly: 흰색 배경 + 연한 회색 테두리로 패널 배경과 명확히 구분 */
     .detail-input[readonly] {
       background: #ffffff;
       border-color: var(--lavender-mid);
@@ -474,7 +553,7 @@
 
     .detail-input[readonly]:hover {
       border-color: var(--lavender);
-      box-shadow: 0 1px 4px rgba(184,169,232,0.18);
+      box-shadow: 0 1px 4px rgba(0,0,0,0.06);
     }
 
     .detail-input:not([readonly]) {
@@ -485,7 +564,7 @@
 
     .detail-input:not([readonly]):focus {
       border-color: var(--mint);
-      box-shadow: 0 0 0 3px rgba(109,213,194,0.18);
+      box-shadow: 0 0 0 3px rgba(115,115,115,0.18);
     }
 
     .detail-input-url[readonly] {
@@ -524,7 +603,7 @@
 
     .detail-input-rich[contenteditable="true"]:focus {
       border-color: var(--mint);
-      box-shadow: 0 0 0 3px rgba(109,213,194,0.18);
+      box-shadow: 0 0 0 3px rgba(115,115,115,0.18);
       outline: none;
     }
 
@@ -559,7 +638,7 @@
     }
 
     .detail-input-key:not([readonly]) {
-      background: #f0fff9;
+      background: #ffffff;
       border-color: var(--mint);
     }
 
@@ -571,8 +650,8 @@
       align-items: center;
       gap: 6px;
       padding: 8px 18px;
-      border: none;
-      border-radius: 50px;
+      border: 1.5px solid transparent;
+      border-radius: 8px;
       font-family: inherit;
       font-size: 13px;
       font-weight: 600;
@@ -581,7 +660,7 @@
     }
 
     .btn:focus-visible {
-      outline: 3px solid var(--lavender);
+      outline: 2px solid var(--lavender);
       outline-offset: 2px;
     }
 
@@ -594,69 +673,72 @@
     .btn-sm { padding: 6px 14px; font-size: 12px; }
 
     .btn-primary {
-      background: linear-gradient(135deg, var(--blue-btn), var(--mint));
+      background: #171717;
       color: #fff;
-      box-shadow: 0 2px 10px rgba(91,164,232,0.3);
+      border-color: #171717;
     }
 
     .btn-primary:hover:not(:disabled) {
-      transform: translateY(-1px);
-      box-shadow: 0 4px 14px rgba(91,164,232,0.4);
+      background: #262626;
+      border-color: #262626;
     }
 
     .btn-edit {
-      background: #e8f9f3;
-      color: var(--green-btn);
-      border: 1.5px solid #b8edd9;
+      background: #fff;
+      color: #4b5563;
+      border-color: var(--border);
     }
 
     .btn-edit:hover:not(:disabled) {
-      background: var(--green-btn);
-      color: #fff;
+      border-color: #a3a3a3;
+      color: var(--text-main);
+      background: #f5f5f5;
     }
 
     .btn-delete {
-      background: #fde8e8;
-      color: var(--coral-btn);
-      border: 1.5px solid #f5c8c8;
+      background: #fff;
+      color: #4b5563;
+      border-color: var(--border);
     }
 
     .btn-delete:hover:not(:disabled) {
-      background: var(--coral-btn);
-      color: #fff;
+      border-color: #f87171;
+      color: #ef4444;
+      background: #fef2f2;
     }
 
     .btn-cancel {
-      background: #f0eeff;
+      background: #fff;
       color: var(--text-sub);
-      border: 1.5px solid var(--lavender-mid);
+      border-color: var(--border);
     }
 
     .btn-cancel:hover:not(:disabled) {
-      background: var(--lavender-mid);
+      border-color: #a3a3a3;
       color: var(--text-main);
+      background: #f5f5f5;
     }
 
     .btn-save {
-      background: linear-gradient(135deg, var(--blue-btn), var(--mint));
+      background: #171717;
       color: #fff;
-      box-shadow: 0 2px 10px rgba(91,164,232,0.3);
+      border-color: #171717;
     }
 
     .btn-save:hover:not(:disabled) {
-      transform: translateY(-1px);
-      box-shadow: 0 4px 14px rgba(91,164,232,0.4);
+      background: #262626;
+      border-color: #262626;
     }
 
     .btn-danger {
-      background: linear-gradient(135deg, #f07a7a, #e05555);
+      background: #dc2626;
       color: #fff;
-      box-shadow: 0 2px 10px rgba(240,122,122,0.35);
+      border-color: #dc2626;
     }
 
     .btn-danger:hover:not(:disabled) {
-      transform: translateY(-1px);
-      box-shadow: 0 4px 14px rgba(240,122,122,0.45);
+      background: #b91c1c;
+      border-color: #b91c1c;
     }
 
     /* ===================================================
@@ -691,7 +773,7 @@
       display: none;
       position: fixed;
       inset: 0;
-      background: rgba(60,50,110,0.4);
+      background: rgba(0,0,0,0.4);
       backdrop-filter: blur(2px);
       z-index: 1100;
       align-items: center;
@@ -749,7 +831,7 @@
       display: none;
       position: fixed;
       inset: 0;
-      background: rgba(60,50,110,0.4);
+      background: rgba(0,0,0,0.4);
       backdrop-filter: blur(2px);
       z-index: 1200;
       align-items: center;
@@ -798,7 +880,7 @@
       outline: none;
       color: var(--text-main);
     }
-    .key-select-search:focus { border-color: var(--mint); box-shadow: 0 0 0 3px rgba(109,213,194,0.18); }
+    .key-select-search:focus { border-color: var(--mint); box-shadow: 0 0 0 3px rgba(115,115,115,0.18); }
 
     .key-select-list { flex: 1; overflow-y: auto; padding: 4px 8px 8px; }
 
@@ -852,6 +934,22 @@
 
 <body>
 <div id="app" role="application" style="display:flex; flex-direction:column">
+
+  <!-- App Header -->
+  <header class="app-header">
+    <a href="/dashboard" class="app-logo">
+      <span class="app-logo-icon" aria-hidden="true">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 2l-2 2m-7.61 7.61a5.5 5.5 0 11-7.778 7.778 5.5 5.5 0 017.777-7.777zm0 0L15.5 7.5m0 0l3 3L22 7l-3-3m-3.5 3.5L19 4"/></svg>
+      </span>
+      <span class="app-title">토큰 관리</span>
+    </a>
+    <div class="app-header-spacer"></div>
+    <div class="app-header-actions">
+      <a href="/admin" class="btn-header-link" id="admin-link" style="display:none">Admin</a>
+      <span class="app-user-email" id="user-email"></span>
+      <button type="button" class="btn-header-link" id="btn-logout">로그아웃</button>
+    </div>
+  </header>
 
   <!-- Tab Bar -->
   <nav class="tab-bar" role="tablist" aria-label="메인 탭">
@@ -1156,6 +1254,48 @@ let sbClient;
 window.addEventListener('sb-client-ready', (e) => {
   sbClient = e.detail;
   if (typeof loadTokens === 'function') loadTokens();
+  initHeader();
+});
+
+// --------------------------------------------------
+// App Header — 로그인 이메일 표시 / Admin 링크 / 로그아웃
+// (career의 NavBar와 동일한 패턴 — hub SSO 세션을 그대로 재사용)
+// --------------------------------------------------
+const SUPER_ADMIN_EMAIL = 'peter.bae0311@gmail.com';
+
+function decodeSessionId(accessToken) {
+  try {
+    const payload = accessToken.split('.')[1];
+    if (!payload) return null;
+    const base64 = payload.replace(/-/g, '+').replace(/_/g, '/');
+    const claims = JSON.parse(atob(base64));
+    return claims.session_id || null;
+  } catch {
+    return null;
+  }
+}
+
+async function initHeader() {
+  const { data: { user } } = await sbClient.auth.getUser();
+  const email = user?.email || '';
+  document.getElementById('user-email').textContent = email;
+  if (email === SUPER_ADMIN_EMAIL) {
+    document.getElementById('admin-link').style.display = '';
+  }
+}
+
+document.getElementById('btn-logout').addEventListener('click', async () => {
+  const { data: { session } } = await sbClient.auth.getSession();
+  const sessionId = session ? decodeSessionId(session.access_token) : null;
+  if (sessionId) {
+    await fetch('/api/auth/logout-event', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ sessionId }),
+    }).catch(() => {});
+  }
+  await sbClient.auth.signOut();
+  window.location.href = '/login';
 });
 
 // --------------------------------------------------
@@ -1165,6 +1305,7 @@ let panelMode          = 'empty';   // 'empty' | 'view' | 'new' | 'edit'
 let selectedRowId      = null;
 let currentDetailRecord = null;
 let tokensCache        = [];
+let initialLoadApplied = false;     // 화면 최초 로드 시 기본값 적용은 1회만
 let pendingDeleteId    = null;
 
 // Detail field IDs → DB column names
@@ -1300,6 +1441,8 @@ async function loadTokens() {
   data.sort((a, b) => {
     const ac = (a.account  || '').localeCompare(b.account  || '', 'ko');
     if (ac !== 0) return ac;
+    const tc = (a.key_type || '').localeCompare(b.key_type || '', 'ko');
+    if (tc !== 0) return tc;
     return (a.key_name || '').localeCompare(b.key_name || '', 'ko');
   });
 
@@ -1312,6 +1455,24 @@ async function loadTokens() {
   }
 
   populateAccountFilterOptions();
+
+  // 화면 최초 로드 시 기본값: 계정 = peter.bae0311@gmail.com(목록에 있을 때만),
+  // KEY 유형은 이미 기본이 "전체". 이후 저장/삭제로 인한 재조회에서는 건드리지 않음.
+  if (!isEditing && !initialLoadApplied) {
+    initialLoadApplied = true;
+    const hasSuperAdminAccount = Array.from(filterAccountEl.options).some(o => o.value === SUPER_ADMIN_EMAIL);
+    if (hasSuperAdminAccount) filterAccountEl.value = SUPER_ADMIN_EMAIL;
+    applyFilters();
+    const firstRow = getFilteredTokens()[0];
+    if (firstRow) {
+      selectedRowId = firstRow.id;
+      showDetail(firstRow);
+      const rowEl = keyListTbody.querySelector(`tr[data-id="${firstRow.id}"]`);
+      if (rowEl) rowEl.classList.add('selected');
+    }
+    return;
+  }
+
   applyFilters();
 }
 
