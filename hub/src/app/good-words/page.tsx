@@ -158,8 +158,8 @@ export default function GoodWordsPage() {
   }
 
   return (
-    <div className="min-h-screen px-4 py-10">
-      <div className="max-w-[1400px] mx-auto space-y-6">
+    <div className="min-h-screen px-6 py-8">
+      <div className="w-full space-y-6">
         <div className="flex items-center justify-between">
           <h1 className="text-2xl font-black tracking-tighter text-neutral-900">좋은글</h1>
           <a
@@ -171,8 +171,8 @@ export default function GoodWordsPage() {
         </div>
 
         <div className="flex flex-col lg:flex-row gap-6">
-          {/* 좌측 40%: 카테고리 선택 + 생성/슬라이드쇼 컨트롤 */}
-          <div className="lg:w-[40%] shrink-0 space-y-4">
+          {/* 좌측 30%: 카테고리 선택 + 생성/슬라이드쇼 컨트롤 */}
+          <div className="lg:w-[30%] shrink-0 space-y-4">
             <div className="rounded-2xl border border-white/60 bg-white/70 backdrop-blur-xl shadow-glass p-5">
               <h2 className="text-sm font-bold text-neutral-900 mb-3">카테고리</h2>
               <div className="grid grid-cols-2 gap-2">
@@ -240,7 +240,7 @@ export default function GoodWordsPage() {
             </div>
           </div>
 
-          {/* 우측 60%: 생성 결과 또는 보관함 */}
+          {/* 우측 70%: 생성 결과 또는 보관함 */}
           <div className="flex-1 rounded-2xl border border-white/60 bg-white/70 backdrop-blur-xl shadow-glass p-5 min-h-[400px]">
             {rightView === 'generate' ? (
               <div className="space-y-3">
