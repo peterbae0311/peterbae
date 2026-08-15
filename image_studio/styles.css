@@ -4,57 +4,60 @@
    ============================================================ */
 
 /* ── 1. CSS 변수 (컬러 팔레트 & 디자인 토큰) ──────────────── */
+/* career/hub과 동일한 뉴트럴 팔레트로 교체(2026-08-15) — 파스텔 그라디언트
+   컨셉 대신 뉴트럴 그레이 + 버튼은 neutral-900 단색, 상태 배지만 표준
+   green/red/blue 유지 */
 :root {
-  /* 그라디언트 팔레트 */
-  --grad-header-from: #667eea;
-  --grad-header-to:   #764ba2;
-  --grad-title-from:  #f8f9ff;
-  --grad-title-to:    #e0e7ff;
+  /* (호환용) 그라디언트 변수 — 버튼/헤더에서 더는 참조하지 않지만 다른 곳에서
+     var(--grad-*)를 계속 쓰는 곳이 있어 뉴트럴 값으로만 대체 */
+  --grad-header-from: #171717;
+  --grad-header-to:   #262626;
+  --grad-title-from:  #171717;
+  --grad-title-to:    #171717;
 
-  --grad-blue-from:   #4f8ef7;
-  --grad-blue-to:     #7c3aed;
-  --grad-purple-from: #9333ea;
-  --grad-purple-to:   #db2777;
-  --grad-green-from:  #10b981;
-  --grad-green-to:    #059669;
+  --grad-blue-from:   #171717;
+  --grad-blue-to:     #262626;
+  --grad-purple-from: #171717;
+  --grad-purple-to:   #262626;
+  --grad-green-from:  #171717;
+  --grad-green-to:    #262626;
 
-  /* 파스텔 배경 */
-  --bg-body:          #f0f4ff;
+  /* 배경 */
+  --bg-body:          #fafafa;
   --bg-panel:         #ffffff;
-  --bg-field:         #f8f9ff;
-  --bg-drop:          #f3f0ff;
+  --bg-field:         #fafafa;
+  --bg-drop:          #fafafa;
   --bg-model-info:    #eff6ff;
-  --bg-error:         #fff1f2;
-  --bg-notes:         #f5f3ff;
-  --bg-prompt:        #faf5ff;
+  --bg-error:         #fef2f2;
+  --bg-notes:         #fafafa;
+  --bg-prompt:        #fafafa;
 
   /* 테두리 */
-  --border-default:   #e2e8f0;
-  --border-focus:     #7c3aed;
-  --border-drop:      #c4b5fd;
-  --border-drop-over: #7c3aed;
-  --border-error:     #fda4af;
+  --border-default:   #e5e7eb;
+  --border-focus:     #737373;
+  --border-drop:      #d4d4d4;
+  --border-drop-over: #737373;
+  --border-error:     #fca5a5;
 
   /* 텍스트 */
-  --text-primary:     #1e1b4b;
+  --text-primary:     #171717;
   --text-secondary:   #6b7280;
   --text-muted:       #9ca3af;
   --text-label:       #374151;
-  --text-error:       #be123c;
-  --text-model:       #5b21b6;
+  --text-error:       #dc2626;
+  --text-model:       #171717;
   --text-blue:        #1d4ed8;
-  --text-green:       #065f46;
+  --text-green:       #16a34a;
 
   /* 레이아웃 */
-  --header-height:    76px;
+  --header-height:    56px;
   --panel-gap:        16px;
   --panel-padding:    32px;
-  --radius-card:      20px;
-  --radius-btn:       12px;
-  --radius-field:     10px;
-  --shadow-card:      0 4px 24px rgba(102, 126, 234, 0.10),
-                      0 1px 4px  rgba(0, 0, 0, 0.06);
-  --shadow-btn:       0 4px 12px rgba(0,0,0,0.15);
+  --radius-card:      16px;
+  --radius-btn:       8px;
+  --radius-field:     8px;
+  --shadow-card:      0 1px 3px rgba(0, 0, 0, 0.06);
+  --shadow-btn:       none;
 
   /* 트랜지션 */
   --transition-fast:  150ms ease;
@@ -78,50 +81,94 @@ html {
 body {
   font-family: 'Pretendard', 'Apple SD Gothic Neo', 'Noto Sans KR', 'Segoe UI',
                system-ui, sans-serif;
-  background: var(--bg-body);
-  background-image:
-    radial-gradient(ellipse at 20% 10%, rgba(167, 139, 250, 0.15) 0%, transparent 50%),
-    radial-gradient(ellipse at 80% 90%, rgba(79, 142, 247, 0.12) 0%, transparent 50%);
-  background-attachment: fixed;
+  background: linear-gradient(135deg, #f5f5f5, #ffffff 50%, #f5f5f5);
   color: var(--text-primary);
   min-height: 100vh;
   display: flex;
   flex-direction: column;
 }
 
-/* ── 3. 헤더 ───────────────────────────────────────────────── */
+/* ── 3. 헤더 (career NavBar와 동일 패턴) ───────────────────── */
 .app-header {
-  background: linear-gradient(135deg, var(--grad-header-from) 0%, var(--grad-header-to) 100%);
-  padding: 18px 32px;
+  display: flex;
+  align-items: center;
+  height: var(--header-height);
+  padding: 0;
+  background: rgba(255, 255, 255, 0.6);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.5);
+  box-shadow: 0 1px 20px rgba(0, 0, 0, 0.08);
   position: sticky;
   top: 0;
   z-index: 100;
-  box-shadow: 0 4px 20px rgba(102, 126, 234, 0.35);
 }
 
 .header-inner {
   display: flex;
-  flex-direction: column;
-  gap: 2px;
+  align-items: center;
+  gap: 10px;
+  height: 100%;
+  padding: 0 20px;
+  border-right: 1px solid rgba(255, 255, 255, 0.5);
 }
 
-/* 그라디언트 텍스트 타이틀 */
+.app-logo-icon {
+  width: 32px;
+  height: 32px;
+  border-radius: 8px;
+  flex-shrink: 0;
+  background: linear-gradient(135deg, #171717, #262626);
+  color: #fff;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 1rem;
+}
+
 .app-title {
-  font-size: 1.75rem;
-  font-weight: 800;
+  font-size: 1.05rem;
+  font-weight: 900;
   letter-spacing: -0.03em;
-  background: linear-gradient(90deg, var(--grad-title-from) 0%, var(--grad-title-to) 100%);
-  -webkit-background-clip: text;
-  -webkit-text-fill-color: transparent;
-  background-clip: text;
+  color: var(--text-primary);
   line-height: 1.2;
+  white-space: nowrap;
 }
 
-.app-subtitle {
-  font-size: 0.825rem;
-  color: rgba(255, 255, 255, 0.75);
-  font-weight: 400;
-  letter-spacing: 0.01em;
+.app-subtitle { display: none; }
+
+.app-header-spacer { flex: 1; }
+
+.app-header-actions {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 0 20px;
+}
+
+.app-user-email {
+  font-size: 0.75rem;
+  color: var(--text-secondary);
+}
+
+.btn-header-link {
+  display: inline-block;
+  font-size: 0.75rem;
+  font-family: inherit;
+  color: #4b5563;
+  background: #fff;
+  border: 1px solid var(--border-default);
+  border-radius: 8px;
+  padding: 6px 12px;
+  text-decoration: none;
+  cursor: pointer;
+  transition: all var(--transition-fast);
+}
+
+.btn-header-link:hover {
+  border-color: #a3a3a3;
+  color: var(--text-primary);
+  background: #f5f5f5;
 }
 
 /* ── 4. 메인 레이아웃 (40:60 분할) ────────────────────────── */
@@ -144,9 +191,7 @@ body {
   display: flex;
   flex-direction: column;
   gap: 0;
-  border: 1px solid rgba(255, 255, 255, 0.8);
-  backdrop-filter: blur(8px);
-  -webkit-backdrop-filter: blur(8px);
+  border: 1px solid var(--border-default);
 }
 
 /* 왼쪽 패널: 콘텐츠가 넘칠 때 내부 스크롤 */
@@ -230,7 +275,7 @@ body {
 .field-textarea:focus {
   outline: none;
   border-color: var(--border-focus);
-  box-shadow: 0 0 0 3px rgba(124, 58, 237, 0.12);
+  box-shadow: 0 0 0 3px rgba(115, 115, 115, 0.12);
   background: #ffffff;
 }
 
@@ -254,7 +299,7 @@ body {
 .field-input:focus {
   outline: none;
   border-color: var(--border-focus);
-  box-shadow: 0 0 0 3px rgba(124, 58, 237, 0.12);
+  box-shadow: 0 0 0 3px rgba(115, 115, 115, 0.12);
   background: #ffffff;
 }
 
@@ -310,7 +355,7 @@ body {
 .field-select:focus {
   outline: none;
   border-color: var(--border-focus);
-  box-shadow: 0 0 0 3px rgba(124, 58, 237, 0.12);
+  box-shadow: 0 0 0 3px rgba(115, 115, 115, 0.12);
 }
 
 /* 옵션 행 (비율 + 규격 나란히) */
@@ -372,30 +417,33 @@ body {
 }
 
 .btn:focus-visible {
-  outline: 3px solid rgba(124, 58, 237, 0.5);
+  outline: 3px solid rgba(115, 115, 115, 0.5);
   outline-offset: 3px;
 }
 
 /* Primary Blue (이미지 생성) */
 .btn-blue {
-  background: linear-gradient(135deg, var(--grad-blue-from), var(--grad-blue-to));
+  background: #171717;
   color: #ffffff;
-  box-shadow: 0 2px 10px rgba(79, 142, 247, 0.35);
 }
 
-/* Primary Purple (이미지 보정) */
+.btn-blue:hover:not(:disabled) { background: #262626; }
+
+/* Primary Purple (이미지 보정) — career와 동일하게 단색 neutral-900으로 통일 */
 .btn-purple {
-  background: linear-gradient(135deg, var(--grad-purple-from), var(--grad-purple-to));
+  background: #171717;
   color: #ffffff;
-  box-shadow: 0 2px 10px rgba(147, 51, 234, 0.35);
 }
 
-/* Secondary Green (다운로드) */
+.btn-purple:hover:not(:disabled) { background: #262626; }
+
+/* Secondary Green (다운로드) — career와 동일하게 단색 neutral-900으로 통일 */
 .btn-green {
-  background: linear-gradient(135deg, var(--grad-green-from), var(--grad-green-to));
+  background: #171717;
   color: #ffffff;
-  box-shadow: 0 2px 10px rgba(16, 185, 129, 0.30);
 }
+
+.btn-green:hover:not(:disabled) { background: #262626; }
 
 /* Disabled 상태 */
 .btn:disabled,
@@ -442,9 +490,9 @@ body {
   justify-content: center;  /* 세로 중앙 정렬 */
   gap: 16px;
   padding: 20px;
-  background: linear-gradient(135deg, #f8f5ff, #eff6ff);
+  background: #fafafa;
   border-radius: 14px;
-  border: 1.5px dashed #c4b5fd;
+  border: 1.5px dashed #d4d4d4;
   flex: 1;      /* result-area 남은 공간 채움 */
   min-height: 0;
 }
@@ -452,7 +500,7 @@ body {
 .spinner {
   width: 44px;
   height: 44px;
-  border: 4px solid rgba(124, 58, 237, 0.15);
+  border: 4px solid rgba(115, 115, 115, 0.15);
   border-top-color: var(--grad-purple-from);
   border-radius: 50%;
   animation: spin 0.85s linear infinite;
@@ -502,8 +550,8 @@ body {
 .image-container {
   border-radius: 14px;
   overflow: hidden;
-  box-shadow: 0 6px 28px rgba(102, 126, 234, 0.22),
-              0 2px 8px rgba(0,0,0,0.10);
+  border: 1px solid var(--border-default);
+  box-shadow: var(--shadow-card);
 }
 
 .result-image {
@@ -528,13 +576,13 @@ body {
 .prompt-display {
   background: var(--bg-prompt);
   padding: 8px 12px;
-  border-top: 1px solid #e9d5ff;
+  border-top: 1px solid #e5e7eb;
 }
 
 .prompt-label {
   font-size: 0.75rem;
   font-weight: 700;
-  color: #7c3aed;
+  color: #6b7280;
   text-transform: uppercase;
   letter-spacing: 0.06em;
   margin-bottom: 4px;
@@ -551,7 +599,7 @@ body {
 .correction-notes {
   background: var(--bg-notes);
   padding: 8px 12px;
-  border-top: 1px solid #ddd6fe;
+  border-top: 1px solid #e5e7eb;
 }
 
 .notes-label {
@@ -588,20 +636,20 @@ body {
 .drop-zone:hover,
 .drop-zone:focus-within {
   border-color: var(--border-drop-over);
-  background: #ede9fe;
+  background: #f5f5f5;
   transform: scale(1.005);
 }
 
 .drop-zone.drag-over {
   border-color: var(--border-drop-over);
-  background: #ddd6fe;
+  background: #e5e7eb;
   border-style: solid;
   transform: scale(1.01);
-  box-shadow: 0 0 0 4px rgba(124, 58, 237, 0.15);
+  box-shadow: 0 0 0 4px rgba(115, 115, 115, 0.15);
 }
 
 .drop-zone:focus-visible {
-  outline: 3px solid rgba(124, 58, 237, 0.5);
+  outline: 3px solid rgba(115, 115, 115, 0.5);
   outline-offset: 3px;
 }
 
@@ -618,7 +666,7 @@ body {
 .drop-primary {
   font-size: 0.9rem;
   font-weight: 600;
-  color: #5b21b6;
+  color: #374151;
 }
 
 .drop-secondary {
@@ -733,7 +781,7 @@ body {
 .tab-btn.tab-active {
   background: #ffffff;
   color: var(--text-primary);
-  box-shadow: 0 2px 8px rgba(102, 126, 234, 0.18), 0 1px 3px rgba(0,0,0,0.08);
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.10);
 }
 
 .tab-icon {
@@ -741,7 +789,7 @@ body {
 }
 
 .tab-btn:focus-visible {
-  outline: 3px solid rgba(124, 58, 237, 0.5);
+  outline: 3px solid rgba(115, 115, 115, 0.5);
   outline-offset: 2px;
 }
 
@@ -757,12 +805,13 @@ body {
 
 /* ── 13-B. 저장/수정 버튼 ────────────────────────────────────── */
 
-/* 저장 버튼 (Teal) */
+/* 저장 버튼 — career와 동일하게 단색 neutral-900으로 통일 */
 .btn-teal {
-  background: linear-gradient(135deg, #0ea5e9, #0284c7);
+  background: #171717;
   color: #ffffff;
-  box-shadow: 0 2px 10px rgba(14, 165, 233, 0.30);
 }
+
+.btn-teal:hover:not(:disabled) { background: #262626; }
 
 /* 수정 버튼 (Outlined) */
 .btn-outline-edit {
@@ -795,9 +844,9 @@ body {
 }
 
 .save-status-error {
-  background: #fff1f2;
-  color: #be123c;
-  border: 1px solid #fda4af;
+  background: #fef2f2;
+  color: #dc2626;
+  border: 1px solid #fca5a5;
 }
 
 .save-status-info {
@@ -911,14 +960,14 @@ body {
 
 /* ── 14. 포커스 가시성 (접근성) ─────────────────────────────── */
 :focus-visible {
-  outline: 3px solid rgba(124, 58, 237, 0.55);
+  outline: 3px solid rgba(115, 115, 115, 0.55);
   outline-offset: 3px;
 }
 
 /* ── 15. 키워드 자동 생성 섹션 ──────────────────────────────── */
 .keyword-section {
-  background: linear-gradient(135deg, #fdf4ff, #eff6ff);
-  border: 1.5px solid #e9d5ff;
+  background: linear-gradient(135deg, #fafafa, #eff6ff);
+  border: 1.5px solid #e5e7eb;
   border-radius: 14px;
   padding: 12px 14px;
   margin-bottom: 4px;
@@ -938,7 +987,7 @@ body {
 .keyword-title {
   font-size: 0.8rem;
   font-weight: 700;
-  color: #6d28d9;
+  color: #171717;
   letter-spacing: -0.01em;
 }
 
@@ -953,23 +1002,24 @@ body {
   flex: 1;
   padding-right: 14px !important;
   background: #ffffff !important;
-  border-color: #ddd6fe !important;
+  border-color: #e5e7eb !important;
   font-size: 0.875rem;
 }
 
 .keyword-input:focus {
-  border-color: #7c3aed !important;
+  border-color: #6b7280 !important;
 }
 
-/* 자동 생성 버튼 (Amber) */
+/* 자동 생성 버튼 — career와 동일하게 단색 neutral-900으로 통일 */
 .btn-keyword {
-  background: linear-gradient(135deg, #f59e0b, #d97706);
+  background: #171717;
   color: #ffffff;
-  box-shadow: 0 2px 10px rgba(245, 158, 11, 0.30);
   flex-shrink: 0;
   padding: 9px 16px;
   font-size: 0.85rem;
 }
+
+.btn-keyword:hover:not(:disabled) { background: #262626; }
 
 /* 자동 생성 상태 메시지 */
 .autofill-status {
@@ -993,14 +1043,14 @@ body {
 }
 
 .autofill-status-error {
-  background: #fff1f2;
-  color: #be123c;
-  border: 1px solid #fda4af;
+  background: #fef2f2;
+  color: #dc2626;
+  border: 1px solid #fca5a5;
 }
 
 /* 섹션 구분선 */
 .keyword-divider {
   height: 1px;
-  background: linear-gradient(90deg, transparent, #e9d5ff 30%, #e9d5ff 70%, transparent);
+  background: linear-gradient(90deg, transparent, #e5e7eb 30%, #e5e7eb 70%, transparent);
   margin: 6px 0 10px;
 }
