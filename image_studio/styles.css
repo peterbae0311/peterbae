@@ -966,7 +966,7 @@ body {
 
 /* ── 15. 키워드 자동 생성 섹션 ──────────────────────────────── */
 .keyword-section {
-  background: linear-gradient(135deg, #fafafa, #eff6ff);
+  background: #fafafa;
   border: 1.5px solid #e5e7eb;
   border-radius: 14px;
   padding: 12px 14px;
