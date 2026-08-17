@@ -598,7 +598,7 @@ function CategoryModal({
               value={prompt}
               onChange={(e) => setPrompt(e.target.value)}
               placeholder="AI 프롬프트를 입력하세요."
-              style={{ height: '472px' }}
+              style={{ height: '419px' }}
               className="w-full px-3 py-2 border border-gray-200/80 bg-white/60 rounded-md text-sm text-gray-800 leading-relaxed focus:outline-none focus:border-neutral-500 focus:ring-1 focus:ring-neutral-500 transition-colors"
             />
           </div>
