@@ -6,6 +6,13 @@ interface ExpandItem {
   id: string;
   content: string;
   source: string | null;
+  translation: string | null;
+}
+
+// 음성 읽기는 항상 ko-KR 발화기로 재생하므로, 원문이 한국어가 아니면 번역을 대신 읽는다
+// (번역이 없으면 원문을 그대로 읽는다 — 예전 동작과 동일).
+function speechTextOf(item: ExpandItem) {
+  return item.translation || item.content;
 }
 
 const VOLUME_KEY = 'good-words:tts-volume';
@@ -106,7 +113,7 @@ export default function ExpandViewModal({
         const next = (indexRef.current + 1) % items.length;
         chainedAdvanceRef.current = true;
         setIndex(next);
-        speak(items[next].content);
+        speak(speechTextOf(items[next]));
       } else {
         setPlaying(false);
       }
@@ -120,7 +127,7 @@ export default function ExpandViewModal({
   // 다음 글로 넘기는 연쇄 재생은 예외 — 위 speak()의 onend 참고).
   useEffect(() => {
     if (playing && current) {
-      speak(current.content);
+      speak(speechTextOf(current));
     } else if (ttsSupported) {
       // 체크 해제 시 진행 중이던 발화를 즉시 멈춘다 — 안 그러면 onend가 뒤늦게 실행되면서
       // (문장이동까지 켜져 있을 때) 이미 꺼둔 뒤에도 다음 문장을 계속 읽어버리는 문제가 있었다.
@@ -212,6 +219,9 @@ export default function ExpandViewModal({
 
         <div className="flex-1 overflow-y-auto px-8 py-10 flex flex-col items-center justify-center text-center">
           <p className="leading-loose text-gray-800 whitespace-pre-wrap" style={{ fontSize: '22px' }}>{current.content}</p>
+          {current.translation && (
+            <p className="leading-loose text-gray-500 whitespace-pre-wrap mt-4" style={{ fontSize: '16px' }}>{current.translation}</p>
+          )}
           {current.source && (
             <p className="text-sm text-gray-400 mt-6">{`< ${current.source} >`}</p>
           )}

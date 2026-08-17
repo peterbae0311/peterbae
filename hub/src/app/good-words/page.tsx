@@ -18,6 +18,7 @@ export interface ArchiveItem {
   category: string;
   content: string;
   source: string | null;
+  translation: string | null;
   created_at: string | null;
   created_by: string;
 }
@@ -107,11 +108,11 @@ export default function GoodWordsPage() {
     }
   }
 
-  async function handleAddItem(content: string, source: string | null) {
+  async function handleAddItem(content: string, source: string | null, translation: string | null) {
     const res = await fetch('/api/good-words', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ items: [{ category: activeCategoryId, content, source }] }),
+      body: JSON.stringify({ items: [{ category: activeCategoryId, content, source, translation }] }),
     });
     const data = await res.json();
     if (!res.ok) throw new Error(data.error ?? '추가에 실패했습니다.');
@@ -119,15 +120,15 @@ export default function GoodWordsPage() {
     await loadArchive();
   }
 
-  async function handleUpdateItem(id: string, content: string, source: string | null) {
+  async function handleUpdateItem(id: string, content: string, source: string | null, translation: string | null) {
     const res = await fetch(`/api/good-words/${id}`, {
       method: 'PATCH',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ content, source }),
+      body: JSON.stringify({ content, source, translation }),
     });
     const data = await res.json();
     if (!res.ok) throw new Error(data.error ?? '수정에 실패했습니다.');
-    setArchiveItems((prev) => prev.map((item) => (item.id === id ? { ...item, content, source } : item)));
+    setArchiveItems((prev) => prev.map((item) => (item.id === id ? { ...item, content, source, translation } : item)));
   }
 
   function handleClose() {
@@ -355,6 +356,9 @@ export default function GoodWordsPage() {
                     </div>
                   )}
                   <p className="text-sm text-gray-700 leading-relaxed line-clamp-6 whitespace-pre-wrap">{item.content}</p>
+                  {item.translation && (
+                    <p className="text-xs text-gray-500 leading-relaxed line-clamp-3 whitespace-pre-wrap mt-2 italic">{item.translation}</p>
+                  )}
                   {item.source && (
                     <p className="text-xs text-gray-400 mt-3">{`< ${item.source} >`}</p>
                   )}
@@ -397,8 +401,8 @@ export default function GoodWordsPage() {
         <EditItemModal
           item={editItem}
           onClose={() => setEditItem(null)}
-          onSave={async (content, source) => {
-            await handleUpdateItem(editItem.id, content, source);
+          onSave={async (content, source, translation) => {
+            await handleUpdateItem(editItem.id, content, source, translation);
             setEditItem(null);
           }}
         />
@@ -408,8 +412,8 @@ export default function GoodWordsPage() {
         <EditItemModal
           item={null}
           onClose={() => setAddModalOpen(false)}
-          onSave={async (content, source) => {
-            await handleAddItem(content, source);
+          onSave={async (content, source, translation) => {
+            await handleAddItem(content, source, translation);
             setAddModalOpen(false);
           }}
         />
@@ -427,7 +431,7 @@ export default function GoodWordsPage() {
   );
 }
 
-interface GeneratedItem { content: string; source: string; }
+interface GeneratedItem { content: string; source: string; translation: string; }
 
 function CategoryModal({
   state, onClose, onSaved, onDeleteCategory, onGenerated,
@@ -511,7 +515,7 @@ function CategoryModal({
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          items: items.map((it) => ({ category: category.id, content: it.content, source: it.source })),
+          items: items.map((it) => ({ category: category.id, content: it.content, source: it.source, translation: it.translation || null })),
         }),
       });
       const saveData = await saveRes.json();
@@ -581,6 +585,7 @@ function CategoryModal({
               {previewItems.map((it, i) => (
                 <div key={i} className="text-xs text-gray-600 border-b border-gray-100 pb-2 last:border-0">
                   <p>{it.content}</p>
+                  {it.translation && <p className="text-gray-500 italic mt-1">{it.translation}</p>}
                   <p className="text-gray-400 mt-1">{`< ${it.source} >`}</p>
                 </div>
               ))}
@@ -626,11 +631,13 @@ function EditItemModal({
 }: {
   item: ArchiveItem | null;
   onClose: () => void;
-  onSave: (content: string, source: string | null) => Promise<void>;
+  onSave: (content: string, source: string | null, translation: string | null) => Promise<void>;
 }) {
   const [content, setContent] = useState(item?.content ?? '');
   const [source, setSource] = useState(item?.source ?? '');
+  const [translation, setTranslation] = useState(item?.translation ?? '');
   const [saving, setSaving] = useState(false);
+  const [translating, setTranslating] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   async function handleSave() {
@@ -638,11 +645,31 @@ function EditItemModal({
     setSaving(true);
     setError(null);
     try {
-      await onSave(content.trim(), source.trim() || null);
+      await onSave(content.trim(), source.trim() || null, translation.trim() || null);
     } catch (err) {
       setError(err instanceof Error ? err.message : (item ? '수정에 실패했습니다.' : '추가에 실패했습니다.'));
     } finally {
       setSaving(false);
+    }
+  }
+
+  async function handleTranslate() {
+    if (!content.trim()) { setError('먼저 내용을 입력해주세요.'); return; }
+    setTranslating(true);
+    setError(null);
+    try {
+      const res = await fetch('/api/good-words/translate', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ content: content.trim() }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error ?? '번역 생성에 실패했습니다.');
+      setTranslation(data.translation);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : '번역 생성에 실패했습니다.');
+    } finally {
+      setTranslating(false);
     }
   }
 
@@ -671,6 +698,25 @@ function EditItemModal({
               onChange={(e) => setSource(e.target.value)}
               placeholder="예: 이효석 · 낙엽을 태우면서"
               className="w-full px-3 py-2 border border-gray-200/80 bg-white/60 rounded-md text-sm text-gray-800 focus:outline-none focus:border-neutral-500 focus:ring-1 focus:ring-neutral-500 transition-colors"
+            />
+          </div>
+          <div>
+            <div className="flex items-center justify-between mb-1.5">
+              <label className="block text-xs font-semibold text-gray-600">한국어 번역 (원문이 한국어가 아닐 경우)</label>
+              <button
+                onClick={handleTranslate}
+                disabled={translating}
+                className="text-xs text-gray-500 hover:text-neutral-900 disabled:opacity-40"
+              >
+                {translating ? '번역 중...' : '번역 생성'}
+              </button>
+            </div>
+            <textarea
+              value={translation}
+              onChange={(e) => setTranslation(e.target.value)}
+              rows={6}
+              placeholder="원문이 한국어가 아니면 번역을 입력하거나 '번역 생성' 버튼을 눌러주세요."
+              className="w-full px-3 py-2 border border-gray-200/80 bg-white/60 rounded-md text-sm text-gray-800 leading-relaxed focus:outline-none focus:border-neutral-500 focus:ring-1 focus:ring-neutral-500 transition-colors"
             />
           </div>
           {error && <p className="text-xs text-red-500">{error}</p>}

@@ -18,6 +18,10 @@ CREATE TABLE good_words (
   content_hash  NUMBER                    NOT NULL,
   -- 글의 출처 — "저자명 · 자료명" 형태(예: 이효석 · 낙엽을 태우면서). 불분명하면 NULL(화면 공백 처리).
   source        VARCHAR2(200),
+  -- content가 한국어가 아닌 경우의 한국어 번역 — 이미 한국어면 NULL(화면/TTS에서 번역 생략).
+  -- 생성 시 LLM이 함께 만들어 저장하거나, 관리자가 수정 화면의 "번역 생성" 버튼으로 나중에
+  -- 채울 수 있다(/api/good-words/translate, 2026-08-17 추가).
+  translation   CLOB,
   created_at    TIMESTAMP WITH TIME ZONE  DEFAULT SYSTIMESTAMP NOT NULL,
   created_by    VARCHAR2(255)             NOT NULL,
   -- 소프트 삭제 — SUPER_ADMIN_EMAIL만 삭제 가능(오남용 방지를 위해 하드 삭제 대신 로그 보존).

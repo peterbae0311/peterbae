@@ -11,12 +11,14 @@ const MAX_PROMPT_LENGTH = 4000;
 
 const OUTPUT_FORMAT_HINT =
   `\n\n요청한 개수만큼 서로 다른 항목을 JSON 배열로만 응답하세요(다른 설명이나 코드블록 없이). ` +
-  `각 항목은 반드시 {"content": "...", "source": "저자명 · 자료명"} 형태여야 합니다 ` +
-  `(content는 ${MAX_CONTENT_LENGTH}자 이내, source는 "저자명 · 자료명" 형식 — 가운데점은 U+00B7 MIDDLE DOT — 예: "이효석 · 낙엽을 태우면서").`;
+  `각 항목은 반드시 {"content": "...", "source": "저자명 · 자료명", "translation": "..."} 형태여야 합니다 ` +
+  `(content는 ${MAX_CONTENT_LENGTH}자 이내, source는 "저자명 · 자료명" 형식 — 가운데점은 U+00B7 MIDDLE DOT — 예: "이효석 · 낙엽을 태우면서". ` +
+  `content가 한국어가 아니면 translation에 자연스러운 한국어 번역을 넣고, content가 이미 한국어면 translation은 빈 문자열 ""로 두세요).`;
 
 interface QuoteItem {
   content: string;
   source: string;
+  translation: string;
 }
 
 function normalizeItems(parsed: unknown[]): QuoteItem[] {
@@ -25,6 +27,7 @@ function normalizeItems(parsed: unknown[]): QuoteItem[] {
     .map((v) => ({
       content: typeof v.content === 'string' ? v.content.trim() : '',
       source: typeof v.source === 'string' ? v.source.trim() : '',
+      translation: typeof v.translation === 'string' ? v.translation.trim() : '',
     }))
     // 400자 한도는 프롬프트로만 지시하면 모델이 자주 넘기므로(실측 확인) 코드에서 하드 컷.
     .filter((v) => v.content && v.source && v.content.length <= MAX_CONTENT_LENGTH);

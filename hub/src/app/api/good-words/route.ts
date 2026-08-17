@@ -8,12 +8,14 @@ import { handleApiError } from '@/lib/goodWords/apiError';
 
 const MAX_CONTENT_LENGTH = 4000;
 const MAX_SOURCE_LENGTH = 200;
+const MAX_TRANSLATION_LENGTH = 4000;
 
 interface GoodWordRow {
   ID: string;
   CATEGORY: string;
   CONTENT: string;
   SOURCE: string | null;
+  TRANSLATION: string | null;
   CREATED_AT: unknown;
   CREATED_BY: string;
 }
@@ -24,6 +26,7 @@ function serialize(row: GoodWordRow) {
     category: row.CATEGORY,
     content: row.CONTENT,
     source: row.SOURCE,
+    translation: row.TRANSLATION,
     created_at: formatOracleTimestamp(row.CREATED_AT),
     created_by: row.CREATED_BY,
   };
@@ -40,7 +43,7 @@ export async function GET(request: NextRequest) {
   try {
     const rows = await withConnection(async (conn) => {
       const result = await conn.execute<GoodWordRow>(
-        `SELECT id, category, content, source, created_at, created_by FROM good_words
+        `SELECT id, category, content, source, translation, created_at, created_by FROM good_words
          WHERE deleted_at IS NULL ${category ? 'AND category = :category' : ''}
          ORDER BY created_at DESC`,
         category ? { category } : {}
@@ -58,6 +61,7 @@ interface SaveItem {
   category: string;
   content: string;
   source: string | null;
+  translation: string | null;
 }
 
 /**
@@ -96,12 +100,24 @@ export async function POST(request: NextRequest) {
       rejected.push({ content, reason: `출처가 ${MAX_SOURCE_LENGTH}자를 초과합니다.` });
       continue;
     }
+    const translation = typeof item?.translation === 'string' && item.translation.trim() ? item.translation.trim() : null;
+    if (translation && translation.length > MAX_TRANSLATION_LENGTH) {
+      rejected.push({ content, reason: `번역이 ${MAX_TRANSLATION_LENGTH}자를 초과합니다.` });
+      continue;
+    }
     const guard = checkGoodWordsContent(content);
     if (!guard.ok) {
       rejected.push({ content, reason: guard.reason ?? '가드레일 위반' });
       continue;
     }
-    toInsert.push({ category: item.category, content, source });
+    if (translation) {
+      const translationGuard = checkGoodWordsContent(translation);
+      if (!translationGuard.ok) {
+        rejected.push({ content, reason: translationGuard.reason ?? '가드레일 위반' });
+        continue;
+      }
+    }
+    toInsert.push({ category: item.category, content, source, translation });
   }
 
   try {
@@ -115,9 +131,9 @@ export async function POST(request: NextRequest) {
             // (선행 SELECT-then-INSERT 방식은 두 요청이 동시에 들어오면 둘 다 통과하는
             // 레이스 컨디션이 있었음 — 인덱스 위반(ORA-00001)을 잡는 방식으로 교체).
             await conn.execute(
-              `INSERT INTO good_words (id, category, content, source, created_by, content_hash)
-               VALUES (:id, :category, :content, :source, :created_by, ORA_HASH(:content))`,
-              { id: randomUUID(), category: item.category, content: item.content, source: item.source, created_by: user.email }
+              `INSERT INTO good_words (id, category, content, source, translation, created_by, content_hash)
+               VALUES (:id, :category, :content, :source, :translation, :created_by, ORA_HASH(:content))`,
+              { id: randomUUID(), category: item.category, content: item.content, source: item.source, translation: item.translation, created_by: user.email }
             );
             saved++;
           } catch (err) {
