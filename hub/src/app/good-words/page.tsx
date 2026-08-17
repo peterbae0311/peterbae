@@ -3,15 +3,17 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { supabase } from '@/lib/supabase';
 import { SUPER_ADMIN_EMAIL } from '@/lib/apps';
-import SlideshowViewer, { SlideshowItem } from './SlideshowViewer';
+import ExpandViewModal from './ExpandViewModal';
 
-interface GoodWordsCategory {
+export interface GoodWordsCategory {
   id: string;
   label: string;
+  classification: string | null;
+  prompt: string;
   sortOrder: number;
 }
 
-interface ArchiveItem {
+export interface ArchiveItem {
   id: string;
   category: string;
   content: string;
@@ -20,41 +22,35 @@ interface ArchiveItem {
   created_by: string;
 }
 
+type CategoryModalState = { mode: 'create' } | { mode: 'edit'; category: GoodWordsCategory };
+
 export default function GoodWordsPage() {
   const [email, setEmail] = useState<string | null | undefined>(undefined);
 
   const [categories, setCategories] = useState<GoodWordsCategory[] | null>(null);
-  const [selectedCategory, setSelectedCategory] = useState('');
-  const [showAllCategories, setShowAllCategories] = useState(false);
+  const [activeCategoryId, setActiveCategoryId] = useState('');
 
-  // 카테고리 관리(SUPER_ADMIN 전용) — 이름 변경/추가/드래그 순서 변경
-  const [editingId, setEditingId] = useState<string | null>(null);
-  const [editingLabel, setEditingLabel] = useState('');
-  const [addingCategory, setAddingCategory] = useState(false);
-  const [newCategoryLabel, setNewCategoryLabel] = useState('');
-  const [deletingCategoryId, setDeletingCategoryId] = useState<string | null>(null);
+  const [archiveItems, setArchiveItems] = useState<ArchiveItem[]>([]);
+  const [archiveLoading, setArchiveLoading] = useState(false);
+  const [deletingId, setDeletingId] = useState<string | null>(null);
+  const [message, setMessage] = useState<string | null>(null);
+
+  const [categoryModal, setCategoryModal] = useState<CategoryModalState | null>(null);
+  const [expandModal, setExpandModal] = useState<{ index: number } | null>(null);
+  const [editItem, setEditItem] = useState<ArchiveItem | null>(null);
+  const [addModalOpen, setAddModalOpen] = useState(false);
+
+  // 카테고리 탭 드래그 순서 변경(SUPER_ADMIN 전용) — 대시보드 카드 드래그와 동일한 패턴.
   const [dragCategoryId, setDragCategoryId] = useState<string | null>(null);
   const [dragOverCategoryId, setDragOverCategoryId] = useState<string | null>(null);
   const [dragPos, setDragPos] = useState<{ x: number; y: number } | null>(null);
   const draggedCategoryRef = useRef<GoodWordsCategory | null>(null);
-  // 브라우저 기본 드래그 고스트 이미지를 숨기기 위한 투명 1x1 이미지(대시보드 카드 드래그와 동일한 패턴).
   const blankDragImageRef = useRef<HTMLImageElement | null>(null);
   useEffect(() => {
     const img = new Image();
     img.src = 'data:image/gif;base64,R0lGODlhAQABAAAAACH5BAEKAAEALAAAAAABAAEAAAICTAEAOw==';
     blankDragImageRef.current = img;
   }, []);
-
-  const [generating, setGenerating] = useState(false);
-  const [generateError, setGenerateError] = useState<string | null>(null);
-  const [generateInfo, setGenerateInfo] = useState<string | null>(null);
-
-  const [archiveItems, setArchiveItems] = useState<ArchiveItem[]>([]);
-  const [archiveLoading, setArchiveLoading] = useState(false);
-  const [saveMessage, setSaveMessage] = useState<string | null>(null);
-  const [deletingId, setDeletingId] = useState<string | null>(null);
-
-  const [slideshowItems, setSlideshowItems] = useState<SlideshowItem[] | null>(null);
 
   useEffect(() => {
     (async () => {
@@ -70,80 +66,30 @@ export default function GoodWordsPage() {
       if (!res.ok) throw new Error(data.error ?? '카테고리를 불러오지 못했습니다.');
       const list: GoodWordsCategory[] = data.categories;
       setCategories(list);
-      setSelectedCategory((prev) => (prev && list.some((c) => c.id === prev) ? prev : (list[0]?.id ?? '')));
+      setActiveCategoryId((prev) => (prev && list.some((c) => c.id === prev) ? prev : (list[0]?.id ?? '')));
     } catch (err) {
-      setSaveMessage(err instanceof Error ? err.message : '카테고리를 불러오지 못했습니다.');
+      setMessage(err instanceof Error ? err.message : '카테고리를 불러오지 못했습니다.');
     }
   }, []);
 
   useEffect(() => { loadCategories(); }, [loadCategories]);
 
-  function categoryLabel(id: string): string {
-    return categories?.find((c) => c.id === id)?.label ?? id;
-  }
-
-  const loadArchive = useCallback(async (): Promise<ArchiveItem[]> => {
+  const loadArchive = useCallback(async () => {
+    if (!activeCategoryId) { setArchiveItems([]); return; }
     setArchiveLoading(true);
     try {
-      const url = showAllCategories
-        ? '/api/good-words'
-        : `/api/good-words?category=${encodeURIComponent(selectedCategory)}`;
-      const res = await fetch(url);
+      const res = await fetch(`/api/good-words?category=${encodeURIComponent(activeCategoryId)}`);
       const data = await res.json();
-      if (!res.ok) throw new Error(data.error ?? '보관함을 불러오지 못했습니다.');
+      if (!res.ok) throw new Error(data.error ?? '목록을 불러오지 못했습니다.');
       setArchiveItems(data.items);
-      return data.items as ArchiveItem[];
     } catch (err) {
-      setSaveMessage(err instanceof Error ? err.message : '보관함을 불러오지 못했습니다.');
-      return [];
+      setMessage(err instanceof Error ? err.message : '목록을 불러오지 못했습니다.');
     } finally {
       setArchiveLoading(false);
     }
-  }, [selectedCategory, showAllCategories]);
+  }, [activeCategoryId]);
 
   useEffect(() => { loadArchive(); }, [loadArchive]);
-
-  /** 생성 즉시 가드레일을 통과한 글을 전부 DB에 저장하고, 보관함 목록을 새로고침한다. */
-  async function handleGenerate() {
-    if (!selectedCategory) return;
-    setGenerating(true);
-    setGenerateError(null);
-    setGenerateInfo(null);
-    try {
-      const res = await fetch('/api/good-words/generate', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ category: selectedCategory }),
-      });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.error ?? '생성에 실패했습니다.');
-
-      if (data.texts.length === 0) {
-        setGenerateInfo(`${data.provider} 제공자로 생성된 글이 없습니다.`);
-        return;
-      }
-
-      const items = data.texts.map((content: string) => ({ category: selectedCategory, content, source: 'AI' }));
-      const saveRes = await fetch('/api/good-words', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ items }),
-      });
-      const saveData = await saveRes.json();
-      if (!saveRes.ok) throw new Error(saveData.error ?? '저장에 실패했습니다.');
-
-      setGenerateInfo(
-        `${data.provider} 제공자로 ${data.texts.length}개 생성, ${saveData.saved}개 저장됨` +
-        (data.rejectedCount > 0 ? ` (생성 직후 가드레일 반려 ${data.rejectedCount}개)` : '') +
-        (saveData.rejected.length > 0 ? ` (저장 시 가드레일 반려 ${saveData.rejected.length}개)` : '')
-      );
-      await loadArchive();
-    } catch (err) {
-      setGenerateError(err instanceof Error ? err.message : '생성에 실패했습니다.');
-    } finally {
-      setGenerating(false);
-    }
-  }
 
   async function handleDelete(id: string) {
     setDeletingId(id);
@@ -155,69 +101,47 @@ export default function GoodWordsPage() {
       }
       setArchiveItems((prev) => prev.filter((item) => item.id !== id));
     } catch (err) {
-      setSaveMessage(err instanceof Error ? err.message : '삭제에 실패했습니다.');
+      setMessage(err instanceof Error ? err.message : '삭제에 실패했습니다.');
     } finally {
       setDeletingId(null);
     }
   }
 
-  function handleStartSlideshow() {
-    if (archiveItems.length === 0) {
-      setSaveMessage('슬라이드쇼로 재생할 글이 보관함에 없습니다.');
-      return;
-    }
-    setSlideshowItems(archiveItems.map((item) => ({ id: item.id, category: item.category, content: item.content, source: item.source })));
+  async function handleAddItem(content: string, source: string | null) {
+    const res = await fetch('/api/good-words', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ items: [{ category: activeCategoryId, content, source }] }),
+    });
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.error ?? '추가에 실패했습니다.');
+    if (data.saved === 0) throw new Error(data.rejected?.[0]?.reason ?? '추가에 실패했습니다.');
+    await loadArchive();
   }
 
-  function startRenameCategory(cat: GoodWordsCategory) {
-    setEditingId(cat.id);
-    setEditingLabel(cat.label);
+  async function handleUpdateItem(id: string, content: string, source: string | null) {
+    const res = await fetch(`/api/good-words/${id}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ content, source }),
+    });
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.error ?? '수정에 실패했습니다.');
+    setArchiveItems((prev) => prev.map((item) => (item.id === id ? { ...item, content, source } : item)));
   }
 
-  async function commitRenameCategory() {
-    const id = editingId;
-    const label = editingLabel.trim();
-    setEditingId(null);
-    if (!id || !label) return;
-
-    const prevCategories = categories;
-    setCategories((prev) => prev?.map((c) => (c.id === id ? { ...c, label } : c)) ?? prev);
-    try {
-      const res = await fetch(`/api/good-words/categories/${id}`, {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ label }),
-      });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.error ?? '이름 변경에 실패했습니다.');
-    } catch (err) {
-      setCategories(prevCategories);
-      setSaveMessage(err instanceof Error ? err.message : '이름 변경에 실패했습니다.');
-    }
+  function handleClose() {
+    window.close();
+    setTimeout(() => { window.location.href = '/dashboard'; }, 300);
   }
 
-  async function handleCreateCategory() {
-    const label = newCategoryLabel.trim();
-    setAddingCategory(false);
-    setNewCategoryLabel('');
-    if (!label) return;
-    try {
-      const res = await fetch('/api/good-words/categories', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ label }),
-      });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.error ?? '카테고리 생성에 실패했습니다.');
-      setCategories((prev) => [...(prev ?? []), data.category]);
-    } catch (err) {
-      setSaveMessage(err instanceof Error ? err.message : '카테고리 생성에 실패했습니다.');
-    }
+  function openEditModal(cat: GoodWordsCategory) {
+    setActiveCategoryId(cat.id);
+    setCategoryModal({ mode: 'edit', category: cat });
   }
 
   async function handleDeleteCategory(cat: GoodWordsCategory) {
     if (!window.confirm(`"${cat.label}" 카테고리를 삭제하면 관련된 좋은글이 모두 함께 삭제됩니다. 계속할까요?`)) return;
-    setDeletingCategoryId(cat.id);
     try {
       const res = await fetch(`/api/good-words/categories/${cat.id}`, { method: 'DELETE' });
       if (!res.ok && res.status !== 204) {
@@ -226,14 +150,12 @@ export default function GoodWordsPage() {
       }
       setCategories((prev) => {
         const next = (prev ?? []).filter((c) => c.id !== cat.id);
-        if (selectedCategory === cat.id) setSelectedCategory(next[0]?.id ?? '');
+        if (activeCategoryId === cat.id) setActiveCategoryId(next[0]?.id ?? '');
         return next;
       });
-      loadArchive();
+      setCategoryModal(null);
     } catch (err) {
-      setSaveMessage(err instanceof Error ? err.message : '삭제에 실패했습니다.');
-    } finally {
-      setDeletingCategoryId(null);
+      setMessage(err instanceof Error ? err.message : '삭제에 실패했습니다.');
     }
   }
 
@@ -249,7 +171,7 @@ export default function GoodWordsPage() {
         throw new Error(data.error ?? '순서 저장에 실패했습니다.');
       }
     } catch (err) {
-      setSaveMessage(err instanceof Error ? err.message : '순서 저장에 실패했습니다.');
+      setMessage(err instanceof Error ? err.message : '순서 저장에 실패했습니다.');
     }
   }
 
@@ -265,6 +187,18 @@ export default function GoodWordsPage() {
     persistCategoryOrder(next);
   }
 
+  // 드래그 없이도(키보드/스크린리더 사용자) 순서를 바꿀 수 있는 대체 수단 — 인접한 항목과 자리만 바꾼다.
+  function moveCategory(id: string, direction: -1 | 1) {
+    if (!categories) return;
+    const from = categories.findIndex((c) => c.id === id);
+    const to = from + direction;
+    if (from === -1 || to < 0 || to >= categories.length) return;
+    const next = [...categories];
+    [next[from], next[to]] = [next[to], next[from]];
+    setCategories(next);
+    persistCategoryOrder(next);
+  }
+
   const isSuperAdmin = email === SUPER_ADMIN_EMAIL;
 
   if (email === undefined) {
@@ -276,193 +210,209 @@ export default function GoodWordsPage() {
       <div className="w-full space-y-6">
         <div className="flex items-center justify-between">
           <h1 className="text-2xl font-black tracking-tighter text-neutral-900">좋은글</h1>
-          <a
-            href="/dashboard"
-            className="text-xs text-gray-600 border border-gray-200/80 rounded-lg px-3 py-2 hover:border-neutral-500 hover:text-neutral-900 hover:bg-neutral-100/60 transition-colors"
-          >
-            대시보드로
-          </a>
+          <div className="flex items-center gap-2">
+            {isSuperAdmin && (
+              <button
+                onClick={() => setCategoryModal({ mode: 'create' })}
+                className="text-xs text-gray-600 border border-gray-200/80 rounded-lg px-3 py-2 hover:border-neutral-500 hover:text-neutral-900 hover:bg-neutral-100/60 transition-colors"
+              >
+                + 카테고리
+              </button>
+            )}
+            <a
+              href="/dashboard"
+              className="text-xs text-gray-600 border border-gray-200/80 rounded-lg px-3 py-2 hover:border-neutral-500 hover:text-neutral-900 hover:bg-neutral-100/60 transition-colors"
+            >
+              대시보드
+            </a>
+            <button
+              onClick={handleClose}
+              className="text-xs text-gray-600 border border-gray-200/80 rounded-lg px-3 py-2 hover:border-neutral-500 hover:text-neutral-900 hover:bg-neutral-100/60 transition-colors"
+            >
+              닫기
+            </button>
+          </div>
         </div>
 
-        <div className="flex flex-col lg:flex-row gap-6">
-          {/* 좌측 30%: 카테고리 선택 + 생성/슬라이드쇼 컨트롤 */}
-          <div className="lg:w-[30%] shrink-0 space-y-4">
-            <div className="rounded-2xl border border-white/60 bg-white/70 backdrop-blur-xl shadow-glass p-5">
-              <h2 className="text-sm font-bold text-neutral-900 mb-3">카테고리</h2>
-              <div className="grid grid-cols-2 gap-2">
-                {categories === null ? (
-                  <p className="col-span-2 text-xs text-gray-400">불러오는 중...</p>
-                ) : (
-                  categories.map((c) => (
-                    <div
-                      key={c.id}
-                      draggable={isSuperAdmin}
-                      onDragStart={(e) => {
-                        if (!isSuperAdmin) return;
-                        if (blankDragImageRef.current) e.dataTransfer.setDragImage(blankDragImageRef.current, 0, 0);
-                        draggedCategoryRef.current = c;
-                        setDragCategoryId(c.id);
-                        setDragPos({ x: e.clientX, y: e.clientY });
-                      }}
-                      onDrag={(e) => { if (isSuperAdmin) setDragPos({ x: e.clientX, y: e.clientY }); }}
-                      onDragEnter={() => { if (isSuperAdmin) setDragOverCategoryId(c.id); }}
-                      onDragOver={(e) => e.preventDefault()}
-                      onDrop={(e) => { e.preventDefault(); handleCategoryDrop(c.id); }}
-                      onDragEnd={() => { setDragCategoryId(null); setDragOverCategoryId(null); setDragPos(null); draggedCategoryRef.current = null; }}
-                      className={
-                        'relative group rounded-lg transition-colors '
-                        + (isSuperAdmin ? 'cursor-grab active:cursor-grabbing ' : '')
-                        + (dragCategoryId === c.id
-                          ? 'opacity-40'
-                          : dragOverCategoryId === c.id
-                            ? 'ring-2 ring-neutral-400'
-                            : '')
-                      }
-                    >
-                      {editingId === c.id ? (
-                        <input
-                          autoFocus
-                          value={editingLabel}
-                          maxLength={20}
-                          onChange={(e) => setEditingLabel(e.target.value)}
-                          onBlur={commitRenameCategory}
-                          onKeyDown={(e) => {
-                            if (e.key === 'Enter') { e.preventDefault(); commitRenameCategory(); }
-                            if (e.key === 'Escape') setEditingId(null);
-                          }}
-                          className="w-full text-sm rounded-lg px-3 py-2 border border-neutral-500 focus:outline-none"
-                        />
-                      ) : (
-                        <button
-                          onClick={() => setSelectedCategory(c.id)}
-                          className={`w-full text-sm rounded-lg px-3 py-2 border transition-colors ${
-                            selectedCategory === c.id
-                              ? 'bg-neutral-900 text-white border-neutral-900'
-                              : 'border-gray-200/80 text-gray-600 hover:border-neutral-500 hover:text-neutral-900'
-                          }`}
-                        >
-                          {c.label}
-                        </button>
-                      )}
-
-                      {isSuperAdmin && editingId !== c.id && (
-                        <div className="absolute -top-1.5 -right-1.5 hidden group-hover:flex gap-0.5">
-                          <button
-                            onClick={(e) => { e.stopPropagation(); startRenameCategory(c); }}
-                            className="w-5 h-5 flex items-center justify-center rounded-full bg-white border border-gray-300 text-gray-500 hover:text-neutral-900 hover:border-neutral-500 text-[10px] shadow-sm"
-                            title="이름 변경"
-                          >✎</button>
-                          <button
-                            onClick={(e) => { e.stopPropagation(); handleDeleteCategory(c); }}
-                            disabled={deletingCategoryId === c.id}
-                            className="w-5 h-5 flex items-center justify-center rounded-full bg-white border border-gray-300 text-red-500 hover:text-red-700 hover:border-red-400 text-[10px] shadow-sm disabled:opacity-40"
-                            title="삭제"
-                          >✕</button>
-                        </div>
-                      )}
-                    </div>
-                  ))
-                )}
-
+        {/* 카테고리 탭 */}
+        <div className="flex items-center gap-1 border-b border-gray-200 overflow-x-auto">
+          {categories === null ? (
+            <p className="text-xs text-gray-400 py-3">불러오는 중...</p>
+          ) : (
+            categories.map((c, i) => (
+              <div
+                key={c.id}
+                draggable={isSuperAdmin}
+                onDragStart={(e) => {
+                  if (!isSuperAdmin) return;
+                  if (blankDragImageRef.current) e.dataTransfer.setDragImage(blankDragImageRef.current, 0, 0);
+                  draggedCategoryRef.current = c;
+                  setDragCategoryId(c.id);
+                  setDragPos({ x: e.clientX, y: e.clientY });
+                }}
+                onDrag={(e) => { if (isSuperAdmin) setDragPos({ x: e.clientX, y: e.clientY }); }}
+                onDragEnter={() => { if (isSuperAdmin) setDragOverCategoryId(c.id); }}
+                onDragOver={(e) => e.preventDefault()}
+                onDrop={(e) => { e.preventDefault(); handleCategoryDrop(c.id); }}
+                onDragEnd={() => { setDragCategoryId(null); setDragOverCategoryId(null); setDragPos(null); draggedCategoryRef.current = null; }}
+                className={
+                  'group relative flex items-center gap-1.5 shrink-0 '
+                  + (isSuperAdmin ? 'cursor-grab active:cursor-grabbing ' : '')
+                  + (dragCategoryId === c.id ? 'opacity-40 ' : dragOverCategoryId === c.id ? 'bg-neutral-100/60 ' : '')
+                }
+              >
+                <button
+                  onClick={() => setActiveCategoryId(c.id)}
+                  className={`text-sm px-4 py-3 border-b-2 transition-colors whitespace-nowrap ${
+                    activeCategoryId === c.id
+                      ? 'border-neutral-900 text-neutral-900 font-bold'
+                      : 'border-transparent text-gray-500 hover:text-neutral-900'
+                  }`}
+                >
+                  {c.label}
+                </button>
                 {isSuperAdmin && (
-                  addingCategory ? (
-                    <input
-                      autoFocus
-                      value={newCategoryLabel}
-                      maxLength={20}
-                      placeholder="카테고리 이름"
-                      onChange={(e) => setNewCategoryLabel(e.target.value)}
-                      onBlur={handleCreateCategory}
-                      onKeyDown={(e) => {
-                        if (e.key === 'Enter') { e.preventDefault(); handleCreateCategory(); }
-                        if (e.key === 'Escape') { setAddingCategory(false); setNewCategoryLabel(''); }
-                      }}
-                      className="text-sm rounded-lg px-3 py-2 border border-dashed border-neutral-400 focus:outline-none"
-                    />
-                  ) : (
+                  <span className="hidden group-hover:inline-flex items-center gap-1 pr-2">
                     <button
-                      onClick={() => setAddingCategory(true)}
-                      className="text-sm rounded-lg px-3 py-2 border border-dashed border-gray-300 text-gray-400 hover:border-neutral-500 hover:text-neutral-900 transition-colors"
-                    >
-                      + 추가
-                    </button>
-                  )
+                      onClick={(e) => { e.stopPropagation(); openEditModal(c); }}
+                      className="text-gray-400 hover:text-neutral-900 text-xs"
+                      title="수정"
+                    >✎</button>
+                    <button
+                      onClick={(e) => { e.stopPropagation(); moveCategory(c.id, -1); }}
+                      disabled={i === 0}
+                      aria-label={`${c.label} 카테고리를 왼쪽으로 이동`}
+                      className="text-gray-400 hover:text-neutral-900 text-xs disabled:opacity-30"
+                    >◀</button>
+                    <button
+                      onClick={(e) => { e.stopPropagation(); moveCategory(c.id, 1); }}
+                      disabled={i === categories.length - 1}
+                      aria-label={`${c.label} 카테고리를 오른쪽으로 이동`}
+                      className="text-gray-400 hover:text-neutral-900 text-xs disabled:opacity-30"
+                    >▶</button>
+                    <span className="text-gray-300 text-xs cursor-grab" title="드래그로 순서 이동">⠿</span>
+                  </span>
                 )}
               </div>
+            ))
+          )}
+        </div>
 
-              <label className="mt-3 flex items-center gap-2 text-xs text-gray-500">
-                <input
-                  type="checkbox"
-                  checked={showAllCategories}
-                  onChange={(e) => setShowAllCategories(e.target.checked)}
-                />
-                보관함/슬라이드쇼에서 모든 카테고리 보기
-              </label>
-            </div>
+        {message && <p className="text-xs text-red-500">{message}</p>}
 
-            <div className="rounded-2xl border border-white/60 bg-white/70 backdrop-blur-xl shadow-glass p-5 space-y-3">
+        {/* 콘텐츠 영역 */}
+        <div>
+          <div className="flex justify-end gap-2 mb-4">
+            {isSuperAdmin && (
               <button
-                onClick={handleGenerate}
-                disabled={generating || !selectedCategory}
-                className="w-full text-sm font-semibold rounded-lg px-3 py-2.5 bg-neutral-900 text-white hover:bg-neutral-700 disabled:opacity-50 transition-colors"
+                onClick={() => setAddModalOpen(true)}
+                disabled={!activeCategoryId}
+                className="text-xs rounded-lg px-3 py-2 border border-gray-200/80 text-gray-700 hover:border-neutral-500 hover:bg-neutral-100/60 disabled:opacity-40 transition-colors"
               >
-                {generating ? '생성 중...' : `"${categoryLabel(selectedCategory)}" 좋은글 생성`}
+                + 추가
               </button>
-
-              <button
-                onClick={handleStartSlideshow}
-                className="w-full text-sm rounded-lg px-3 py-2.5 border border-gray-200/80 text-gray-700 hover:border-neutral-500 hover:bg-neutral-100/60 transition-colors"
-              >
-                슬라이드쇼 시작
-              </button>
-
-              {saveMessage && <p className="text-xs text-gray-500">{saveMessage}</p>}
-            </div>
+            )}
+            <button
+              onClick={() => setExpandModal({ index: 0 })}
+              disabled={archiveItems.length === 0}
+              className="text-xs rounded-lg px-3 py-2 border border-gray-200/80 text-gray-700 hover:border-neutral-500 hover:bg-neutral-100/60 disabled:opacity-40 transition-colors"
+            >
+              ⤢ 확대 보기
+            </button>
           </div>
 
-          {/* 우측 70%: 생성 결과 또는 보관함 */}
-          <div className="flex-1 rounded-2xl border border-white/60 bg-white/70 backdrop-blur-xl shadow-glass p-5 min-h-[400px]">
-            <div className="space-y-3">
-              {generateError && <p className="text-sm text-red-500">{generateError}</p>}
-              {generateInfo && <p className="text-xs text-gray-400">{generateInfo}</p>}
-
-              {archiveLoading ? (
-                <p className="text-sm text-gray-400 text-center py-16">불러오는 중...</p>
-              ) : archiveItems.length === 0 ? (
-                <p className="text-sm text-gray-400 text-center py-16">
-                  {generating ? '생성 중...' : '아직 저장된 글이 없습니다. 왼쪽에서 카테고리를 고르고 "좋은글 생성"을 눌러주세요.'}
-                </p>
-              ) : (
-                <div className="grid sm:grid-cols-2 gap-3">
-                  {archiveItems.map((item) => (
-                    <div key={item.id} className="rounded-xl border border-gray-200/80 p-4">
-                      <div className="flex items-center justify-between mb-2">
-                        <span className="text-xs font-semibold text-gray-500">{categoryLabel(item.category)}</span>
-                        {isSuperAdmin && (
-                          <button
-                            onClick={() => handleDelete(item.id)}
-                            disabled={deletingId === item.id}
-                            className="text-xs text-red-500 hover:text-red-700 disabled:opacity-40"
-                          >
-                            {deletingId === item.id ? '삭제 중...' : '삭제'}
-                          </button>
-                        )}
-                      </div>
-                      <p className="text-sm text-gray-700 leading-relaxed">{item.content}</p>
-                      {item.source && (
-                        <p className="text-xs text-gray-400 mt-2">{`< 출처 : ${item.source} >`}</p>
-                      )}
+          {archiveLoading ? (
+            <p className="text-sm text-gray-400 text-center py-16">불러오는 중...</p>
+          ) : archiveItems.length === 0 ? (
+            <p className="text-sm text-gray-400 text-center py-16">
+              {isSuperAdmin
+                ? '아직 저장된 글이 없습니다. 위 탭의 ✎ 버튼에서 카테고리를 열어 "좋은글 생성"을 눌러주세요.'
+                : '아직 저장된 글이 없습니다.'}
+            </p>
+          ) : (
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+              {archiveItems.map((item, i) => (
+                <div
+                  key={item.id}
+                  onClick={() => setExpandModal({ index: i })}
+                  className="rounded-xl border border-gray-200/80 bg-white/70 p-4 cursor-pointer hover:border-neutral-400 hover:shadow-sm transition-all"
+                >
+                  {isSuperAdmin && (
+                    <div className="flex justify-end gap-2 mb-1">
+                      <button
+                        onClick={(e) => { e.stopPropagation(); setEditItem(item); }}
+                        className="text-xs text-gray-500 hover:text-neutral-900"
+                      >
+                        수정
+                      </button>
+                      <button
+                        onClick={(e) => { e.stopPropagation(); handleDelete(item.id); }}
+                        disabled={deletingId === item.id}
+                        className="text-xs text-red-500 hover:text-red-700 disabled:opacity-40"
+                      >
+                        {deletingId === item.id ? '삭제 중...' : '삭제'}
+                      </button>
                     </div>
-                  ))}
+                  )}
+                  <p className="text-sm text-gray-700 leading-relaxed line-clamp-6 whitespace-pre-wrap">{item.content}</p>
+                  {item.source && (
+                    <p className="text-xs text-gray-400 mt-3">{`< ${item.source} >`}</p>
+                  )}
                 </div>
-              )}
+              ))}
             </div>
-          </div>
+          )}
         </div>
       </div>
 
-      {slideshowItems && (
-        <SlideshowViewer items={slideshowItems} categories={categories ?? []} onClose={() => setSlideshowItems(null)} />
+      {expandModal && archiveItems.length > 0 && (
+        <ExpandViewModal
+          items={archiveItems}
+          startIndex={expandModal.index}
+          categoryLabel={categories?.find((c) => c.id === activeCategoryId)?.label ?? ''}
+          onClose={() => setExpandModal(null)}
+        />
+      )}
+
+      {categoryModal && (
+        <CategoryModal
+          state={categoryModal}
+          onClose={() => setCategoryModal(null)}
+          onSaved={async (saved) => {
+            await loadCategories();
+            setActiveCategoryId(saved.id);
+            setCategoryModal({ mode: 'edit', category: saved });
+          }}
+          onDeleted={() => setCategoryModal(null)}
+          onDeleteCategory={handleDeleteCategory}
+          onGenerated={async (info) => {
+            await loadArchive();
+            if (info) setMessage(info);
+            setCategoryModal(null);
+          }}
+        />
+      )}
+
+      {editItem && (
+        <EditItemModal
+          item={editItem}
+          onClose={() => setEditItem(null)}
+          onSave={async (content, source) => {
+            await handleUpdateItem(editItem.id, content, source);
+            setEditItem(null);
+          }}
+        />
+      )}
+
+      {addModalOpen && (
+        <EditItemModal
+          item={null}
+          onClose={() => setAddModalOpen(false)}
+          onSave={async (content, source) => {
+            await handleAddItem(content, source);
+            setAddModalOpen(false);
+          }}
+        />
       )}
 
       {dragCategoryId && dragPos && draggedCategoryRef.current && (
@@ -473,6 +423,272 @@ export default function GoodWordsPage() {
           {draggedCategoryRef.current.label}
         </div>
       )}
+    </div>
+  );
+}
+
+interface GeneratedItem { content: string; source: string; }
+
+function CategoryModal({
+  state, onClose, onSaved, onDeleteCategory, onGenerated,
+}: {
+  state: CategoryModalState;
+  onClose: () => void;
+  onSaved: (saved: GoodWordsCategory) => void;
+  onDeleted: () => void;
+  onDeleteCategory: (cat: GoodWordsCategory) => void;
+  onGenerated: (info?: string) => void;
+}) {
+  const [category, setCategory] = useState<GoodWordsCategory | null>(state.mode === 'edit' ? state.category : null);
+  const [label, setLabel] = useState(category?.label ?? '');
+  const [classification, setClassification] = useState(category?.classification ?? '');
+  const [prompt, setPrompt] = useState(category?.prompt ?? '');
+  const [saving, setSaving] = useState(false);
+  const [generating, setGenerating] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [info, setInfo] = useState<string | null>(null);
+  // 카테고리를 아직 저장하지 않은 생성 화면(신규)에서는 저장할 카테고리 id가 없어 자동
+  // 저장이 불가능하다 — 대신 결과를 미리보기로만 보여준다("저장 전 프롬프트 테스트").
+  const [previewItems, setPreviewItems] = useState<GeneratedItem[] | null>(null);
+
+  async function handleSave() {
+    setSaving(true);
+    setError(null);
+    setInfo(null);
+    try {
+      const url = category ? `/api/good-words/categories/${category.id}` : '/api/good-words/categories';
+      const method = category ? 'PATCH' : 'POST';
+      const res = await fetch(url, {
+        method,
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ label, classification, prompt }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error ?? '저장에 실패했습니다.');
+      const saved = category
+        ? { ...category, label, classification: classification || null, prompt }
+        : (data.category as GoodWordsCategory);
+      setCategory(saved);
+      setInfo('저장되었습니다.');
+      onSaved(saved);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : '저장에 실패했습니다.');
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  async function handleGenerate() {
+    if (!prompt.trim()) { setError('AI 프롬프트를 입력해주세요.'); return; }
+    setGenerating(true);
+    setError(null);
+    setInfo(null);
+    setPreviewItems(null);
+    try {
+      const genRes = await fetch('/api/good-words/generate', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ prompt }),
+      });
+      const genData = await genRes.json();
+      if (!genRes.ok) throw new Error(genData.error ?? '생성에 실패했습니다.');
+
+      const items: GeneratedItem[] = genData.items;
+      if (items.length === 0) {
+        setInfo(`${genData.provider} 제공자로 생성된 항목이 없습니다.`);
+        return;
+      }
+
+      // 아직 저장 안 한 새 카테고리는 저장할 category id가 없다 — 미리보기만 보여주고,
+      // "저장" 눌러서 카테고리를 만든 뒤 다시 생성하면 그때 자동 저장된다.
+      if (!category) {
+        setPreviewItems(items);
+        setInfo(`${genData.provider} 제공자로 ${items.length}개 생성됨 (미리보기 — 저장하려면 먼저 카테고리를 저장하세요)`);
+        return;
+      }
+
+      const saveRes = await fetch('/api/good-words', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          items: items.map((it) => ({ category: category.id, content: it.content, source: it.source })),
+        }),
+      });
+      const saveData = await saveRes.json();
+      if (!saveRes.ok) throw new Error(saveData.error ?? '저장에 실패했습니다.');
+
+      onGenerated(`${genData.provider} 제공자로 ${items.length}개 생성, ${saveData.saved}개 저장됨`);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : '생성에 실패했습니다.');
+    } finally {
+      setGenerating(false);
+    }
+  }
+
+  return (
+    <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50 px-4">
+      <div className="bg-white rounded-lg shadow-xl w-[1000px] h-[88vh] max-w-full flex flex-col relative">
+        {generating && (
+          <div className="absolute inset-0 bg-white/95 rounded-lg z-10 flex flex-col items-center justify-center gap-3">
+            <div className="w-8 h-8 border-2 border-gray-200 border-t-neutral-900 rounded-full animate-spin" />
+            <p className="text-sm text-gray-600">좋은글을 생성하고 있습니다...</p>
+            <p className="text-xs text-gray-400">최대 1~2분 정도 걸릴 수 있어요.</p>
+          </div>
+        )}
+
+        <div className="shrink-0 flex items-center justify-between px-5 py-3 border-b border-gray-200">
+          <span className="text-sm font-bold text-gray-800">카테고리 {category ? '수정' : '생성'}</span>
+          <button onClick={onClose} className="text-gray-400 hover:text-gray-700 text-lg leading-none">✕</button>
+        </div>
+
+        <div className="flex-1 overflow-y-auto px-5 py-4 space-y-4">
+          <div>
+            <label className="block text-xs font-semibold text-gray-600 mb-1.5">제목 <span className="text-red-500">*</span></label>
+            <input
+              value={label}
+              onChange={(e) => setLabel(e.target.value)}
+              placeholder="카테고리의 제목을 입력하세요."
+              maxLength={30}
+              className="w-full px-3 py-2 border border-gray-200/80 bg-white/60 rounded-md text-sm text-gray-800 focus:outline-none focus:border-neutral-500 focus:ring-1 focus:ring-neutral-500 transition-colors"
+            />
+          </div>
+          <div>
+            <label className="block text-xs font-semibold text-gray-600 mb-1.5">분류</label>
+            <input
+              value={classification}
+              onChange={(e) => setClassification(e.target.value)}
+              placeholder="카테고리의 분류를 입력하세요."
+              maxLength={50}
+              className="w-full px-3 py-2 border border-gray-200/80 bg-white/60 rounded-md text-sm text-gray-800 focus:outline-none focus:border-neutral-500 focus:ring-1 focus:ring-neutral-500 transition-colors"
+            />
+          </div>
+          <div>
+            <label className="block text-xs font-semibold text-gray-600 mb-1.5">프롬프트 <span className="text-red-500">*</span></label>
+            <textarea
+              value={prompt}
+              onChange={(e) => setPrompt(e.target.value)}
+              placeholder="AI 프롬프트를 입력하세요."
+              style={{ height: '472px' }}
+              className="w-full px-3 py-2 border border-gray-200/80 bg-white/60 rounded-md text-sm text-gray-800 leading-relaxed focus:outline-none focus:border-neutral-500 focus:ring-1 focus:ring-neutral-500 transition-colors"
+            />
+          </div>
+
+          {error && <p className="text-xs text-red-500">{error}</p>}
+          {info && <p className="text-xs text-gray-500">{info}</p>}
+
+          {previewItems && (
+            <div className="border border-dashed border-gray-300 rounded-lg p-3 space-y-2 max-h-48 overflow-y-auto">
+              {previewItems.map((it, i) => (
+                <div key={i} className="text-xs text-gray-600 border-b border-gray-100 pb-2 last:border-0">
+                  <p>{it.content}</p>
+                  <p className="text-gray-400 mt-1">{`< ${it.source} >`}</p>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+
+        <div className="shrink-0 flex items-center justify-end gap-2 px-5 py-3 border-t border-gray-200">
+          {category && (
+            <button
+              onClick={() => onDeleteCategory(category)}
+              className="px-3 py-2 text-xs text-red-500 border border-gray-200/80 rounded-lg hover:border-red-400 hover:bg-red-50 transition-colors mr-auto"
+            >
+              삭제
+            </button>
+          )}
+          <button onClick={onClose} className="px-3 py-2 text-xs text-gray-600 border border-gray-200/80 rounded-lg hover:border-neutral-500 hover:text-neutral-900 hover:bg-neutral-100/60 transition-colors">
+            취소
+          </button>
+          <button
+            onClick={handleSave}
+            disabled={saving}
+            className="px-3 py-2 text-xs font-semibold rounded-lg bg-neutral-900 text-white hover:bg-neutral-700 disabled:opacity-50 transition-colors"
+          >
+            {saving ? '저장 중...' : '저장'}
+          </button>
+          <button
+            onClick={handleGenerate}
+            disabled={generating}
+            title={category ? undefined : '생성 결과를 미리보기만 하고, 저장하려면 먼저 "저장"을 눌러 카테고리를 만드세요.'}
+            className="px-3 py-2 text-xs rounded-lg border border-gray-200/80 text-gray-700 hover:border-neutral-500 hover:bg-neutral-100/60 disabled:opacity-50 transition-colors"
+          >
+            좋은글 생성{category ? '' : ' (미리보기)'}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function EditItemModal({
+  item, onClose, onSave,
+}: {
+  item: ArchiveItem | null;
+  onClose: () => void;
+  onSave: (content: string, source: string | null) => Promise<void>;
+}) {
+  const [content, setContent] = useState(item?.content ?? '');
+  const [source, setSource] = useState(item?.source ?? '');
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  async function handleSave() {
+    if (!content.trim()) { setError('내용을 입력해주세요.'); return; }
+    setSaving(true);
+    setError(null);
+    try {
+      await onSave(content.trim(), source.trim() || null);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : (item ? '수정에 실패했습니다.' : '추가에 실패했습니다.'));
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  return (
+    <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50 px-4">
+      <div className="bg-white rounded-lg shadow-xl w-[1000px] max-w-full max-h-[85vh] flex flex-col">
+        <div className="shrink-0 flex items-center justify-between px-5 py-3 border-b border-gray-200">
+          <span className="text-sm font-bold text-gray-800">좋은글 {item ? '수정' : '추가'}</span>
+          <button onClick={onClose} className="text-gray-400 hover:text-gray-700 text-lg leading-none">✕</button>
+        </div>
+
+        <div className="flex-1 overflow-y-auto px-5 py-4 space-y-4">
+          <div>
+            <label className="block text-xs font-semibold text-gray-600 mb-1.5">내용</label>
+            <textarea
+              value={content}
+              onChange={(e) => setContent(e.target.value)}
+              rows={10}
+              className="w-full px-3 py-2 border border-gray-200/80 bg-white/60 rounded-md text-sm text-gray-800 leading-relaxed focus:outline-none focus:border-neutral-500 focus:ring-1 focus:ring-neutral-500 transition-colors"
+            />
+          </div>
+          <div>
+            <label className="block text-xs font-semibold text-gray-600 mb-1.5">출처</label>
+            <input
+              value={source}
+              onChange={(e) => setSource(e.target.value)}
+              placeholder="예: 이효석 · 낙엽을 태우면서"
+              className="w-full px-3 py-2 border border-gray-200/80 bg-white/60 rounded-md text-sm text-gray-800 focus:outline-none focus:border-neutral-500 focus:ring-1 focus:ring-neutral-500 transition-colors"
+            />
+          </div>
+          {error && <p className="text-xs text-red-500">{error}</p>}
+        </div>
+
+        <div className="shrink-0 flex items-center justify-end gap-2 px-5 py-3 border-t border-gray-200">
+          <button onClick={onClose} className="px-3 py-2 text-xs text-gray-600 border border-gray-200/80 rounded-lg hover:border-neutral-500 hover:text-neutral-900 hover:bg-neutral-100/60 transition-colors">
+            취소
+          </button>
+          <button
+            onClick={handleSave}
+            disabled={saving}
+            className="px-3 py-2 text-xs font-semibold rounded-lg bg-neutral-900 text-white hover:bg-neutral-700 disabled:opacity-50 transition-colors"
+          >
+            {saving ? '저장 중...' : '저장'}
+          </button>
+        </div>
+      </div>
     </div>
   );
 }

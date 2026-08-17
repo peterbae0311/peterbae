@@ -1,126 +1,141 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createServerSupabaseClient } from '@/lib/supabaseServer';
-import { getCategoryLabel } from '@/lib/goodWords/categoriesDb';
+import { SUPER_ADMIN_EMAIL } from '@/lib/apps';
 import { callChatWithFallback } from '@/lib/goodWords/aiProviders';
-import { filterGoodWordsBatch, MIN_LENGTH as GUARDRAIL_MIN, MAX_LENGTH as GUARDRAIL_MAX } from '@/lib/goodWords/guardrail';
 import { handleApiError } from '@/lib/goodWords/apiError';
 
-const GENERATE_COUNT = 15;
+const GENERATE_COUNT = 20;
+const MAX_CONTENT_LENGTH = 400;
+const MAX_ATTEMPTS = 3;
+const MAX_PROMPT_LENGTH = 4000;
 
-// LLM은 숫자 글자수 지시만으로는 분량을 잘 못 맞추고 한두 문장짜리 짧은 명언체로 회귀하는
-// 경향이 강하다(Groq llama-3.3-70b 실측 확인 — 80~150자 지시에도 13~76자짜리를 반복 생성).
-// 범위의 하한·상한에 각각 걸치는 예시 2개를 동시에 주고 "이 두 예시 사이 분량"이라고
-// 프레이밍하면 훨씬 안정적으로 맞춘다(단일 예시 + 문구 경고만으로는 부족했음).
-const SHORT_EXAMPLE =
-  '오늘 하루도 마음이 많이 지쳤죠. 애써 괜찮은 척하지 않아도 돼요. ' +
-  '지금은 잠시 멈춰 숨을 골라도 괜찮습니다. 당신의 속도대로 천천히 걸어가면 충분합니다.';
-const LONG_EXAMPLE =
-  '오늘 하루도 마음이 많이 지쳤죠. 애써 괜찮은 척하지 않아도 돼요. ' +
-  '흔들리는 날이 있다는 건 그만큼 열심히 살아왔다는 증거니까요. 지금은 잠시 멈춰 숨을 골라도 괜찮습니다. ' +
-  '당신의 속도대로 천천히 걸어가면 그것으로 충분합니다.';
+const OUTPUT_FORMAT_HINT =
+  `\n\n요청한 개수만큼 서로 다른 항목을 JSON 배열로만 응답하세요(다른 설명이나 코드블록 없이). ` +
+  `각 항목은 반드시 {"content": "...", "source": "저자명 · 자료명"} 형태여야 합니다 ` +
+  `(content는 ${MAX_CONTENT_LENGTH}자 이내, source는 "저자명 · 자료명" 형식 — 가운데점은 U+00B7 MIDDLE DOT — 예: "이효석 · 낙엽을 태우면서").`;
 
-function buildPrompt(label: string, count: number, isRetry: boolean) {
-  const system =
-    '당신은 따뜻한 위로와 공감의 글을 쓰는 작가입니다. 다음 조건을 모두 지켜 한국어로 글을 씁니다.\n' +
-    `- 분량: 반드시 3~4개의 문장으로 구성해 공백 포함 ${GUARDRAIL_MIN}자~${GUARDRAIL_MAX}자 사이로 쓸 것. ` +
-    `아래 두 예시(각각 ${SHORT_EXAMPLE.length}자, ${LONG_EXAMPLE.length}자)가 허용 분량의 하한·상한이니, ` +
-    '반드시 그 사이 분량으로 쓸 것. 이보다 짧은 한두 문장짜리 명언체는 절대 금지 — ' +
-    '다 쓴 뒤 글자 수를 세어보고 짧으면 문장이나 구절을 추가해 반드시 범위 안으로 늘릴 것\n' +
-    '- 톤: 따뜻함, 공감, 희망, 여운, 위로\n' +
-    '- 금지: 정치적 발언, 혐오·차별 표현, 타인과의 우열/등수 비교, 욕설이나 공격적 표현\n' +
-    '- 출력 형식: 다른 설명이나 코드블록 없이 JSON 문자열 배열만 출력\n\n' +
-    `분량 하한 예시(${SHORT_EXAMPLE.length}자, 내용은 참고만 하고 그대로 베끼지 말 것):\n"${SHORT_EXAMPLE}"\n\n` +
-    `분량 상한 예시(${LONG_EXAMPLE.length}자, 내용은 참고만 하고 그대로 베끼지 말 것):\n"${LONG_EXAMPLE}"` +
-    (isRetry
-      ? `\n\n경고: 이전 시도에서 생성한 글들이 전부 너무 짧아서(${GUARDRAIL_MIN}자 미만) 반려되었다. ` +
-        `이번에는 반드시 위 두 예시 사이 분량(최소 ${GUARDRAIL_MIN}자 이상)으로 작성할 것.`
-      : '');
-  const user = `카테고리 "${label}"를 주제로, 서로 다른 내용의 좋은 글 ${count}개를 JSON 배열로 생성해줘. 각 글은 두 예시 사이의 문장 수와 분량을 반드시 지켜줘.`;
-  return { system, user };
+interface QuoteItem {
+  content: string;
+  source: string;
 }
 
-function extractJsonArray(content: string): string[] {
-  const stripped = content.trim().replace(/^```(?:json)?/i, '').replace(/```$/, '').trim();
+function normalizeItems(parsed: unknown[]): QuoteItem[] {
+  return parsed
+    .filter((v): v is Record<string, unknown> => v !== null && typeof v === 'object')
+    .map((v) => ({
+      content: typeof v.content === 'string' ? v.content.trim() : '',
+      source: typeof v.source === 'string' ? v.source.trim() : '',
+    }))
+    // 400자 한도는 프롬프트로만 지시하면 모델이 자주 넘기므로(실측 확인) 코드에서 하드 컷.
+    .filter((v) => v.content && v.source && v.content.length <= MAX_CONTENT_LENGTH);
+}
+
+// Groq처럼 completion 토큰을 provider별로 낮게 잘라야 하는 경우(aiProviders.ts의
+// maxTokensCap 참고) 20개를 한 번에 다 못 채우고 배열 중간에서 응답이 잘리는 경우가 흔하다
+// (실측 확인) — 마지막으로 완성된 "},{" 경계까지만 잘라 배열을 닫는 방식으로 부분 응답이라도
+// 최대한 살린다. 아예 완성된 항목이 하나도 없으면 그때만 예외를 던진다.
+function extractJsonArray(raw: string): QuoteItem[] {
+  const stripped = raw.trim().replace(/^```(?:json)?/i, '').replace(/```$/, '').trim();
   const start = stripped.indexOf('[');
-  const end = stripped.lastIndexOf(']');
-  if (start === -1 || end === -1 || end < start) {
+  if (start === -1) {
     throw new Error('LLM 응답에서 JSON 배열을 찾지 못했습니다.');
   }
-  const parsed = JSON.parse(stripped.slice(start, end + 1));
-  if (!Array.isArray(parsed) || !parsed.every((v) => typeof v === 'string')) {
-    throw new Error('LLM 응답이 문자열 배열 형식이 아닙니다.');
+  const body = stripped.slice(start);
+
+  const candidates: string[] = [];
+  const lastBracket = body.lastIndexOf(']');
+  if (lastBracket !== -1) candidates.push(body.slice(0, lastBracket + 1));
+  const lastCompleteObj = body.lastIndexOf('},');
+  if (lastCompleteObj !== -1) candidates.push(body.slice(0, lastCompleteObj + 1) + ']');
+  const lastCurly = body.lastIndexOf('}');
+  if (lastCurly !== -1 && lastCurly > lastBracket) candidates.push(body.slice(0, lastCurly + 1) + ']');
+
+  for (const candidate of candidates) {
+    try {
+      const parsed: unknown = JSON.parse(candidate);
+      if (Array.isArray(parsed)) {
+        const items = normalizeItems(parsed);
+        if (items.length > 0) return items;
+      }
+    } catch {
+      // 다음 후보 시도
+    }
   }
-  return parsed;
+
+  throw new Error('LLM 응답에서 완성된 JSON 항목을 하나도 찾지 못했습니다.');
 }
 
+/**
+ * 카테고리 편집 모달에서 (아직 저장하지 않았을 수도 있는) 프롬프트 텍스트를 그대로 받아
+ * 생성만 수행한다 — 카테고리 DB 조회 없이 prompt 문자열 자체가 입력이라, "저장 전 프롬프트
+ * 테스트"가 자연스럽게 된다. 저장은 별도로 POST /api/good-words가 담당한다.
+ */
 export async function POST(request: NextRequest) {
   const supabase = await createServerSupabaseClient();
   const { data: { user } } = await supabase.auth.getUser();
-  if (!user) return NextResponse.json({ error: '로그인이 필요합니다.' }, { status: 401 });
-
-  const body = await request.json().catch(() => null);
-  const category = body?.category;
-  if (typeof category !== 'string' || !category) {
-    return NextResponse.json({ error: '유효하지 않은 카테고리입니다.' }, { status: 400 });
+  // 생성 버튼은 카테고리 관리 모달 안에만 있어 UI상 SUPER_ADMIN만 도달하지만, 공유 LLM
+  // 쿼터를 쓰는 라우트라 다른 쓰기 라우트와 동일하게 서버에서도 명시적으로 막는다.
+  if (!user || user.email !== SUPER_ADMIN_EMAIL) {
+    return NextResponse.json({ error: '생성 권한이 없습니다.' }, { status: 403 });
   }
 
-  const MAX_ATTEMPTS = 5;
+  const body = await request.json().catch(() => null);
+  const prompt = typeof body?.prompt === 'string' ? body.prompt.trim() : '';
+  if (!prompt) {
+    return NextResponse.json({ error: 'AI 프롬프트를 입력해주세요.' }, { status: 400 });
+  }
+  if (prompt.length > MAX_PROMPT_LENGTH) {
+    return NextResponse.json({ error: `AI 프롬프트는 ${MAX_PROMPT_LENGTH}자 이내로 입력해주세요.` }, { status: 400 });
+  }
 
   try {
-    const label = await getCategoryLabel(category);
-    if (!label) {
-      return NextResponse.json({ error: '존재하지 않는 카테고리입니다.' }, { status: 400 });
-    }
-
-    const passed: string[] = [];
+    const passed: QuoteItem[] = [];
     const seen = new Set<string>();
-    let rejectedCount = 0;
     let lastProvider = '';
     const allFailures: string[] = [];
 
-    // 무료 모델은 분량 지시를 잘 못 맞추고 대부분 짧게 써서 가드레일 통과율이 ~40% 수준이다
-    // (실측 확인) — 매번 부족분의 2배를 요청해 통과율 손실을 보정하고, 그래도 못 채우면
-    // 더 강한 경고와 함께 재시도한다.
+    // 무료 모델이 요청 개수를 다 못 채우거나 완전 동일한 항목을 중복 반환하는 경우가 있어
+    // (실측 확인), 부족분의 2배를 요청하며 최대 3회까지 재시도한다. 원문 정확성 자체는
+    // 검증하지 않는다 — LLM이 실제 출판물 원문을 글자 단위로 정확히 재현한다는 보장은 없음.
     for (let attempt = 0; attempt < MAX_ATTEMPTS && passed.length < GENERATE_COUNT; attempt++) {
       const remaining = GENERATE_COUNT - passed.length;
       const requestCount = Math.min(remaining * 2, 30);
-      const { system, user: userPrompt } = buildPrompt(label, requestCount, attempt > 0);
+      const userPrompt = `위 조건에 맞는 항목을 ${requestCount}개 찾아주세요.${OUTPUT_FORMAT_HINT}`;
 
       const { content, provider, failures } = await callChatWithFallback(
         [
-          { role: 'system', content: system },
+          { role: 'system', content: prompt },
           { role: 'user', content: userPrompt },
         ],
-        { maxTokens: 3000, temperature: 0.75 }
+        { maxTokens: 8000, temperature: 0.8 }
       );
       lastProvider = provider;
       allFailures.push(...failures);
 
-      const rawTexts = extractJsonArray(content);
-      const { passed: batchPassed, rejected } = filterGoodWordsBatch(rawTexts);
-      if (batchPassed.length === 0 && rawTexts.length > 0) {
-        console.warn(
-          `[good-words/generate] attempt ${attempt}: ${provider} 응답 ${rawTexts.length}개 전부 반려 — `,
-          rejected.map((r) => `${r.text.length}자(${r.reason})`).join(', ')
-        );
-      }
-      // 무료 모델은 같은 문장을 순서만 바꿔 여러 번 반복하는 경향이 있어(실측 확인),
-      // 정확히 같은 텍스트는 보관함에 중복 저장되지 않도록 여기서 걸러낸다.
-      for (const text of batchPassed) {
-        if (passed.length >= GENERATE_COUNT) break;
-        if (!seen.has(text)) {
-          seen.add(text);
-          passed.push(text);
+      // 파싱 실패(예: provider별 토큰 상한 때문에 배열 중간에서 응답이 잘림)는 이번 시도만
+      // 버리고 다음 시도로 넘어간다 — 전체 요청을 실패시키지 않는다.
+      try {
+        const items = extractJsonArray(content);
+        for (const item of items) {
+          if (passed.length >= GENERATE_COUNT) break;
+          if (!seen.has(item.content)) {
+            seen.add(item.content);
+            passed.push(item);
+          }
         }
+      } catch (err) {
+        allFailures.push(err instanceof Error ? err.message : String(err));
       }
-      rejectedCount += rejected.length;
+    }
+
+    if (passed.length === 0) {
+      throw new Error(allFailures.join(' / ') || '생성된 항목이 없습니다.');
     }
 
     return NextResponse.json({
-      texts: passed,
+      items: passed,
       provider: lastProvider,
       providerFailures: allFailures,
-      rejectedCount,
     });
   } catch (err) {
     return handleApiError(err);

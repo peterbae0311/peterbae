@@ -1,12 +1,10 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createServerSupabaseClient } from '@/lib/supabaseServer';
 import { SUPER_ADMIN_EMAIL } from '@/lib/apps';
-import { renameCategory, deleteCategory, categoryLabelExists } from '@/lib/goodWords/categoriesDb';
+import { updateCategory, deleteCategory, categoryLabelExists, parseCategoryInput } from '@/lib/goodWords/categoriesDb';
 import { handleApiError } from '@/lib/goodWords/apiError';
 
-const MAX_LABEL_LENGTH = 20;
-
-/** 카테고리 이름 변경 — SUPER_ADMIN만 가능. */
+/** 카테고리 수정(제목/분류/프롬프트) — SUPER_ADMIN만 가능. */
 export async function PATCH(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   const supabase = await createServerSupabaseClient();
   const { data: { user } } = await supabase.auth.getUser();
@@ -16,29 +14,24 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
 
   const { id } = await params;
   const body = await request.json().catch(() => null);
-  const label = typeof body?.label === 'string' ? body.label.trim() : '';
-  if (!label) {
-    return NextResponse.json({ error: '카테고리 이름을 입력해주세요.' }, { status: 400 });
-  }
-  if (label.length > MAX_LABEL_LENGTH) {
-    return NextResponse.json({ error: `카테고리 이름은 ${MAX_LABEL_LENGTH}자 이내로 입력해주세요.` }, { status: 400 });
-  }
+  const { input, error } = parseCategoryInput(body);
+  if (!input) return NextResponse.json({ error }, { status: 400 });
 
   try {
-    if (await categoryLabelExists(label, id)) {
+    if (await categoryLabelExists(input.label, id)) {
       return NextResponse.json({ error: '이미 같은 이름의 카테고리가 있습니다.' }, { status: 409 });
     }
-    const updated = await renameCategory(id, label);
+    const updated = await updateCategory(id, input);
     if (!updated) return NextResponse.json({ error: '존재하지 않는 카테고리입니다.' }, { status: 404 });
-    return NextResponse.json({ id, label });
+    return NextResponse.json({ id, ...input });
   } catch (err) {
     return handleApiError(err);
   }
 }
 
 /**
- * 카테고리 삭제 — SUPER_ADMIN만 가능. DB의 ON DELETE CASCADE가 관련 good_words 행을
- * 함께 제거하므로(oracle/good-words-schema.sql 참고), 애플리케이션에서 별도로 지울 필요 없음.
+ * 카테고리 소프트 삭제 — SUPER_ADMIN만 가능. 카테고리와 그 안의 좋은글을 같은 트랜잭션으로
+ * 함께 소프트 삭제한다(개별 좋은글 삭제와 동일한 복구 가능 정책 — categoriesDb.ts 참고).
  */
 export async function DELETE(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   const supabase = await createServerSupabaseClient();
@@ -50,7 +43,7 @@ export async function DELETE(request: NextRequest, { params }: { params: Promise
   const { id } = await params;
 
   try {
-    const deleted = await deleteCategory(id);
+    const deleted = await deleteCategory(id, user.email);
     if (!deleted) return NextResponse.json({ error: '존재하지 않는 카테고리입니다.' }, { status: 404 });
     return new NextResponse(null, { status: 204 });
   } catch (err) {

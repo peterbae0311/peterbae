@@ -7,53 +7,72 @@
 -- ============================================================
 
 CREATE TABLE good_words (
-  id          VARCHAR2(36)              NOT NULL,
-  -- 처음엔 VARCHAR2(20)(고정 8종 슬러그)였으나, 카테고리를 사용자가 자유롭게 생성할 수 있게
-  -- 되면서 새 카테고리 id는 UUID(36자)로 발급 — 기존 8종 슬러그도 계속 유효(good_words_categories
-  -- 시드 참고), 2026-08-15에 VARCHAR2(36)으로 확장.
-  category    VARCHAR2(36)              NOT NULL,
-  -- 80~150자(가드레일, 2026-08-15부터 — 이전엔 150~200자) 한글 기준 최대 600바이트(4바이트/자)
-  -- 여유를 두어 1000바이트로 설정(기존 길이 유지, 축소는 불필요).
-  content     VARCHAR2(1000)            NOT NULL,
-  -- 글의 출처 — LLM 생성분은 'AI', 출처가 불분명하면 NULL(화면에는 공백 처리). 2026-08-15 추가.
-  source      VARCHAR2(50),
-  created_at  TIMESTAMP WITH TIME ZONE  DEFAULT SYSTIMESTAMP NOT NULL,
-  created_by  VARCHAR2(255)             NOT NULL,
+  id            VARCHAR2(36)              NOT NULL,
+  category      VARCHAR2(36)              NOT NULL,
+  -- 근대 문학 원문 발췌라 한 문단이 꽤 길 수 있어(2026-08-16, 화면설계서 반영으로 콘텐츠가
+  -- "AI가 지어낸 150~200자 위로 문구"에서 "실제 문학 작품 발췌"로 바뀌면서 VARCHAR2(4000)으로 확장).
+  content       VARCHAR2(4000)            NOT NULL,
+  -- 저장 시점 중복 방지용 해시(ORA_HASH(content)) — 아래 idx_good_words_dedup 유니크 인덱스가
+  -- 이 값을 기준으로 한다. content를 그대로 유니크 인덱스에 걸면 멀티바이트(한글) 콘텐츠가
+  -- Oracle의 인덱스 키 길이 한도를 넘길 수 있어 해시로 우회했다(2026-08-17).
+  content_hash  NUMBER                    NOT NULL,
+  -- 글의 출처 — "저자명 · 자료명" 형태(예: 이효석 · 낙엽을 태우면서). 불분명하면 NULL(화면 공백 처리).
+  source        VARCHAR2(200),
+  created_at    TIMESTAMP WITH TIME ZONE  DEFAULT SYSTIMESTAMP NOT NULL,
+  created_by    VARCHAR2(255)             NOT NULL,
   -- 소프트 삭제 — SUPER_ADMIN_EMAIL만 삭제 가능(오남용 방지를 위해 하드 삭제 대신 로그 보존).
-  deleted_at  TIMESTAMP WITH TIME ZONE,
-  deleted_by  VARCHAR2(255),
+  deleted_at    TIMESTAMP WITH TIME ZONE,
+  deleted_by    VARCHAR2(255),
   CONSTRAINT pk_good_words PRIMARY KEY (id)
 );
 
 -- 카테고리별 보관함 목록 조회(deleted_at IS NULL 필터 + created_at 정렬)가 가장 흔한 쿼리.
 CREATE INDEX idx_good_words_category ON good_words (category, created_at DESC);
 
+-- 같은 카테고리에 완전히 동일한 문장이 중복 저장되는 것을 DB가 원자적으로 막는다("삭제 전까지
+-- 계속 누적" 요구사항 — 여러 번 생성해도 중복은 안 쌓여야 함). 애초에 SELECT로 먼저 확인하고
+-- INSERT하는 방식은 두 요청이 거의 동시에 들어오면 둘 다 통과해버리는 레이스 컨디션이 있었다
+-- (2026-08-17 실측 확인 후 이 유니크 인덱스로 교체). 세 번째 컬럼의 CASE는 Oracle에 부분
+-- 유니크 인덱스 문법이 없어 흉내낸 것 — 삭제 안 된 행끼리만 (category, content_hash) 유니크를
+-- 강제하고, 삭제된 행은 서로/현재행과 절대 충돌하지 않게(ora_hash(id)는 행마다 달라 사실상 유니크).
+CREATE UNIQUE INDEX idx_good_words_dedup ON good_words (
+  category, content_hash, (CASE WHEN deleted_at IS NULL THEN 0 ELSE ora_hash(id) END)
+);
+
 -- ============================================================
--- 카테고리 관리(생성/수정/삭제/순서 변경) — 2026-08-15 추가
--- id는 good_words.category가 그대로 참조하는 안정적 식별자(사용자가 라벨을 바꿔도 안 바뀜).
--- 기존 8종은 하위호환을 위해 예전 슬러그를 id로 그대로 시드했고, 새로 만드는 카테고리는
--- 애플리케이션에서 randomUUID()로 id를 발급한다.
+-- 카테고리 관리(생성/수정/삭제/순서 변경)
+-- id는 good_words.category가 그대로 참조하는 안정적 식별자(라벨을 바꿔도 안 바뀜) — 애플리케이션에서
+-- randomUUID()로 발급한다.
+--
+-- classification/prompt는 2026-08-16 화면설계서 반영으로 추가 — 카테고리는 감정 테마(위로/사랑 등)가
+-- 아니라 "수필/소설/평론/격언" 같은 문학 장르 탭이고, 각 카테고리가 저마다 다른 전용 AI 프롬프트를
+-- 갖는다(예: 수필 탭은 "근대 수필에서 퍼블릭 도메인 문장을 찾아라", 격언 탭은 "명언·격언을 찾아라").
+-- 한때 전역 공용 프롬프트 테이블(good_words_prompt_config)을 따로 뒀으나 배포 전에 이 방식으로
+-- 대체됐다.
 -- ============================================================
 CREATE TABLE good_words_categories (
-  id          VARCHAR2(36)              NOT NULL,
-  label       VARCHAR2(50)              NOT NULL,
-  sort_order  NUMBER(10)                NOT NULL,
-  created_at  TIMESTAMP WITH TIME ZONE  DEFAULT SYSTIMESTAMP NOT NULL,
+  id              VARCHAR2(36)              NOT NULL,
+  label           VARCHAR2(50)              NOT NULL,
+  classification  VARCHAR2(50),
+  prompt          CLOB                      NOT NULL,
+  sort_order      NUMBER(10)                NOT NULL,
+  created_at      TIMESTAMP WITH TIME ZONE  DEFAULT SYSTIMESTAMP NOT NULL,
+  -- 소프트 삭제 — good_words와 동일한 정책(2026-08-17부터). 카테고리 삭제 시 애플리케이션이
+  -- 카테고리 자신과 그 안의 good_words 행을 같은 트랜잭션으로 함께 소프트 삭제한다
+  -- (lib/goodWords/categoriesDb.ts의 deleteCategory 참고). 처음엔 FK의 ON DELETE CASCADE로
+  -- 하드 삭제했었는데, 복구 불가능한 삭제라 앱의 "삭제는 소프트 삭제 + 로그 기록" 정책과
+  -- 어긋나 바꿨다.
+  deleted_at      TIMESTAMP WITH TIME ZONE,
+  deleted_by      VARCHAR2(255),
   CONSTRAINT pk_good_words_categories PRIMARY KEY (id)
 );
 
--- 카테고리 삭제 시 관련 좋은글을 DB 레벨에서 원자적으로 함께 제거(ON DELETE CASCADE) —
--- 애플리케이션에서 "카테고리 삭제 후 관련 글 삭제"를 2단계로 나누면 중간에 실패했을 때
--- 고아 레코드가 남을 수 있어, FK cascade로 일관성을 보장한다.
+-- CASCADE는 이제 정상 앱 흐름에서는 발동하지 않는다(위 소프트 삭제 참고) — 누군가 수동으로
+-- 카테고리 행을 하드 DELETE하는 예외적 상황에서도 고아 good_words 행이 안 남게 하는
+-- 방어적 안전장치로만 남겨둔다.
 ALTER TABLE good_words ADD CONSTRAINT fk_good_words_category
   FOREIGN KEY (category) REFERENCES good_words_categories (id) ON DELETE CASCADE;
 
-INSERT INTO good_words_categories (id, label, sort_order) VALUES ('comfort', '위로', 0);
-INSERT INTO good_words_categories (id, label, sort_order) VALUES ('love', '사랑', 1);
-INSERT INTO good_words_categories (id, label, sort_order) VALUES ('family', '가족', 2);
-INSERT INTO good_words_categories (id, label, sort_order) VALUES ('life', '인생', 3);
-INSERT INTO good_words_categories (id, label, sort_order) VALUES ('relationship', '인간관계', 4);
-INSERT INTO good_words_categories (id, label, sort_order) VALUES ('courage', '용기', 5);
-INSERT INTO good_words_categories (id, label, sort_order) VALUES ('gratitude', '감사', 6);
-INSERT INTO good_words_categories (id, label, sort_order) VALUES ('rest', '쉼', 7);
-COMMIT;
+-- 초기 4개 카테고리(화면설계서 slide1 기준) — 실제 prompt 전문은 이 파일이 아니라
+-- hub/src/app/api/good-words/categories에서 관리자가 입력한 값을 그대로 저장/조회한다.
+-- 아래는 seed 목적의 예시일 뿐, 운영 중에는 화면의 카테고리 관리 모달로 자유롭게 수정한다.
