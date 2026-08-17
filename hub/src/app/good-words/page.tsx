@@ -391,10 +391,8 @@ export default function GoodWordsPage() {
           }}
           onDeleted={() => setCategoryModal(null)}
           onDeleteCategory={handleDeleteCategory}
-          onGenerated={async (info) => {
+          onGenerated={async () => {
             await loadArchive();
-            if (info) setMessage(info);
-            setCategoryModal(null);
           }}
         />
       )}
@@ -443,7 +441,7 @@ function CategoryModal({
   onSaved: (saved: GoodWordsCategory) => void;
   onDeleted: () => void;
   onDeleteCategory: (cat: GoodWordsCategory) => void;
-  onGenerated: (info?: string) => void;
+  onGenerated: () => void;
 }) {
   const [category, setCategory] = useState<GoodWordsCategory | null>(state.mode === 'edit' ? state.category : null);
   const [label, setLabel] = useState(category?.label ?? '');
@@ -455,6 +453,9 @@ function CategoryModal({
   const [generating, setGenerating] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [info, setInfo] = useState<string | null>(null);
+  // "좋은글 생성" 완료 결과("groq 제공자로 8개 생성, 8개 저장됨") — 메인 화면에는 안 보이고
+  // 이 모달 상단 제목 옆에만 표시한다(요청사항).
+  const [generateResult, setGenerateResult] = useState<string | null>(null);
   // 카테고리를 아직 저장하지 않은 생성 화면(신규)에서는 저장할 카테고리 id가 없어 자동
   // 저장이 불가능하다 — 대신 결과를 미리보기로만 보여준다("저장 전 프롬프트 테스트").
   const [previewItems, setPreviewItems] = useState<GeneratedItem[] | null>(null);
@@ -491,6 +492,7 @@ function CategoryModal({
     setGenerating(true);
     setError(null);
     setInfo(null);
+    setGenerateResult(null);
     setPreviewItems(null);
     try {
       const genRes = await fetch('/api/good-words/generate', {
@@ -525,7 +527,8 @@ function CategoryModal({
       const saveData = await saveRes.json();
       if (!saveRes.ok) throw new Error(saveData.error ?? '저장에 실패했습니다.');
 
-      onGenerated(`${genData.provider} 제공자로 ${items.length}개 생성, ${saveData.saved}개 저장됨`);
+      setGenerateResult(`${genData.provider} 제공자로 ${items.length}개 생성, ${saveData.saved}개 저장됨`);
+      onGenerated();
     } catch (err) {
       setError(err instanceof Error ? err.message : '생성에 실패했습니다.');
     } finally {
@@ -545,7 +548,10 @@ function CategoryModal({
         )}
 
         <div className="shrink-0 flex items-center justify-between px-5 py-3 border-b border-gray-200">
-          <span className="text-sm font-bold text-gray-800">카테고리 {category ? '수정' : '생성'}</span>
+          <div className="flex items-center gap-3">
+            <span className="text-sm font-bold text-gray-800">카테고리 {category ? '수정' : '생성'}</span>
+            {generateResult && <span className="text-xs text-gray-500">{generateResult}</span>}
+          </div>
           <button onClick={onClose} className="text-gray-400 hover:text-gray-700 text-lg leading-none">✕</button>
         </div>
 
