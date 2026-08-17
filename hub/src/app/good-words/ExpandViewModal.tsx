@@ -9,10 +9,14 @@ interface ExpandItem {
   translation: string | null;
 }
 
-// 음성 읽기는 항상 ko-KR 발화기로 재생하므로, 원문이 한국어가 아니면 번역을 대신 읽는다
-// (번역이 없으면 원문을 그대로 읽는다 — 예전 동작과 동일).
-function speechTextOf(item: ExpandItem) {
-  return item.translation || item.content;
+const HANGUL_RE = /[ㄱ-ㆎ가-힣]/;
+
+// 음성 읽기는 항상 ko-KR 발화기로 재생한다 — 원문 자체가 한국어면 그대로 읽고, 아니면
+// 번역이 있을 때만 번역을 읽는다. 번역이 필요한(=원문이 한국어가 아닌) 글인데 번역이 없으면
+// 어색한 발음으로 외국어 원문을 그대로 읽지 않도록 null을 반환해 그 글을 건너뛴다.
+function speechTextOf(item: ExpandItem): string | null {
+  if (HANGUL_RE.test(item.content)) return item.content;
+  return item.translation || null;
 }
 
 const VOLUME_KEY = 'good-words:tts-volume';
@@ -95,8 +99,30 @@ export default function ExpandViewModal({
     return () => window.speechSynthesis.removeEventListener('voiceschanged', loadVoices);
   }, [ttsSupported]);
 
-  const speak = useCallback((text: string) => {
+  // skipCount는 "번역이 없어서 건너뛴 글"이 몇 개나 연속됐는지 세어, 모든 글이 읽을 수 없는
+  // 경우(전부 외국어인데 번역이 하나도 없는 등) 무한 재귀에 빠지지 않게 막는 안전장치다.
+  const speak = useCallback((item: ExpandItem, skipCount = 0) => {
     if (!ttsSupported) return;
+    // 다음 글로 넘어가서 이어 읽는다(문장이동까지 같이 켜져 있을 때만) — 아니면 읽기를 멈춘다.
+    // playingRef를 다시 확인하는 이유: 이 시점엔 사용자가 이미 "음성 읽기"를 껐을 수 있어(비동기
+    // 콜백) — 꺼진 상태인데도 autoAdvancing만 보고 계속 이어 읽으면 체크 해제가 안 먹는 버그가 된다.
+    const advanceOrStop = (nextSkipCount: number) => {
+      if (autoAdvancing && playingRef.current && items.length > 1 && nextSkipCount < items.length) {
+        const next = (indexRef.current + 1) % items.length;
+        chainedAdvanceRef.current = true;
+        setIndex(next);
+        speak(items[next], nextSkipCount);
+      } else {
+        setPlaying(false);
+      }
+    };
+
+    const text = speechTextOf(item);
+    if (!text) {
+      // 원문이 한국어가 아닌데 번역이 없는 글 — 어색하게 원문을 읽지 않고 소리 없이 건너뛴다.
+      advanceOrStop(skipCount + 1);
+      return;
+    }
     window.speechSynthesis.cancel();
     const utterance = new SpeechSynthesisUtterance(text);
     utterance.lang = 'ko-KR';
@@ -104,20 +130,9 @@ export default function ExpandViewModal({
     utterance.rate = rate;
     const voice = voices.find((v) => v.voiceURI === voiceURI);
     if (voice) utterance.voice = voice;
-    utterance.onend = () => {
-      // 문장이동(▶)까지 같이 켜져 있으면 읽기가 끝난 시점에 다음 글로 넘어가서 이어 읽는다
-      // (이때 이동 시간 선택은 의미가 없어져 disable 처리 — 아래 렌더 부분 참고). playingRef를
-      // 다시 확인하는 이유: 이 시점엔 사용자가 이미 "음성 읽기"를 껐을 수 있어(비동기 콜백) —
-      // 꺼진 상태인데도 autoAdvancing만 보고 계속 이어 읽으면 체크 해제가 안 먹는 버그가 된다.
-      if (autoAdvancing && playingRef.current && items.length > 1) {
-        const next = (indexRef.current + 1) % items.length;
-        chainedAdvanceRef.current = true;
-        setIndex(next);
-        speak(speechTextOf(items[next]));
-      } else {
-        setPlaying(false);
-      }
-    };
+    // 문장이동(▶)까지 같이 켜져 있으면 읽기가 끝난 시점에 다음 글로 넘어가서 이어 읽는다
+    // (이때 이동 시간 선택은 의미가 없어져 disable 처리 — 아래 렌더 부분 참고).
+    utterance.onend = () => advanceOrStop(0);
     window.speechSynthesis.speak(utterance);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [ttsSupported, volume, rate, voices, voiceURI, autoAdvancing, items]);
@@ -127,7 +142,7 @@ export default function ExpandViewModal({
   // 다음 글로 넘기는 연쇄 재생은 예외 — 위 speak()의 onend 참고).
   useEffect(() => {
     if (playing && current) {
-      speak(speechTextOf(current));
+      speak(current);
     } else if (ttsSupported) {
       // 체크 해제 시 진행 중이던 발화를 즉시 멈춘다 — 안 그러면 onend가 뒤늦게 실행되면서
       // (문장이동까지 켜져 있을 때) 이미 꺼둔 뒤에도 다음 문장을 계속 읽어버리는 문제가 있었다.
