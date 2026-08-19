@@ -2723,11 +2723,16 @@
       .app-header,
       .panel-left,
       .panel-right-tabs,
+      #rtabCareerCoaching,
+      #rtabCareerCoaching2,
+      #rtabCareerCoaching3,
       #rtabAiAnalysis,
+      #rtabDiagResult,
       #rtabDiagNotStarted,
       .btn-rediag,
       .btn-start-diag,
       .btn-pdf-dl,
+      .cc2-print-btn,
       .diag-result-header { display: none !important; }
 
       /* PDF 출력용 헤더 표시 */
@@ -2758,7 +2763,7 @@
         overflow: visible !important;
         padding: 0 !important;
       }
-      #rtabDiagResult {
+      #rtabDiagResult.active {
         display: flex !important;
         flex-direction: column;
         gap: 16px;
@@ -2795,6 +2800,297 @@
       }
 
       @page { margin: 15mm 15mm 15mm 15mm; size: A4; }
+
+      /* 커리어 코칭 2 — "전문성 확보.html" 리포트 인쇄 형식 */
+      #rtabCareerCoaching2.active,
+      #rtabCareerCoaching3.active {
+        display: flex !important;
+        flex-direction: column;
+        gap: 16px;
+        padding: 0 !important;
+        overflow: visible !important;
+        height: auto !important;
+        max-height: none !important;
+      }
+      .cc2-section {
+        break-inside: avoid;
+        page-break-inside: avoid;
+        border: 1px solid #ccc !important;
+        box-shadow: none !important;
+      }
+      .cc2-banner,
+      .cc2-cta-box {
+        -webkit-print-color-adjust: exact !important;
+        print-color-adjust: exact !important;
+        color-adjust: exact !important;
+        break-inside: avoid;
+        page-break-inside: avoid;
+      }
+    }
+
+    /* ===== 커리어 코칭 (목업) ===== */
+    .cc-beta-badge {
+      font-size: 11px; font-weight: 700; color: var(--color-secondary);
+      background: var(--color-secondary-light); border: 1px solid #c4b5fd;
+      border-radius: 99px; padding: 3px 11px; white-space: nowrap;
+    }
+    .cc-section-desc {
+      font-size: 11px; color: var(--color-text-muted); opacity: 0.85;
+      margin: -6px 0 14px; line-height: 1.5;
+    }
+    .cc-subtitle {
+      font-size: 13px; font-weight: 700; color: var(--color-text);
+      margin-bottom: 10px;
+    }
+
+    /* 평가 등급 배지 (가로 막대 그래프 우측) */
+    .cc-grade-badge {
+      font-size: 11px; font-weight: 700; border-radius: 99px;
+      padding: 2px 10px; white-space: nowrap; flex-shrink: 0; margin-left: 8px;
+    }
+    .cc-grade-badge.grade-s { color: #7C3AED; background: var(--color-secondary-light); }
+    .cc-grade-badge.grade-a { color: var(--color-primary); background: var(--color-primary-light); }
+    .cc-grade-badge.grade-b { color: #0891B2; background: #E0F2FE; }
+    .cc-grade-badge.grade-c { color: var(--color-warning); background: var(--color-warning-light); }
+    .cc-grade-badge.grade-d { color: var(--color-danger); background: var(--color-danger-light); }
+
+    /* 프로젝트 피드백 카드 */
+    .fb-card {
+      border: 1px solid var(--color-border); border-radius: var(--radius-md);
+      padding: 14px 16px; margin-bottom: 10px; background: var(--color-card);
+    }
+    .fb-card:last-child { margin-bottom: 0; }
+    .fb-card-header {
+      display: flex; align-items: baseline; justify-content: space-between;
+      gap: 10px; margin-bottom: 12px; padding-bottom: 10px;
+      border-bottom: 1px solid var(--color-border-subtle);
+    }
+    .fb-card-title { font-size: 13px; font-weight: 700; color: var(--color-text); }
+    .fb-card-period { font-size: 11px; color: var(--color-text-muted); white-space: nowrap; }
+
+    /* 핵심 키워드 */
+    .fb-keywords-row {
+      display: flex; align-items: center; flex-wrap: wrap; gap: 6px;
+      margin-bottom: 14px;
+    }
+    .fb-keywords-label {
+      font-size: 11px; font-weight: 700; color: var(--color-text-muted);
+      margin-right: 4px; white-space: nowrap;
+    }
+    .fb-keyword-chip {
+      display: inline-block; font-size: 11px; font-weight: 600;
+      color: var(--color-primary); background: var(--color-primary-light);
+      border: 1px solid rgba(37,99,235,0.2);
+      border-radius: 99px; padding: 3px 10px; white-space: nowrap;
+    }
+
+    /* 키워드별 설명 (인사이트 블록) */
+    .fb-insight-block {
+      padding: 10px 0 0; border-top: 1px solid var(--color-border-subtle);
+      margin-top: 10px;
+    }
+    .fb-insight-block:first-of-type { border-top: none; margin-top: 0; padding-top: 0; }
+    .fb-insight-title {
+      font-size: 13px; font-weight: 700; color: var(--color-text);
+      margin-bottom: 4px;
+    }
+    .fb-insight-en {
+      font-size: 11px; font-weight: 500; color: var(--color-text-muted);
+      margin-left: 2px;
+    }
+    .fb-insight-desc {
+      font-size: 12px; color: var(--color-text-muted); line-height: 1.6;
+    }
+
+    /* 커리어 패스 스텝퍼 */
+    .cpath-track {
+      display: flex; align-items: center; margin: 4px 0 16px;
+    }
+    .cpath-step {
+      flex: 1; display: flex; flex-direction: column; align-items: center; gap: 6px;
+      position: relative;
+    }
+    .cpath-step:not(:last-child)::after {
+      content: ''; position: absolute; top: 6px; left: 50%; width: 100%; height: 2px;
+      background: var(--color-border); z-index: 0;
+    }
+    .cpath-step.done:not(:last-child)::after { background: var(--color-primary); }
+    .cpath-dot {
+      width: 14px; height: 14px; border-radius: 50%; background: var(--color-border);
+      border: 2px solid var(--color-card); position: relative; z-index: 1;
+    }
+    .cpath-step.done .cpath-dot { background: var(--color-primary); }
+    .cpath-step.current .cpath-dot {
+      background: #fff; border: 3px solid var(--color-primary); width: 16px; height: 16px;
+      box-shadow: 0 0 0 4px rgba(37,99,235,0.15);
+    }
+    .cpath-label { font-size: 11px; color: var(--color-text-muted); font-weight: 500; text-align: center; }
+    .cpath-step.current .cpath-label { color: var(--color-primary); font-weight: 700; }
+    .cpath-step.done .cpath-label { color: var(--color-text); }
+
+    /* 긍정 피드백 박스 */
+    .cc-feedback-box {
+      font-size: 12.5px; line-height: 1.65; color: var(--color-text);
+      background: var(--color-primary-tint); border: 1px solid var(--color-primary-light);
+      border-radius: var(--radius-md); padding: 12px 14px; margin-bottom: 16px;
+    }
+
+    /* 수평/수직 성장 경로 카드 */
+    .gpath-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 16px; }
+    .gpath-card {
+      border: 1px solid var(--color-border); border-radius: var(--radius-md);
+      padding: 14px; background: var(--color-card);
+    }
+    .gpath-icon { font-size: 18px; margin-bottom: 6px; }
+    .gpath-title { font-size: 12.5px; font-weight: 700; color: var(--color-text); margin-bottom: 6px; }
+    .gpath-desc { font-size: 12px; color: var(--color-text-muted); line-height: 1.55; }
+
+    /* Growth Archetype 카드 */
+    .archetype-card {
+      display: flex; gap: 12px; align-items: flex-start;
+      padding: 14px 16px; background: linear-gradient(135deg, #f5f0ff 0%, #eff6ff 100%);
+      border: 1px solid #ddd6fe; border-radius: var(--radius-lg);
+    }
+    .archetype-icon { font-size: 22px; flex-shrink: 0; line-height: 1.4; }
+    .archetype-name { font-size: 13px; font-weight: 700; color: #6d28d9; margin-bottom: 4px; }
+    .archetype-desc { font-size: 12px; color: #475569; line-height: 1.65; }
+
+    /* 성장 로드맵 */
+    .roadmap-grid { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 10px; }
+    .roadmap-card {
+      border: 1px solid var(--color-border); border-radius: var(--radius-md);
+      padding: 14px; background: var(--color-card);
+    }
+    .roadmap-badge {
+      display: inline-block; font-size: 11px; font-weight: 700; border-radius: 99px;
+      padding: 3px 11px; margin-bottom: 10px;
+    }
+    .roadmap-badge.badge-short { color: var(--color-success-dark); background: var(--color-success-light); }
+    .roadmap-badge.badge-mid   { color: var(--color-primary); background: var(--color-primary-light); }
+    .roadmap-badge.badge-long  { color: var(--color-secondary); background: var(--color-secondary-light); }
+    .roadmap-list { list-style: none; display: flex; flex-direction: column; gap: 8px; padding: 0; }
+    .roadmap-list li {
+      font-size: 12px; color: var(--color-text); line-height: 1.5;
+      padding-left: 14px; position: relative;
+    }
+    .roadmap-list li::before {
+      content: '›'; position: absolute; left: 0; color: var(--color-text-muted); font-weight: 700;
+    }
+
+    /* 전문 역량 제시 번호 배지 */
+    .cc-goal-num {
+      flex-shrink: 0; width: 22px; height: 22px; border-radius: 50%;
+      background: var(--color-primary); color: #fff; font-size: 11px; font-weight: 700;
+      display: flex; align-items: center; justify-content: center; margin-top: 1px;
+    }
+
+    @media (max-width: 1300px) {
+      .gpath-grid, .roadmap-grid { grid-template-columns: 1fr; }
+    }
+
+    /* ===== 커리어 코칭 2 (목업 — 전문성 확보 리포트 형식) ===== */
+    .cc2-banner {
+      background: linear-gradient(135deg, #1e293b 0%, #0f172a 100%);
+      color: #fff; padding: 28px 28px; border-radius: var(--radius-xl);
+      position: relative;
+    }
+    .cc2-banner-badge {
+      display: inline-block; background: rgba(255,255,255,0.15); color: #93c5fd;
+      font-size: 12px; font-weight: 700; padding: 3px 11px; border-radius: 99px;
+      margin-bottom: 10px; letter-spacing: 0.2px;
+    }
+    .cc2-banner-title { font-size: 20px; font-weight: 800; letter-spacing: -0.3px; margin-bottom: 6px; }
+    .cc2-banner-desc { color: #94a3b8; font-size: 13px; line-height: 1.55; }
+    .cc2-print-btn {
+      position: absolute; top: 24px; right: 24px;
+      background: rgba(255,255,255,0.15); color: #fff; border: 1px solid rgba(255,255,255,0.3);
+      padding: 7px 14px; border-radius: var(--radius-md); font-size: 12px; cursor: pointer;
+    }
+    .cc2-print-btn:hover { background: rgba(255,255,255,0.25); }
+
+    .cc2-section {
+      background: var(--color-card); border: 1px solid var(--color-border);
+      border-radius: var(--radius-xl); padding: 22px 24px; box-shadow: var(--shadow-sm);
+    }
+    .cc2-section-title {
+      font-size: 15px; font-weight: 700; color: var(--color-text);
+      display: flex; align-items: center; gap: 8px; margin-bottom: 8px;
+    }
+    .cc2-section-desc {
+      background: var(--color-bg); border: 1px dashed var(--color-border);
+      color: var(--color-text-muted); font-size: 11.5px; line-height: 1.6;
+      padding: 10px 14px; border-radius: var(--radius-md); margin-bottom: 16px;
+    }
+    .cc2-section-desc::before { content: "💡"; margin-right: 6px; }
+
+    .cc2-summary-box {
+      background: var(--color-primary-tint); border-left: 4px solid var(--color-primary);
+      padding: 14px 16px; border-radius: 0 var(--radius-md) var(--radius-md) 0;
+      margin-bottom: 16px; font-weight: 700; font-size: 13.5px; color: var(--color-primary-dark);
+    }
+
+    .cc2-item-card {
+      border: 1px solid var(--color-border); border-radius: var(--radius-lg);
+      padding: 16px 18px; margin-bottom: 12px;
+    }
+    .cc2-item-card:last-child { margin-bottom: 0; }
+    .cc2-item-title { font-size: 13.5px; font-weight: 700; color: var(--color-text); margin-bottom: 8px; }
+    .cc2-item-goal { font-size: 12px; color: var(--color-text-muted); margin-bottom: 8px; }
+    .cc2-keywords { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 10px; }
+    .cc2-tag {
+      background: var(--color-bg); color: var(--color-text-muted); font-size: 11px;
+      font-weight: 600; padding: 3px 10px; border-radius: var(--radius-sm);
+    }
+    .cc2-content-list { list-style: none; }
+    .cc2-content-list li {
+      position: relative; padding-left: 16px; margin-bottom: 6px;
+      font-size: 12px; color: var(--color-text-muted); line-height: 1.55;
+    }
+    .cc2-content-list li::before {
+      content: "•"; position: absolute; left: 0; color: var(--color-primary); font-weight: 700;
+    }
+    .cc2-content-list li strong { color: var(--color-text); }
+
+    .cc2-grid-2col {
+      display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 12px;
+    }
+    .cc2-cap-card {
+      padding: 13px 15px; background: var(--color-bg); border: 1px solid var(--color-border);
+      border-radius: var(--radius-md);
+    }
+    .cc2-cap-card strong { display: block; font-size: 12.5px; color: var(--color-primary-dark); margin-bottom: 5px; }
+    .cc2-cap-card p { font-size: 11.5px; color: var(--color-text-muted); line-height: 1.5; }
+
+    .cc2-roadmap-card {
+      border: 1px solid var(--color-border); border-radius: var(--radius-lg);
+      padding: 16px; background: var(--color-card); position: relative;
+    }
+    .cc2-roadmap-tag {
+      background: var(--color-primary-light); color: var(--color-primary-dark);
+      font-weight: 700; font-size: 11px; padding: 3px 9px; border-radius: var(--radius-sm);
+      display: inline-block; margin-bottom: 8px;
+    }
+
+    .cc2-cta-box {
+      background: linear-gradient(135deg, var(--color-primary-tint) 0%, var(--color-primary-light) 100%);
+      border: 1px solid #bfdbfe; border-radius: var(--radius-lg); padding: 22px; text-align: center;
+    }
+    .cc2-cta-box p { font-size: 13.5px; color: var(--color-primary-dark); font-weight: 700; line-height: 1.55; margin-bottom: 14px; }
+    .cc2-btn-cta {
+      background: var(--color-primary); color: #fff; border: none; padding: 11px 22px;
+      font-size: 13px; font-weight: 700; border-radius: var(--radius-md); cursor: pointer;
+      box-shadow: 0 4px 6px -1px rgba(37,99,235,0.3);
+    }
+    .cc2-btn-cta:hover { background: var(--color-primary-dark); }
+    .cc2-subhead { font-size: 14px; font-weight: 700; color: var(--color-text); margin: 18px 0 8px; }
+    .cc2-subhead-desc { font-size: 11.5px; color: var(--color-text-muted); margin-bottom: 12px; }
+
+    /* 커리어 코칭 2 / 3 — 카드 그리드 2열 고정 */
+    #rtabCareerCoaching2 .cc2-grid-2col,
+    #rtabCareerCoaching3 .cc2-grid-2col { grid-template-columns: repeat(2, 1fr); }
+    @media (max-width: 900px) {
+      #rtabCareerCoaching2 .cc2-grid-2col,
+      #rtabCareerCoaching3 .cc2-grid-2col { grid-template-columns: 1fr; }
     }
 
     /* ===== 반응형 (최소한) ===== */
@@ -2984,13 +3280,804 @@
 
     <!-- 우측 패널 탭 네비게이션 -->
     <div class="panel-right-tabs">
-      <button class="panel-right-tab active" data-rtab="ai-analysis">AI 분석</button>
+      <button class="panel-right-tab active" data-rtab="career-coaching">커리어 코칭 1</button>
+      <button class="panel-right-tab" data-rtab="career-coaching-2">커리어 코칭 2</button>
+      <button class="panel-right-tab" data-rtab="career-coaching-3">커리어 코칭 3</button>
+      <button class="panel-right-tab" data-rtab="ai-analysis">AI 분석</button>
       <button class="panel-right-tab" data-rtab="diag-result">전문성 분석 결과</button>
       <button class="panel-right-tab" data-rtab="diag-not-started">전문성 분석 미실시</button>
     </div>
 
+    <!-- 탭0: 커리어 코칭 (목업) -->
+    <div class="panel-right-content active" id="rtabCareerCoaching">
+
+      <!-- 탭 헤더 -->
+      <div class="diag-result-header">
+        <span class="diag-result-header-title">💬 커리어 코칭 1</span>
+        <span class="cc-beta-badge">AI 코칭 목업</span>
+      </div>
+
+      <!-- 1. AI 역량 진단 -->
+      <div class="diag-section">
+        <div class="diag-section-title">🎯 AI 역량 진단</div>
+        <div class="cc-section-desc">기반 데이터: 전문분야 · 프로젝트 수행이력 · 자격 정보 · 학습 현황</div>
+        <div class="cc-feedback-box" style="margin-bottom:14px;">
+          역량 진단 설문 결과 <b>Skilled 등급 (80점)</b>으로, 반도체 설계·공정·소재 전 영역에서 안정적인 역량 기반을 갖추고 있습니다.
+        </div>
+        <div class="survey-cat-section" style="margin-bottom:0;">
+          <div class="survey-cat-row">
+            <div class="survey-cat-top">
+              <span class="survey-cat-label">반도체 로직 설계 역량</span>
+              <span class="cc-grade-badge grade-s">S · 최우수 (5.0/5)</span>
+            </div>
+            <div class="survey-cat-bar-wrap"><div class="survey-cat-bar-fill" style="width:100%;background:#7C3AED;"></div></div>
+          </div>
+          <div class="survey-cat-row">
+            <div class="survey-cat-top">
+              <span class="survey-cat-label">반도체 검증 및 검사 역량</span>
+              <span class="cc-grade-badge grade-a">A · 우수 (4.0/5)</span>
+            </div>
+            <div class="survey-cat-bar-wrap"><div class="survey-cat-bar-fill" style="width:80%;background:#2563EB;"></div></div>
+          </div>
+          <div class="survey-cat-row">
+            <div class="survey-cat-top">
+              <span class="survey-cat-label">공정 제어 및 센서 데이터 분석 역량</span>
+              <span class="cc-grade-badge grade-a">A · 우수 (4.0/5)</span>
+            </div>
+            <div class="survey-cat-bar-wrap"><div class="survey-cat-bar-fill" style="width:80%;background:#2563EB;"></div></div>
+          </div>
+          <div class="survey-cat-row">
+            <div class="survey-cat-top">
+              <span class="survey-cat-label">공정 최적화 및 실험 설계 역량</span>
+              <span class="cc-grade-badge grade-a">A · 우수 (4.0/5)</span>
+            </div>
+            <div class="survey-cat-bar-wrap"><div class="survey-cat-bar-fill" style="width:80%;background:#2563EB;"></div></div>
+          </div>
+          <div class="survey-cat-row">
+            <div class="survey-cat-top">
+              <span class="survey-cat-label">반도체 소재 특성 평가 및 공정 설계 역량</span>
+              <span class="cc-grade-badge grade-a">A · 우수 (4.0/5)</span>
+            </div>
+            <div class="survey-cat-bar-wrap"><div class="survey-cat-bar-fill" style="width:80%;background:#2563EB;"></div></div>
+          </div>
+          <div class="survey-cat-row" style="margin-bottom:0;">
+            <div class="survey-cat-top">
+              <span class="survey-cat-label">데이터 기반 문제 해결 역량</span>
+              <span class="cc-grade-badge grade-b">B · 양호 (3.0/5)</span>
+            </div>
+            <div class="survey-cat-bar-wrap"><div class="survey-cat-bar-fill" style="width:60%;background:#0891B2;"></div></div>
+          </div>
+        </div>
+      </div>
+
+      <!-- 2. 프로젝트 피드백 -->
+      <div class="diag-section">
+        <div class="diag-section-title">📝 프로젝트 피드백</div>
+        <div class="cc-section-desc">기반 데이터: 프로젝트 입력 내용 · 전문분야 · 프로젝트 수행이력 · 자격 정보 · 학습 현황</div>
+
+        <div class="fb-card">
+          <div class="fb-card-header">
+            <span class="fb-card-title">5nm급 고성능 AI 가속기 로직 설계</span>
+            <span class="fb-card-period">2026.01 ~ 2026.03</span>
+          </div>
+          <div class="fb-keywords-row">
+            <span class="fb-keywords-label">핵심 키워드</span>
+            <span class="fb-keyword-chip">저전력 고성능 아키텍처 설계</span>
+            <span class="fb-keyword-chip">RTL·UVM 기반 검증 역량</span>
+            <span class="fb-keyword-chip">데이터 기반 품질 무결성 확보</span>
+          </div>
+          <div class="fb-insight-block">
+            <div class="fb-insight-title">하드웨어 아키텍처 최적화력 <span class="fb-insight-en">(Architecture Optimization)</span></div>
+            <p class="fb-insight-desc">연산 유닛 배치와 HBM 인터페이스를 통합 설계해 전력·속도·수율을 동시에 개선했다는 점은, 상충하는 제약조건 속에서 최적해를 찾아내는 고난도 설계 역량을 보여줍니다.</p>
+          </div>
+          <div class="fb-insight-block">
+            <div class="fb-insight-title">검증 기반 품질 보증력 <span class="fb-insight-en">(Verification Rigor)</span></div>
+            <p class="fb-insight-desc">UVM 기반 시뮬레이션으로 50여 개의 크리티컬 버그를 사전에 잡아낸 경험은, 양산 이후의 리스크를 최소화하는 꼼꼼한 엔지니어링 태도를 증명합니다.</p>
+          </div>
+        </div>
+
+        <div class="fb-card">
+          <div class="fb-card-header">
+            <span class="fb-card-title">EUV 리소그래피 마스크 오염 제어</span>
+            <span class="fb-card-period">2025.10 ~ 2020.12</span>
+          </div>
+          <div class="fb-keywords-row">
+            <span class="fb-keywords-label">핵심 키워드</span>
+            <span class="fb-keyword-chip">AI 비전 기반 결함 검출</span>
+            <span class="fb-keyword-chip">공정 데이터 시각화</span>
+            <span class="fb-keyword-chip">원가 절감형 설비 혁신</span>
+          </div>
+          <div class="fb-insight-block">
+            <div class="fb-insight-title">AI 기술의 현장 적용력 <span class="fb-insight-en">(Applied AI Engineering)</span></div>
+            <p class="fb-insight-desc">AI 비전 알고리즘을 도입해 20nm급 미세 오염원을 95% 확률로 탐지해낸 경험은, 최신 기술을 실제 생산 현장의 문제 해결에 접목시키는 실전 응용력을 보여줍니다.</p>
+          </div>
+          <div class="fb-insight-block">
+            <div class="fb-insight-title">정량적 원가 절감 성과 <span class="fb-insight-en">(Quantifiable Cost Impact)</span></div>
+            <p class="fb-insight-desc">연간 150억 원의 비용 절감과 가동률 15% 상승을 동시에 달성한 성과는, 기술적 해결책을 사업적 임팩트로 직결시키는 엔지니어임을 증명합니다.</p>
+          </div>
+        </div>
+
+        <div class="fb-card">
+          <div class="fb-card-header">
+            <span class="fb-card-title">반도체 증착 공정 수율 최적화 (ALD)</span>
+            <span class="fb-card-period">2025.07 ~ 2025.09</span>
+          </div>
+          <div class="fb-keywords-row">
+            <span class="fb-keywords-label">핵심 키워드</span>
+            <span class="fb-keyword-chip">실험계획법(DOE) 기반 최적화</span>
+            <span class="fb-keyword-chip">공정 수율 개선</span>
+            <span class="fb-keyword-chip">데이터 기반 의사결정</span>
+          </div>
+          <div class="fb-insight-block">
+            <div class="fb-insight-title">실험 설계 효율화 역량 <span class="fb-insight-en">(DOE-driven Efficiency)</span></div>
+            <p class="fb-insight-desc">100회 이상의 실험을 40회로 줄이면서도 최적 조건을 찾아낸 경험은, 통계적 실험계획법을 능숙하게 다루는 데이터 기반 문제해결 역량을 보여줍니다.</p>
+          </div>
+          <div class="fb-insight-block">
+            <div class="fb-insight-title">수율·생산성 동시 개선 성과 <span class="fb-insight-en">(Yield &amp; Throughput Impact)</span></div>
+            <p class="fb-insight-desc">수율을 6%p 끌어올리면서 처리량까지 20% 향상시킨 경험은, 품질과 생산성이라는 두 목표를 동시에 달성하는 균형 잡힌 공정 개선 역량을 입증합니다.</p>
+          </div>
+        </div>
+
+        <div class="fb-card">
+          <div class="fb-card-header">
+            <span class="fb-card-title">DRAM 패키지용 고방열 EMC 소재</span>
+            <span class="fb-card-period">2025.04 ~ 2025.06</span>
+          </div>
+          <div class="fb-keywords-row">
+            <span class="fb-keywords-label">핵심 키워드</span>
+            <span class="fb-keyword-chip">신소재 공정 적용</span>
+            <span class="fb-keyword-chip">열관리 성능 개선</span>
+            <span class="fb-keyword-chip">외부 협력사 기술 협업</span>
+          </div>
+          <div class="fb-insight-block">
+            <div class="fb-insight-title">신소재 공정화 역량 <span class="fb-insight-en">(Materials-to-Process Translation)</span></div>
+            <p class="fb-insight-desc">신규 EMC 소재의 특성을 분석해 실제 양산 공정 조건으로 구현해낸 경험은, 소재 지식과 공정 엔지니어링을 연결하는 융합형 역량을 보여줍니다.</p>
+          </div>
+          <div class="fb-insight-block">
+            <div class="fb-insight-title">외부 협력사와의 기술 리드십 <span class="fb-insight-en">(Supplier Technical Leadership)</span></div>
+            <p class="fb-insight-desc">소재 업체와 협업해 최적 조성비를 제안하고 문제를 해결한 경험은, 사내외 이해관계자를 아우르며 기술적 의사결정을 주도하는 역량을 증명합니다.</p>
+          </div>
+        </div>
+      </div>
+
+      <!-- 3. 성장 방향성 -->
+      <div class="diag-section">
+        <div class="diag-section-title">🧭 성장 방향성</div>
+        <div class="cc-section-desc">기반 데이터: 프로젝트 입력 내용 · 전문분야 · 프로젝트 수행이력 · 자격 정보 · 학습 현황</div>
+
+        <div class="cpath-track">
+          <div class="cpath-step done"><span class="cpath-dot"></span><span class="cpath-label">입문</span></div>
+          <div class="cpath-step done"><span class="cpath-dot"></span><span class="cpath-label">실무</span></div>
+          <div class="cpath-step current"><span class="cpath-dot"></span><span class="cpath-label">전문가</span></div>
+          <div class="cpath-step"><span class="cpath-dot"></span><span class="cpath-label">시니어 전문가</span></div>
+          <div class="cpath-step"><span class="cpath-dot"></span><span class="cpath-label">마스터</span></div>
+        </div>
+        <div class="cc-feedback-box">
+          현재 <b>사내강사 커리어 패스 5단계 중 3단계(전문가)</b>에 해당하며, 반도체 로직 설계·공정 최적화·소재 평가 등 전 영역에 걸쳐 프로젝트 경험을 축적하고 있습니다. 특히 반도체 로직 설계 역량(5.0/5)이 두드러지며, 자격증(반도체공정기술사·설계기사·재료분석기사)과 AI 데이터 사이언티스트 전문분야를 함께 보유해 다음 단계로의 성장 가능성이 긍정적으로 진단됩니다.
+        </div>
+
+        <div class="gpath-grid">
+          <div class="gpath-card">
+            <div class="gpath-icon">↔️</div>
+            <div class="gpath-title">수평 경로 · 직무 확장</div>
+            <div class="gpath-desc">반도체 공정·설계 도메인 지식에 학습 현황의 클라우드(AWS·Terraform·Kubernetes) 역량을 더해 <b>반도체 스마트팩토리 데이터 플랫폼 엔지니어 · MLOps 엔지니어</b>로 확장 가능</div>
+          </div>
+          <div class="gpath-card">
+            <div class="gpath-icon">↗️</div>
+            <div class="gpath-title">수직 경로 · 전문가 · 리더</div>
+            <div class="gpath-desc"><b>반도체 공정·설계 마스터 사내강사</b> 또는 반도체 R&amp;D 데이터분석 그룹 리드로 성장 가능</div>
+          </div>
+        </div>
+
+        <div class="archetype-card">
+          <div class="archetype-icon">🧩</div>
+          <div class="archetype-body">
+            <div class="archetype-name">Growth Archetype · "데이터 기반 공정 혁신가"</div>
+            <div class="archetype-desc">현장의 설계·공정 문제를 수율, 원가, 가동률 같은 정량 데이터로 풀어내는 데 강점을 보이는 유형입니다. 여기에 AI·클라우드 학습을 더해, 반도체 도메인과 데이터 기술을 함께 다루는 스마트팩토리 영역의 리더로 성장해 나갈 잠재력을 갖추고 있습니다.</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- 4. 성장 로드맵 -->
+      <div class="diag-section">
+        <div class="diag-section-title">🗺️ 성장 로드맵</div>
+        <div class="cc-section-desc">기반 데이터: 프로젝트 입력 내용 · 전문분야 · 프로젝트 수행이력 · 자격 정보 · 학습 현황</div>
+        <div class="roadmap-grid">
+          <div class="roadmap-card">
+            <span class="roadmap-badge badge-short">단기 · 3개월</span>
+            <ul class="roadmap-list">
+              <li>4개 프로젝트의 성과 지표(수율·원가절감·가동률)를 정량 포트폴리오로 정리</li>
+              <li>진행 중인 클라우드 학습(Terraform·Kubernetes)을 반도체 공정 데이터 파이프라인에 실습 적용</li>
+              <li>AWS 솔루션 아키텍트 심화과정 수료 마무리</li>
+            </ul>
+          </div>
+          <div class="roadmap-card">
+            <span class="roadmap-badge badge-mid">중기 · 6개월</span>
+            <ul class="roadmap-list">
+              <li>반도체 공정 데이터를 클라우드 기반으로 시각화하는 파일럿 프로젝트 리드</li>
+              <li>사내 강의 1회 이상 진행 (반도체 공정 데이터분석 주제)</li>
+              <li>FinOps 실무 지식을 활용한 데이터 인프라 비용 최적화 제안</li>
+            </ul>
+          </div>
+          <div class="roadmap-card">
+            <span class="roadmap-badge badge-long">장기 · 1년</span>
+            <ul class="roadmap-list">
+              <li>반도체 데이터 플랫폼·MLOps 분야 시니어 전문가로 승급 (커리어 패스 2단계 상승)</li>
+              <li>반도체 공정 데이터분석 분야 사내 마스터 강사 인증 취득</li>
+              <li>스마트팩토리 데이터 플랫폼 신규 프로젝트 기획 리드 역할 수행</li>
+            </ul>
+          </div>
+        </div>
+      </div>
+
+      <!-- 5. 성장을 위한 추천 콘텐츠 -->
+      <div class="diag-section">
+        <div class="diag-section-title">🎁 성장을 위한 추천 콘텐츠</div>
+        <div class="cc-section-desc">기반 데이터: 프로젝트 입력 내용 · 전문분야 · 프로젝트 수행이력 · 자격 정보 · 학습 현황</div>
+
+        <div class="cc-subtitle">📚 추천 교육과정 5</div>
+        <div class="course-rec-grid">
+          <div class="course-card">
+            <div class="course-thumb thumb-navy"><span class="course-badge">이러닝</span><span class="course-count">72명</span></div>
+            <div class="course-info">
+              <div class="course-title">반도체 공정 데이터 분석 실무 (SEM·TEM 데이터 활용)</div>
+              <div class="course-org">반도체생산그룹</div>
+              <div class="course-stats"><span>♡ 11</span><span>👁 72</span><span>2개월 전</span></div>
+            </div>
+          </div>
+          <div class="course-card">
+            <div class="course-thumb thumb-purple"><span class="course-badge">오프라인</span><span class="course-count">45명</span></div>
+            <div class="course-info">
+              <div class="course-title">MLOps 파이프라인 구축 실무 (Kubernetes 기반)</div>
+              <div class="course-org">데이터플랫폼그룹</div>
+              <div class="course-stats"><span>♡ 7</span><span>👁 45</span><span>4개월 전</span></div>
+            </div>
+          </div>
+          <div class="course-card">
+            <div class="course-thumb thumb-green"><span class="course-badge live">실시간 온라인</span><span class="course-count">38명</span></div>
+            <div class="course-info">
+              <div class="course-title">스마트팩토리 데이터 플랫폼 아키텍처</div>
+              <div class="course-org">데이터플랫폼그룹</div>
+              <div class="course-stats"><span>♡ 5</span><span>👁 38</span><span>1개월 전</span></div>
+            </div>
+          </div>
+          <div class="course-card">
+            <div class="course-thumb thumb-navy2"><span class="course-badge">오프라인</span><span class="course-count">29명</span></div>
+            <div class="course-info">
+              <div class="course-title">AWS 기반 설비 데이터 수집·분석 실무</div>
+              <div class="course-org">데이터플랫폼그룹</div>
+              <div class="course-stats"><span>♡ 4</span><span>👁 29</span><span>3개월 전</span></div>
+            </div>
+          </div>
+          <div class="course-card">
+            <div class="course-thumb thumb-maroon"><span class="course-badge">이러닝</span><span class="course-count">51명</span></div>
+            <div class="course-info">
+              <div class="course-title">통계적 공정관리(SPC) 심화과정</div>
+              <div class="course-org">반도체생산그룹</div>
+              <div class="course-stats"><span>♡ 6</span><span>👁 51</span><span>5개월 전</span></div>
+            </div>
+          </div>
+        </div>
+
+        <div class="cc-subtitle" style="margin-top:16px;">🚀 추천 프로젝트 5</div>
+        <div class="course-rec-grid">
+          <div class="course-card">
+            <div class="course-thumb thumb-charcoal"><span class="course-badge">모집중</span><span class="course-count">2명 모집</span></div>
+            <div class="course-info">
+              <div class="course-title">반도체 공정 데이터 클라우드 마이그레이션 PoC</div>
+              <div class="course-org">데이터플랫폼그룹</div>
+              <div class="course-stats"><span>3개월</span><span>데이터 아키텍처 담당</span></div>
+            </div>
+          </div>
+          <div class="course-card">
+            <div class="course-thumb thumb-teal"><span class="course-badge">기획중</span><span class="course-count">3명 모집</span></div>
+            <div class="course-info">
+              <div class="course-title">스마트팩토리 이상감지(Anomaly Detection) 모델 개발</div>
+              <div class="course-org">반도체생산그룹</div>
+              <div class="course-stats"><span>4개월</span><span>모델링·검증 담당</span></div>
+            </div>
+          </div>
+          <div class="course-card">
+            <div class="course-thumb thumb-navy3"><span class="course-badge">추천</span><span class="course-count">1명 모집</span></div>
+            <div class="course-info">
+              <div class="course-title">반도체 데이터분석 사내강사 커리큘럼 개발</div>
+              <div class="course-org">인재개발그룹</div>
+              <div class="course-stats"><span>6개월</span><span>커리큘럼 설계 리드</span></div>
+            </div>
+          </div>
+          <div class="course-card">
+            <div class="course-thumb thumb-olive"><span class="course-badge">모집중</span><span class="course-count">2명 모집</span></div>
+            <div class="course-info">
+              <div class="course-title">FinOps 기반 데이터 인프라 비용 최적화</div>
+              <div class="course-org">데이터플랫폼그룹</div>
+              <div class="course-stats"><span>3개월</span><span>비용 최적화 제안</span></div>
+            </div>
+          </div>
+          <div class="course-card">
+            <div class="course-thumb thumb-brown"><span class="course-badge">추천</span><span class="course-count">협업</span></div>
+            <div class="course-info">
+              <div class="course-title">반도체 설비 예지보전(Predictive Maintenance) 파일럿</div>
+              <div class="course-org">반도체생산그룹</div>
+              <div class="course-stats"><span>2개월</span><span>데이터 분석 협업</span></div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- 6. 전문 역량 제시 -->
+      <div class="diag-section">
+        <div class="diag-section-title">🏅 전문 역량 제시</div>
+        <div class="cc-section-desc">기반 데이터: 프로젝트 입력 내용 · 전문분야 · 프로젝트 수행이력 · 자격 정보 · 학습 현황</div>
+        <div class="goal-container">
+          <div class="goal-item-card">
+            <div class="goal-item-view">
+              <span class="cc-goal-num">1</span>
+              <div class="goal-item-view-body">
+                <span class="goal-item-view-title">반도체 공정·설계 아키텍처 최적화 역량</span>
+                <span class="goal-item-view-desc">전력·속도·수율 등 상충하는 제약조건 속에서 최적해를 찾아내는 고난도 설계·공정 역량을 갖추고 있습니다.</span>
+              </div>
+            </div>
+          </div>
+          <div class="goal-item-card">
+            <div class="goal-item-view">
+              <span class="cc-goal-num">2</span>
+              <div class="goal-item-view-body">
+                <span class="goal-item-view-title">데이터 기반 실험설계(DOE) 및 품질 개선 역량</span>
+                <span class="goal-item-view-desc">통계적 실험계획법으로 실험 효율을 높이고, 공정 수율과 생산성을 동시에 개선합니다.</span>
+              </div>
+            </div>
+          </div>
+          <div class="goal-item-card">
+            <div class="goal-item-view">
+              <span class="cc-goal-num">3</span>
+              <div class="goal-item-view-body">
+                <span class="goal-item-view-title">AI·비전 기술의 현장 적용 역량</span>
+                <span class="goal-item-view-desc">최신 AI 비전 알고리즘을 생산 현장의 결함 검출·품질 문제 해결에 실전 접목합니다.</span>
+              </div>
+            </div>
+          </div>
+          <div class="goal-item-card">
+            <div class="goal-item-view">
+              <span class="cc-goal-num">4</span>
+              <div class="goal-item-view-body">
+                <span class="goal-item-view-title">정량적 성과 도출 및 원가 절감 기획력</span>
+                <span class="goal-item-view-desc">프로젝트 성과를 수율·원가·가동률 등 구체적 수치로 증명하여 사업적 임팩트로 연결합니다.</span>
+              </div>
+            </div>
+          </div>
+          <div class="goal-item-card">
+            <div class="goal-item-view">
+              <span class="cc-goal-num">5</span>
+              <div class="goal-item-view-body">
+                <span class="goal-item-view-title">외부 협력사·다부서 기술 협업 역량</span>
+                <span class="goal-item-view-desc">소재 업체, 생산·분석팀 등 다양한 이해관계자와 기술적 의사결정을 조율하며 문제를 해결합니다.</span>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+    </div><!-- /rtabCareerCoaching -->
+
+    <!-- 탭0-2: 커리어 코칭 2 (목업 — "전문성 확보.html" 리포트 형식) -->
+    <div class="panel-right-content" id="rtabCareerCoaching2">
+
+      <!-- 탭 헤더 -->
+      <div class="diag-result-header">
+        <span class="diag-result-header-title">🧭 커리어 코칭 2</span>
+        <span class="cc-beta-badge">리포트 목업</span>
+      </div>
+
+      <!-- 리포트 배너 -->
+      <div class="cc2-banner">
+        <span class="cc2-banner-badge">CAREER ANALYSIS REPORT</span>
+        <div class="cc2-banner-title">L&amp;D 전문가 분석 및 커리어 성장 리포트</div>
+        <div class="cc2-banner-desc">교육 기획부터 HR Tech 구축, 행정 자동화(DX)까지 아우르는 올라운드 L&amp;D 담당자를 위한 맞춤 가이드</div>
+        <button class="cc2-print-btn" onclick="window.print()">📄 PDF / 인쇄 저장</button>
+      </div>
+
+      <!-- SECTION 1: 프로젝트 진단 및 평가 -->
+      <div class="cc2-section">
+        <div class="cc2-section-title">1. 입력 프로젝트 진단 및 평가</div>
+        <div class="cc2-section-desc">입력해주신 주요 프로젝트 및 설문 결과를 교육전략 직무 관점에서 객관적으로 분석한 피드백입니다. 직무 및 자격 정보, 전문분야 Profile, 전문가 정의 기반으로 AI가 종합 분석한 자신만의 전문성을 확인해보세요.</div>
+
+        <div class="cc2-summary-box">"전략적 기획(워크샵) + 시스템 구축(HR Tech) + 행정 자동화(Ops)를 모두 경험한 All-round L&amp;D 전문가"</div>
+
+        <div class="cc2-item-card">
+          <div class="cc2-item-title">1) 파트별 강점 워크샵 기획 및 운영 (30차수, 4hr/8hr)</div>
+          <div class="cc2-keywords">
+            <span class="cc2-tag">대규모 실행력</span>
+            <span class="cc2-tag">맞춤형 L&amp;D 설계</span>
+            <span class="cc2-tag">강점 기반 조직문화</span>
+          </div>
+          <ul class="cc2-content-list">
+            <li><strong>대규모 프로젝트 실행력:</strong> 30차수 운영을 통해 단발성 이벤트에 그치지 않고 일관된 품질 제어(QC) 및 스케줄링 검증</li>
+            <li><strong>모듈형·맞춤형 설계 능력:</strong> 부서별 직무 특성에 맞춰 4시간/8시간 코스로 유연하게 모듈화하여 제안하는 현장 밀착형 기획</li>
+            <li><strong>강점 기반 조직문화 이식:</strong> 구성원의 몰입과 협업을 끌어내는 '강점 기반 HRD' 트렌드를 성공적으로 정착시킨 퍼실리테이션 경험</li>
+          </ul>
+        </div>
+
+        <div class="cc2-item-card">
+          <div class="cc2-item-title">2) DScovery 교육 시스템 기획 및 구축 (LMS/HR Tech)</div>
+          <div class="cc2-keywords">
+            <span class="cc2-tag">HR Tech 기획</span>
+            <span class="cc2-tag">LX(학습 경험) 설계</span>
+            <span class="cc2-tag">VOC 기반 UX 개선</span>
+          </div>
+          <ul class="cc2-content-list">
+            <li><strong>LMS/교육 플랫폼 기획·구축:</strong> 단순 운영자를 넘어 HR Tech 시스템의 구조를 직접 설계해 본 희소성 높은 경쟁력</li>
+            <li><strong>학습자 및 운영자 중심 UX 개선:</strong> VOC를 반영하여 학습 만족도와 관리 효율성을 동시에 극대화한 서비스 마인드</li>
+          </ul>
+        </div>
+      </div>
+
+      <!-- SECTION 2: 핵심 경쟁력 TOP 5 -->
+      <div class="cc2-section">
+        <div class="cc2-section-title">2. 나만의 차별화된 핵심 경쟁력 TOP 5</div>
+        <div class="cc2-section-desc">프로젝트 경험을 바탕으로 도출된 자신만의 고유한 역량 자산입니다. 나만의 차별화된 강점을 지속적으로 발전시켜보세요.</div>
+
+        <div class="cc2-grid-2col">
+          <div class="cc2-cap-card">
+            <strong>1. 대규모 맞춤형 교육 설계 및 실행력</strong>
+            <p>30차수 프로젝트를 안정적으로 이끈 스케줄링·QC 역량 및 직무 특성에 맞춘 모듈화 기획력</p>
+          </div>
+          <div class="cc2-cap-card">
+            <strong>2. HR Tech &amp; 교육 시스템 기획력</strong>
+            <p>교육 플랫폼의 구조를 직접 설계하여 디지털 기반 학습 경험을 확장하는 능력</p>
+          </div>
+          <div class="cc2-cap-card">
+            <strong>3. VOC 기반 학습 경험 최적화 (LX)</strong>
+            <p>학습자와 운영자 양측의 니즈를 발굴해 시스템과 과정에 반영하는 고객 중심 사고방식</p>
+          </div>
+          <div class="cc2-cap-card">
+            <strong>4. HR Operations 프로세스 혁신 역량</strong>
+            <p>비효율적 행정의 자동화를 단행하여 본연의 기획 업무에 집중할 수 있는 환경 구축</p>
+          </div>
+          <div class="cc2-cap-card">
+            <strong>5. 조직문화 연계 및 데이터 확장성</strong>
+            <p>축적된 강점/학습 데이터를 바탕으로 향후 리더십·팀빌딩 전략으로 연계하는 기획력</p>
+          </div>
+        </div>
+      </div>
+
+      <!-- SECTION 3: 성장 방향성 -->
+      <div class="cc2-section">
+        <div class="cc2-section-title">3. 더 높은 레벨의 전문가로 도약하기 위한 성장 방향성</div>
+        <div class="cc2-section-desc">현재 역량에 머무르지 않고, 조직에서 더욱 경쟁력 있는 L&amp;D 리더나 전문가로 거듭나기 위해 강화해야 할 로드맵입니다.</div>
+
+        <div class="cc2-item-card">
+          <div class="cc2-item-title">1. HR Analytics &amp; Data-Driven L&amp;D (데이터 기반 HRD)</div>
+          <div class="cc2-item-goal"><strong>목표:</strong> 교육 운영자를 넘어 교육이 사업 성과(Business Impact)에 기여함을 정량적으로 증명하는 전문가</div>
+          <ul class="cc2-content-list">
+            <li>강점 워크샵 수강 전/후의 팀 몰입도, 협업 지수, 업무 성과(KPI) 변화를 데이터로 측정</li>
+            <li>"강점 워크샵 미이수 파트 대비 협업 만족도 15% 상승"과 같은 정량적 Insight 리포트 제시 역량 강화</li>
+          </ul>
+        </div>
+
+        <div class="cc2-item-card">
+          <div class="cc2-item-title">2. Learning Experience (LX) Architecture (학습 경험 디자이너)</div>
+          <div class="cc2-item-goal"><strong>목표:</strong> 단발성 교육을 넘어, 구성원의 일상 속에서 학습이 선순환되는 '학습 생태계' 설계자</div>
+          <ul class="cc2-content-list">
+            <li>AI 기반 개인화 추천 및 마이크로 러닝(Micro-learning) 요소를 도입한 LX 체계 기획</li>
+            <li>'진단 → 추천 학습 → 현업 실습 → 피드백'으로 이어지는 지속 가능한 학습 로드맵 구축</li>
+          </ul>
+        </div>
+
+        <div class="cc2-item-card">
+          <div class="cc2-item-title">3. Organizational Development (OD) &amp; Strategic HRBP</div>
+          <div class="cc2-item-goal"><strong>목표:</strong> 단순 교육 기획을 넘어 경영 전략을 조직의 행동과 문화로 이식하는 전략적 파트너</div>
+          <ul class="cc2-content-list">
+            <li>'조직 진단 → 문제 정의 → 맞춤형 인터벤션(워크샵/컨설팅) 설계'의 풀스택 OD 프로세스 주도</li>
+            <li>경영진의 비전 변화에 맞춘 신규 직무 역량(Re-skilling/Up-skilling) 전사 이식 체계 강화</li>
+          </ul>
+        </div>
+      </div>
+
+      <!-- SECTION 4: 추천 학습 과정 -->
+      <div class="cc2-section">
+        <div class="cc2-section-title">4. 역량 강화를 위한 단계별 추천 교육 과정</div>
+        <div class="cc2-section-desc">성장 방향성을 달성하기 위해 DScovery에서 다양한 교육과정과 POPcon을 추천합니다.</div>
+
+        <div class="cc2-grid-2col" style="margin-bottom:14px;">
+          <div class="cc2-roadmap-card">
+            <span class="cc2-roadmap-tag">POPcon · 즉시</span>
+            <div class="cc2-item-title">데이터 기반 L&amp;D 성과 측정 실무 입문</div>
+            <p style="font-size:11.5px;color:var(--color-text-muted);">교육의 ROI 및 비즈니스 임팩트를 정량화하는 기법 습득</p>
+          </div>
+          <div class="cc2-roadmap-card">
+            <span class="cc2-roadmap-tag">POPcon · 즉시</span>
+            <div class="cc2-item-title">HRD 트렌드 코리아 2026 하이라이트</div>
+            <p style="font-size:11.5px;color:var(--color-text-muted);">2026년 HRD 트렌드 코리아 한눈에 보기</p>
+          </div>
+        </div>
+        <ul class="cc2-content-list">
+          <li><strong>[3개월 내] HR Tech &amp; LMS UX/UI 기획 워크숍:</strong> 사용자 경험 중심의 교육 시스템 고도화 및 테크 기획력 강화</li>
+          <li><strong>[6개월 내] 조직 진단 및 풀스택 OD 컨설팅 과정:</strong> 파트별 문제를 진단하고 맞춤형 솔루션을 설계하는 OD 리더십 개발</li>
+        </ul>
+      </div>
+
+      <!-- SECTION 5: 커리어 트랙 & 사내강사 온보딩 -->
+      <div class="cc2-section">
+        <div class="cc2-section-title">5. 미래 커리어 트랙 &amp; 사내강사 활동 안내</div>
+        <div class="cc2-section-desc">나의 보유 역량을 바탕으로 진출할 수 있는 커리어 방향 및 지식 공유(사내강사) 활동을 위한 온보딩 섹션입니다.</div>
+
+        <div class="cc2-grid-2col" style="margin-bottom:16px;">
+          <div class="cc2-roadmap-card">
+            <span class="cc2-roadmap-tag">Track 1</span>
+            <div class="cc2-item-title">사내 L&amp;D / HRD Lead</div>
+            <p style="font-size:11.5px;color:var(--color-text-muted);">인하우스 총괄 리더로서 정량적 HR Analytics와 육성 체계를 총괄하는 핵심 리더</p>
+          </div>
+          <div class="cc2-roadmap-card">
+            <span class="cc2-roadmap-tag">Track 2</span>
+            <div class="cc2-item-title">HR Tech / LX Manager</div>
+            <p style="font-size:11.5px;color:var(--color-text-muted);">AI 및 에듀테크를 기반으로 학습 플랫폼과 디지털 경험을 혁신하는 Product Leader</p>
+          </div>
+          <div class="cc2-roadmap-card">
+            <span class="cc2-roadmap-tag">Track 3</span>
+            <div class="cc2-item-title">OD Consultant / 강사</div>
+            <p style="font-size:11.5px;color:var(--color-text-muted);">독자적 퍼실리테이션 콘텐츠와 프로세스 혁신 경험을 바탕으로 현장을 바꾸는 전문 컨설턴트</p>
+          </div>
+        </div>
+
+        <div class="cc2-cta-box">
+          <p>"가장 깊게 배우는 사람은 가르치는 사람입니다.<br>여러분의 업무 노하우를 나누고, 사내강사에 도전하여 커리어의 새로운 전환점을 만들어보세요."</p>
+          <button class="cc2-btn-cta">내 경험으로 만들 수 있는 강의 주제 보기</button>
+        </div>
+
+        <div class="cc2-subhead">📌 [초안] 사내강사 프로필 등록용 추천 역량 5선</div>
+        <div class="cc2-subhead-desc">사내강사 신청 시 내 프로필의 '강의 가능 역량'에 바로 등록하여 수강생 및 교육 과정 추천 알고리즘 매칭에 활용할 수 있습니다.</div>
+
+        <div class="cc2-grid-2col">
+          <div class="cc2-cap-card" style="background:#fff;">
+            <strong>맞춤형 교육 모듈 기획 및 개발</strong>
+            <p>조직/파트별 직무 특성과 이슈를 분석하여 4시간/8시간 맞춤형 교육 모듈과 연간 교육 로드맵을 설계할 수 있습니다.</p>
+          </div>
+          <div class="cc2-cap-card" style="background:#fff;">
+            <strong>대규모 프로젝트 운영 및 품질 관리(QC)</strong>
+            <p>수십 차수에 달하는 대규모 교육 프로젝트의 스케줄링, 리소스 관리, 운영 품질 제어 프로세스를 구축할 수 있습니다.</p>
+          </div>
+          <div class="cc2-cap-card" style="background:#fff;">
+            <strong>강점 기반 팀 빌딩 및 퍼실리테이션</strong>
+            <p>구성원의 강점을 진단하고 파트별 '강점 지도'를 작성하여 협업을 촉진하는 퍼실리테이션을 진행할 수 있습니다.</p>
+          </div>
+          <div class="cc2-cap-card" style="background:#fff;">
+            <strong>학습자/운영자 경험(LX) 기반 시스템 기획</strong>
+            <p>현장의 VOC를 수집·분석하여 교육 효과성을 극대화하는 교육 플랫폼(LMS) 기능 및 UI/UX 프로세스를 설계할 수 있습니다.</p>
+          </div>
+          <div class="cc2-cap-card" style="background:#fff;">
+            <strong>업무 프로세스 자동화(DX) 및 리소스 최적화</strong>
+            <p>강사료 지급, 교육 수료 처리 등 반복 업무를 전산 연계하여 자동화하고 운영 리소스를 50% 이상 절감할 수 있습니다.</p>
+          </div>
+        </div>
+      </div>
+
+    </div><!-- /rtabCareerCoaching2 -->
+
+    <!-- 탭0-3: 커리어 코칭 3 (목업 — 커리어 코칭 1 데이터 × 커리어 코칭 2 리포트 형식, 커리어 성장 관점) -->
+    <div class="panel-right-content" id="rtabCareerCoaching3">
+
+      <!-- 탭 헤더 -->
+      <div class="diag-result-header">
+        <span class="diag-result-header-title">🌱 커리어 코칭 3</span>
+        <span class="cc-beta-badge">커리어 성장 리포트 목업</span>
+      </div>
+
+      <!-- 리포트 배너 -->
+      <div class="cc2-banner">
+        <span class="cc2-banner-badge">PERSONAL CAREER GROWTH REPORT</span>
+        <div class="cc2-banner-title">반도체 공정·설계 전문가 커리어 성장 리포트</div>
+        <div class="cc2-banner-desc">로직 설계부터 공정 최적화, 신소재 평가까지 아우르는 데이터 기반 반도체 전문가를 위한 맞춤 커리어 성장 가이드</div>
+        <button class="cc2-print-btn" onclick="window.print()">📄 PDF / 인쇄 저장</button>
+      </div>
+
+      <!-- SECTION 1: 프로젝트 진단 및 평가 -->
+      <div class="cc2-section">
+        <div class="cc2-section-title">1. 입력 프로젝트 진단 및 평가</div>
+        <div class="cc2-section-desc">입력해주신 주요 프로젝트와 역량 진단 설문 결과를 커리어 성장 관점에서 객관적으로 분석한 피드백입니다. 전문분야·자격 정보·학습 현황을 기반으로 AI가 종합 분석한 나만의 성장 잠재력을 확인해보세요.</div>
+
+        <div class="cc2-summary-box">"설계 최적화(로직) + 공정 혁신(수율·원가) + 신소재 융합(소재-공정 연계)을 모두 경험한 데이터 기반 반도체 전문가"</div>
+
+        <div class="cc2-item-card">
+          <div class="cc2-item-title">1) 5nm급 고성능 AI 가속기 로직 설계 (2026.01 ~ 2026.03)</div>
+          <div class="cc2-keywords">
+            <span class="cc2-tag">저전력 고성능 아키텍처 설계</span>
+            <span class="cc2-tag">RTL·UVM 기반 검증 역량</span>
+            <span class="cc2-tag">데이터 기반 품질 무결성 확보</span>
+          </div>
+          <ul class="cc2-content-list">
+            <li><strong>하드웨어 아키텍처 최적화력:</strong> 연산 유닛 배치와 HBM 인터페이스를 통합 설계해 전력·속도·수율을 동시에 개선 — 상충하는 제약조건 속에서 최적해를 찾는 고난도 설계 역량</li>
+            <li><strong>검증 기반 품질 보증력:</strong> UVM 기반 시뮬레이션으로 50여 개의 크리티컬 버그를 사전에 검출 — 양산 이후 리스크를 최소화하는 꼼꼼한 엔지니어링 태도</li>
+          </ul>
+        </div>
+
+        <div class="cc2-item-card">
+          <div class="cc2-item-title">2) EUV 리소그래피 마스크 오염 제어 (2025.10 ~ 2025.12)</div>
+          <div class="cc2-keywords">
+            <span class="cc2-tag">AI 비전 기반 결함 검출</span>
+            <span class="cc2-tag">공정 데이터 시각화</span>
+            <span class="cc2-tag">원가 절감형 설비 혁신</span>
+          </div>
+          <ul class="cc2-content-list">
+            <li><strong>AI 기술의 현장 적용력:</strong> AI 비전 알고리즘을 도입해 20nm급 미세 오염원을 95% 확률로 탐지 — 최신 기술을 생산 현장 문제 해결에 접목하는 실전 응용력</li>
+            <li><strong>정량적 원가 절감 성과:</strong> 연간 150억 원 비용 절감과 가동률 15% 상승을 동시에 달성 — 기술적 해결책을 사업적 임팩트로 연결하는 역량</li>
+          </ul>
+        </div>
+
+        <div class="cc2-item-card">
+          <div class="cc2-item-title">3) 반도체 증착 공정 수율 최적화 — ALD (2025.07 ~ 2025.09)</div>
+          <div class="cc2-keywords">
+            <span class="cc2-tag">실험계획법(DOE) 기반 최적화</span>
+            <span class="cc2-tag">공정 수율 개선</span>
+            <span class="cc2-tag">데이터 기반 의사결정</span>
+          </div>
+          <ul class="cc2-content-list">
+            <li><strong>실험 설계 효율화 역량:</strong> 100회 이상의 실험을 40회로 줄이면서도 최적 조건을 도출 — 통계적 실험계획법을 능숙히 다루는 데이터 기반 문제해결 역량</li>
+            <li><strong>수율·생산성 동시 개선 성과:</strong> 수율을 6%p 끌어올리며 처리량까지 20% 향상 — 품질과 생산성을 함께 잡는 균형 잡힌 공정 개선 역량</li>
+          </ul>
+        </div>
+
+        <div class="cc2-item-card">
+          <div class="cc2-item-title">4) DRAM 패키지용 고방열 EMC 소재 (2025.04 ~ 2025.06)</div>
+          <div class="cc2-keywords">
+            <span class="cc2-tag">신소재 공정 적용</span>
+            <span class="cc2-tag">열관리 성능 개선</span>
+            <span class="cc2-tag">외부 협력사 기술 협업</span>
+          </div>
+          <ul class="cc2-content-list">
+            <li><strong>신소재 공정화 역량:</strong> 신규 EMC 소재 특성을 분석해 실제 양산 공정 조건으로 구현 — 소재 지식과 공정 엔지니어링을 잇는 융합형 역량</li>
+            <li><strong>외부 협력사와의 기술 리드십:</strong> 소재 업체와 협업해 최적 조성비를 제안·해결 — 사내외 이해관계자를 아우르는 기술 의사결정 주도력</li>
+          </ul>
+        </div>
+      </div>
+
+      <!-- SECTION 2: 핵심 경쟁력 TOP 5 -->
+      <div class="cc2-section">
+        <div class="cc2-section-title">2. 나만의 차별화된 핵심 경쟁력 TOP 5</div>
+        <div class="cc2-section-desc">프로젝트 경험을 바탕으로 도출된 자신만의 고유한 역량 자산입니다. 커리어 성장을 위해 지속적으로 발전시켜 보세요.</div>
+
+        <div class="cc2-grid-2col">
+          <div class="cc2-cap-card">
+            <strong>1. 반도체 공정·설계 아키텍처 최적화력</strong>
+            <p>전력·속도·수율 등 상충하는 제약조건 속에서 최적해를 찾아내는 고난도 설계·공정 역량</p>
+          </div>
+          <div class="cc2-cap-card">
+            <strong>2. 데이터 기반 실험설계(DOE) 및 품질 개선력</strong>
+            <p>통계적 실험계획법으로 실험 효율을 높이고, 공정 수율과 생산성을 동시에 개선하는 역량</p>
+          </div>
+          <div class="cc2-cap-card">
+            <strong>3. AI·비전 기술의 현장 적용력</strong>
+            <p>최신 AI 비전 알고리즘을 생산 현장의 결함 검출·품질 문제 해결에 실전 접목하는 능력</p>
+          </div>
+          <div class="cc2-cap-card">
+            <strong>4. 정량적 성과 도출 및 원가 절감 기획력</strong>
+            <p>프로젝트 성과를 수율·원가·가동률 등 구체적 수치로 증명해 사업적 임팩트로 연결하는 역량</p>
+          </div>
+          <div class="cc2-cap-card">
+            <strong>5. 외부 협력사·다부서 기술 협업력</strong>
+            <p>소재 업체, 생산·분석팀 등 다양한 이해관계자와 기술적 의사결정을 조율하는 협업 역량</p>
+          </div>
+        </div>
+      </div>
+
+      <!-- SECTION 3: 성장 방향성 -->
+      <div class="cc2-section">
+        <div class="cc2-section-title">3. 더 높은 레벨의 전문가로 도약하기 위한 성장 방향성</div>
+        <div class="cc2-section-desc">현재 사내강사 커리어 패스 5단계 중 3단계(전문가)에 해당합니다. 다음 단계로 도약하기 위해 강화해야 할 단기·중기·장기 로드맵입니다.</div>
+
+        <div class="cc2-item-card">
+          <div class="cc2-item-title">단기 (3개월) · 성과의 정량화 &amp; 신기술 실습</div>
+          <div class="cc2-item-goal"><strong>목표:</strong> 지금까지의 프로젝트 성과를 데이터로 증명하고, 새로 학습 중인 클라우드 기술을 현업에 접목하는 단계</div>
+          <ul class="cc2-content-list">
+            <li>4개 프로젝트의 성과 지표(수율·원가절감·가동률)를 정량 포트폴리오로 정리</li>
+            <li>학습 중인 클라우드 기술(Terraform·Kubernetes)을 반도체 공정 데이터 파이프라인에 실습 적용</li>
+            <li>AWS 솔루션 아키텍트 심화과정 수료 마무리</li>
+          </ul>
+        </div>
+
+        <div class="cc2-item-card">
+          <div class="cc2-item-title">중기 (6개월) · 리드 경험 &amp; 지식 공유 확대</div>
+          <div class="cc2-item-goal"><strong>목표:</strong> 기술 리드 경험을 쌓고, 사내 지식 공유(강의) 활동으로 영향력을 넓히는 단계</div>
+          <ul class="cc2-content-list">
+            <li>반도체 공정 데이터를 클라우드 기반으로 시각화하는 파일럿 프로젝트 리드</li>
+            <li>사내 강의 1회 이상 진행 (반도체 공정 데이터분석 주제)</li>
+            <li>FinOps 실무 지식을 활용한 데이터 인프라 비용 최적화 제안</li>
+          </ul>
+        </div>
+
+        <div class="cc2-item-card">
+          <div class="cc2-item-title">장기 (1년) · 시니어 전문가 &amp; 마스터 강사로 도약</div>
+          <div class="cc2-item-goal"><strong>목표:</strong> 커리어 패스 상 시니어 전문가로 승급하고, 조직 내 마스터 강사로 자리매김하는 단계</div>
+          <ul class="cc2-content-list">
+            <li>반도체 데이터 플랫폼·MLOps 분야 시니어 전문가로 승급 (커리어 패스 2단계 상승)</li>
+            <li>반도체 공정 데이터분석 분야 사내 마스터 강사 인증 취득</li>
+            <li>스마트팩토리 데이터 플랫폼 신규 프로젝트 기획 리드 역할 수행</li>
+          </ul>
+        </div>
+      </div>
+
+      <!-- SECTION 4: 추천 학습 과정 -->
+      <div class="cc2-section">
+        <div class="cc2-section-title">4. 역량 강화를 위한 단계별 추천 교육 과정</div>
+        <div class="cc2-section-desc">성장 방향성을 달성하기 위해 추천하는 교육과정과 참여 가능한 프로젝트입니다.</div>
+
+        <div class="cc2-grid-2col" style="margin-bottom:14px;">
+          <div class="cc2-roadmap-card">
+            <span class="cc2-roadmap-tag">이러닝 · 즉시</span>
+            <div class="cc2-item-title">반도체 공정 데이터 분석 실무 (SEM·TEM 데이터 활용)</div>
+            <p style="font-size:11.5px;color:var(--color-text-muted);">72명이 수강 중인 인기 과정으로, 공정 데이터 해석 역량을 한 단계 끌어올릴 수 있습니다.</p>
+          </div>
+          <div class="cc2-roadmap-card">
+            <span class="cc2-roadmap-tag">오프라인 · 즉시</span>
+            <div class="cc2-item-title">MLOps 파이프라인 구축 실무 (Kubernetes 기반)</div>
+            <p style="font-size:11.5px;color:var(--color-text-muted);">수평 성장 경로(데이터 플랫폼 엔지니어)로 나아가기 위한 핵심 실습 과정입니다.</p>
+          </div>
+        </div>
+        <ul class="cc2-content-list">
+          <li><strong>[3개월 내] 스마트팩토리 데이터 플랫폼 아키텍처 (실시간 온라인):</strong> 클라우드 기반 공정 데이터 시각화·설계 역량 강화</li>
+          <li><strong>[4개월] 반도체 공정 데이터 클라우드 마이그레이션 PoC 프로젝트:</strong> 데이터 아키텍처 담당으로 참여해 리드 경험 축적</li>
+          <li><strong>[6개월] 반도체 데이터분석 사내강사 커리큘럼 개발 프로젝트:</strong> 커리큘럼 설계 리드로 참여해 지식 공유 역량 강화</li>
+        </ul>
+      </div>
+
+      <!-- SECTION 5: 커리어 트랙 & 사내강사 온보딩 -->
+      <div class="cc2-section">
+        <div class="cc2-section-title">5. 미래 커리어 트랙 &amp; 사내강사 활동 안내</div>
+        <div class="cc2-section-desc">보유 역량을 바탕으로 진출할 수 있는 커리어 방향과 지식 공유(사내강사) 활동을 위한 온보딩 섹션입니다.</div>
+
+        <div class="cc2-grid-2col" style="margin-bottom:16px;">
+          <div class="cc2-roadmap-card">
+            <span class="cc2-roadmap-tag">Track 1</span>
+            <div class="cc2-item-title">반도체 스마트팩토리 데이터 플랫폼 엔지니어</div>
+            <p style="font-size:11.5px;color:var(--color-text-muted);">반도체 공정·설계 도메인 지식에 클라우드(AWS·Terraform·Kubernetes) 역량을 더해 수평 확장</p>
+          </div>
+          <div class="cc2-roadmap-card">
+            <span class="cc2-roadmap-tag">Track 2</span>
+            <div class="cc2-item-title">반도체 공정·설계 마스터 사내강사 / R&amp;D 데이터분석 그룹 리드</div>
+            <p style="font-size:11.5px;color:var(--color-text-muted);">축적한 도메인 전문성을 바탕으로 조직 내 전문가·리더로 수직 성장</p>
+          </div>
+          <div class="cc2-roadmap-card">
+            <span class="cc2-roadmap-tag">Track 3</span>
+            <div class="cc2-item-title">반도체 데이터분석 마스터 강사</div>
+            <p style="font-size:11.5px;color:var(--color-text-muted);">1년 내 목표인 사내 마스터 강사 인증을 통해 지식 공유형 커리어로 확장</p>
+          </div>
+        </div>
+
+        <div class="cc2-cta-box">
+          <p>"가장 깊게 배우는 사람은 가르치는 사람입니다.<br>수율·원가·가동률로 증명해온 나만의 노하우를 나누고, 사내강사에 도전하여 커리어의 새로운 전환점을 만들어보세요."</p>
+          <button class="cc2-btn-cta">내 경험으로 만들 수 있는 강의 주제 보기</button>
+        </div>
+
+        <div class="cc2-subhead">📌 [초안] 사내강사 프로필 등록용 추천 역량 5선</div>
+        <div class="cc2-subhead-desc">사내강사 신청 시 내 프로필의 '강의 가능 역량'에 바로 등록하여 수강생 및 교육 과정 추천 알고리즘 매칭에 활용할 수 있습니다.</div>
+
+        <div class="cc2-grid-2col">
+          <div class="cc2-cap-card" style="background:#fff;">
+            <strong>반도체 로직 설계·아키텍처 최적화 지도</strong>
+            <p>전력·속도·수율 등 상충하는 제약조건 속에서 최적해를 도출하는 설계 방법론을 강의할 수 있습니다.</p>
+          </div>
+          <div class="cc2-cap-card" style="background:#fff;">
+            <strong>실험계획법(DOE) 기반 공정 최적화 코칭</strong>
+            <p>통계적 실험설계로 실험 횟수를 줄이면서 수율을 높이는 노하우를 전수할 수 있습니다.</p>
+          </div>
+          <div class="cc2-cap-card" style="background:#fff;">
+            <strong>AI 비전 기반 결함 검출 실무 교육</strong>
+            <p>AI 비전 알고리즘을 활용한 미세 오염·결함 검출 기법을 지도할 수 있습니다.</p>
+          </div>
+          <div class="cc2-cap-card" style="background:#fff;">
+            <strong>정량적 성과 리포팅 및 원가절감 기획</strong>
+            <p>기술 성과를 수율·원가·가동률 데이터로 증명하는 보고 기법을 공유할 수 있습니다.</p>
+          </div>
+          <div class="cc2-cap-card" style="background:#fff;">
+            <strong>사내외 이해관계자 기술 협업 퍼실리테이션</strong>
+            <p>협력사·타부서와의 기술적 의사결정을 조율하는 협업 노하우를 전달할 수 있습니다.</p>
+          </div>
+        </div>
+      </div>
+
+    </div><!-- /rtabCareerCoaching3 -->
+
     <!-- 탭1: AI 분석 -->
-    <div class="panel-right-content active" id="rtabAiAnalysis">
+    <div class="panel-right-content" id="rtabAiAnalysis">
 
     <!-- 역량 진단 설문 섹션 -->
     <div class="survey-section" id="surveySection">
@@ -5837,7 +6924,13 @@ JSON만 출력하세요. 다른 설명 없이 아래 형식으로만 출력:
       document.querySelectorAll('.panel-right-content').forEach(c => c.classList.remove('active'));
       tab.classList.add('active');
       const target = tab.dataset.rtab;
-      if (target === 'ai-analysis') {
+      if (target === 'career-coaching') {
+        document.getElementById('rtabCareerCoaching').classList.add('active');
+      } else if (target === 'career-coaching-2') {
+        document.getElementById('rtabCareerCoaching2').classList.add('active');
+      } else if (target === 'career-coaching-3') {
+        document.getElementById('rtabCareerCoaching3').classList.add('active');
+      } else if (target === 'ai-analysis') {
         document.getElementById('rtabAiAnalysis').classList.add('active');
       } else if (target === 'diag-result') {
         document.getElementById('rtabDiagResult').classList.add('active');
