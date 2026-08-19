@@ -1,3 +1,0 @@
-# env files — this app has no server process today, but keep this as a
-# safety net in case one is ever added (see hub CLAUDE.md key-centralization notes)
-.env*
