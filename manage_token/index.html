@@ -7,7 +7,6 @@
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@400;500;600;700&display=swap" rel="stylesheet" />
-  <link rel="stylesheet" href="auth/auth.css" />
 
   <style>
     /* ===================================================
@@ -20,24 +19,26 @@
     }
 
     :root {
-      --mint:           #6dd5c2;
-      --mint-light:     #e8faf7;
-      --mint-mid:       #b2ece3;
-      --lavender:       #b8a9e8;
-      --lavender-light: #f0eeff;
-      --lavender-mid:   #d6cff5;
-      --blue-soft:      #7ab8f5;
-      --blue-btn:       #5ba4e8;
-      --green-btn:      #5cc8a0;
-      --coral-btn:      #f07a7a;
-      --text-main:      #3a3a5c;
-      --text-sub:       #7a7a9a;
-      --text-light:     #b0b0cc;
-      --bg-page:        #f6f4ff;
+      /* career/hub과 동일한 뉴트럴 팔레트로 교체(2026-08-15) — 변수명은 유지하되
+         파스텔 민트/라벤더 대신 뉴트럴 그레이 + 표준 blue/green/red 포인트만 사용 */
+      --mint:           #737373;
+      --mint-light:     #fafafa;
+      --mint-mid:       #d4d4d4;
+      --lavender:       #6b7280;
+      --lavender-light: #f5f5f5;
+      --lavender-mid:   #e5e7eb;
+      --blue-soft:      #2563eb;
+      --blue-btn:       #2563eb;
+      --green-btn:      #16a34a;
+      --coral-btn:      #dc2626;
+      --text-main:      #171717;
+      --text-sub:       #6b7280;
+      --text-light:     #9ca3af;
+      --bg-page:        #fafafa;
       --bg-card:        #ffffff;
-      --border:         #e2dff5;
-      --shadow-sm:      0 2px 8px rgba(120,100,200,0.08);
-      --shadow-md:      0 4px 20px rgba(120,100,200,0.15);
+      --border:         #e5e7eb;
+      --shadow-sm:      0 1px 3px rgba(0,0,0,0.06);
+      --shadow-md:      0 4px 16px rgba(0,0,0,0.10);
       --radius-sm:      8px;
       --radius-md:      14px;
       --radius-lg:      20px;
@@ -47,7 +48,7 @@
     html, body {
       height: 100%;
       font-family: 'Noto Sans KR', system-ui, -apple-system, sans-serif;
-      background: var(--bg-page);
+      background: linear-gradient(135deg, #f5f5f5, #ffffff 50%, #f5f5f5);
       color: var(--text-main);
       font-size: 14px;
       line-height: 1.6;
@@ -64,67 +65,84 @@
     }
 
     /* ===================================================
-       Tab Bar
+       App Header (career NavBar와 동일 패턴)
     =================================================== */
-    .tab-bar {
+    .app-header {
       display: flex;
-      align-items: flex-end;
-      gap: 4px;
-      padding: 16px 24px 0;
-      background: linear-gradient(135deg, #ede9ff 0%, #e4f9f6 100%);
-      border-bottom: 2px solid var(--border);
-      flex-shrink: 0;
-    }
-
-    .tab-bar-spacer { flex: 1; }
-
-    .btn-logout {
-      display: inline-flex;
       align-items: center;
-      gap: 5px;
-      margin-bottom: 6px;
-      padding: 7px 16px;
-      border: 1.5px solid var(--border);
-      border-radius: 50px;
-      background: #fff;
-      color: var(--text-sub);
-      font-family: inherit;
-      font-size: 13px;
-      font-weight: 500;
-      cursor: pointer;
-      transition: all var(--transition);
+      height: 56px;
+      background: rgba(255,255,255,0.6);
+      backdrop-filter: blur(20px);
+      -webkit-backdrop-filter: blur(20px);
+      border-bottom: 1px solid rgba(255,255,255,0.5);
+      box-shadow: 0 1px 20px rgba(0,0,0,0.08);
+      flex-shrink: 0;
+      position: sticky;
+      top: 0;
+      z-index: 20;
     }
 
-    .btn-logout:hover {
-      border-color: var(--coral-btn);
-      color: var(--coral-btn);
-      background: #fde8e8;
+    .app-logo {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      height: 100%;
+      padding: 0 16px;
+      border-right: 1px solid rgba(255,255,255,0.5);
+      text-decoration: none;
     }
 
-    .tab-btn {
-      padding: 10px 28px;
-      border: 2px solid transparent;
-      border-bottom: none;
-      border-radius: var(--radius-sm) var(--radius-sm) 0 0;
-      background: rgba(255,255,255,0.5);
-      color: var(--text-sub);
-      font-size: 14px;
-      font-weight: 500;
-      font-family: inherit;
-      cursor: pointer;
-      transition: all var(--transition);
-      position: relative;
-      bottom: -2px;
+    .app-logo-icon {
+      width: 32px;
+      height: 32px;
+      border-radius: 8px;
+      flex-shrink: 0;
+      background: linear-gradient(135deg, #171717, #262626);
+      color: #fff;
+      display: flex;
+      align-items: center;
+      justify-content: center;
     }
 
-    .tab-btn:hover { background: rgba(255,255,255,0.8); color: var(--text-main); }
-
-    .tab-btn.active {
-      background: var(--bg-card);
+    .app-title {
+      font-size: 15px;
+      font-weight: 900;
+      letter-spacing: -0.03em;
       color: var(--text-main);
-      font-weight: 700;
-      border-color: var(--border);
-      border-bottom-color: var(--bg-card);
+    }
+
+    .app-header-spacer { flex: 1; }
+
+    .app-header-actions {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      padding: 0 16px;
+    }
+
+    .app-user-email {
+      font-size: 12px;
+      color: var(--text-sub);
+    }
+
+    .btn-header-link {
+      display: inline-block;
+      font-size: 12px;
+      font-family: inherit;
+      color: #4b5563;
+      background: #fff;
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 6px 12px;
+      text-decoration: none;
+      cursor: pointer;
+      transition: all var(--transition);
+    }
+
+    .btn-header-link:hover {
+      border-color: #a3a3a3;
+      color: var(--text-main);
+      background: #f5f5f5;
     }
 
     /* ===================================================
@@ -224,7 +242,7 @@
       flex: 1;
       min-width: 0;
       padding: 6px 28px 6px 10px;
-      background: #fff url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23b8a9e8' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpolyline points='6 9 12 15 18 9'%3E%3C/polyline%3E%3C/svg%3E") no-repeat right 8px center / 13px;
+      background: #fff url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%236b7280' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpolyline points='6 9 12 15 18 9'%3E%3C/polyline%3E%3C/svg%3E") no-repeat right 8px center / 13px;
       border: 1.5px solid var(--border);
       border-radius: var(--radius-sm);
       font-size: 12.5px;
@@ -235,7 +253,7 @@
       transition: border-color var(--transition);
     }
 
-    .filter-select:focus { border-color: var(--mint); box-shadow: 0 0 0 3px rgba(109,213,194,0.18); }
+    .filter-select:focus { border-color: var(--mint); box-shadow: 0 0 0 3px rgba(115,115,115,0.18); }
 
     /* ===================================================
        Key List Table
@@ -270,7 +288,7 @@
       cursor: pointer;
     }
 
-    .key-list-table tbody tr:nth-child(even) { background: #fbfaff; }
+    .key-list-table tbody tr:nth-child(even) { background: #fafafa; }
     .key-list-table tbody tr:last-child { border-bottom: none; }
     .key-list-table tbody tr:hover { background: var(--mint-light); }
 
@@ -372,26 +390,36 @@
     .form-grid {
       display: grid;
       grid-template-columns: 1fr 1fr;
-      gap: 20px 20px;
+      gap: 10px 24px;
     }
 
     .span-full { grid-column: 1 / -1; }
 
     .detail-field {
       display: flex;
-      flex-direction: column;
-      gap: 5px;
+      flex-direction: row;
+      align-items: center;
+      gap: 10px;
+      min-height: 32px;
+    }
+
+    /* 여러 줄 필드(textarea/rich text)는 레이블을 값 상단에 맞춰 정렬 */
+    .detail-field.align-top {
+      align-items: flex-start;
+    }
+
+    .detail-field.align-top > .detail-label {
+      padding-top: 8px;
     }
 
     .detail-label {
+      flex: 0 0 92px;
       font-size: 10.5px;
       font-weight: 700;
       color: var(--lavender);
       letter-spacing: 0.07em;
       text-transform: uppercase;
-      padding-bottom: 3px;
-      border-bottom: 1.5px solid var(--lavender-mid);
-      margin-bottom: 1px;
+      white-space: nowrap;
     }
 
     .detail-label .required {
@@ -399,20 +427,10 @@
       margin-left: 2px;
     }
 
-    .detail-label-row {
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-      gap: 8px;
-      padding-bottom: 3px;
-      border-bottom: 1.5px solid var(--lavender-mid);
-      margin-bottom: 1px;
-    }
-
-    .detail-label-row .detail-label {
-      border-bottom: none;
-      padding-bottom: 0;
-      margin-bottom: 0;
+    .detail-field > .detail-input {
+      flex: 1 1 0%;
+      width: auto;
+      min-width: 0;
     }
 
     .copy-btn {
@@ -459,7 +477,7 @@
     select.detail-input:not(:disabled) {
       cursor: pointer;
       border-color: var(--lavender-mid);
-      background: #fff url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23b8a9e8' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpolyline points='6 9 12 15 18 9'%3E%3C/polyline%3E%3C/svg%3E") no-repeat right 10px center / 14px;
+      background: #fff url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%236b7280' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpolyline points='6 9 12 15 18 9'%3E%3C/polyline%3E%3C/svg%3E") no-repeat right 10px center / 14px;
     }
 
     select.detail-input:disabled {
@@ -488,7 +506,7 @@
       transition: border-color var(--transition), background var(--transition), box-shadow var(--transition);
     }
 
-    /* readonly: 흰색 배경 + 연한 라벤더 테두리로 패널 배경(#f6f4ff)과 명확히 구분 */
+    /* readonly: 흰색 배경 + 연한 회색 테두리로 패널 배경과 명확히 구분 */
     .detail-input[readonly] {
       background: #ffffff;
       border-color: var(--lavender-mid);
@@ -498,7 +516,7 @@
 
     .detail-input[readonly]:hover {
       border-color: var(--lavender);
-      box-shadow: 0 1px 4px rgba(184,169,232,0.18);
+      box-shadow: 0 1px 4px rgba(0,0,0,0.06);
     }
 
     .detail-input:not([readonly]) {
@@ -509,7 +527,7 @@
 
     .detail-input:not([readonly]):focus {
       border-color: var(--mint);
-      box-shadow: 0 0 0 3px rgba(109,213,194,0.18);
+      box-shadow: 0 0 0 3px rgba(115,115,115,0.18);
     }
 
     .detail-input-url[readonly] {
@@ -548,7 +566,7 @@
 
     .detail-input-rich[contenteditable="true"]:focus {
       border-color: var(--mint);
-      box-shadow: 0 0 0 3px rgba(109,213,194,0.18);
+      box-shadow: 0 0 0 3px rgba(115,115,115,0.18);
       outline: none;
     }
 
@@ -583,8 +601,96 @@
     }
 
     .detail-input-key:not([readonly]) {
-      background: #f0fff9;
+      background: #ffffff;
       border-color: var(--mint);
+    }
+
+    /* Key 값 목록 — NAME/VALUE 행 반복 + 추가/삭제 */
+    .key-values-list {
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+      flex: 1 1 0%;
+      min-width: 0;
+    }
+
+    .kv-row {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .kv-row .kv-name {
+      flex: 0 0 220px;
+      font-family: monospace;
+      font-size: 12px;
+      background: var(--mint-light);
+      border-color: var(--mint-mid);
+    }
+
+    .kv-row .kv-name:not([readonly]) {
+      background: #ffffff;
+      border-color: var(--mint);
+    }
+
+    .kv-row .kv-value {
+      flex: 1 1 0%;
+      min-width: 0;
+      font-family: monospace;
+      font-size: 12px;
+      background: var(--mint-light);
+      border-color: var(--mint-mid);
+    }
+
+    .kv-row .kv-value:not([readonly]) {
+      background: #ffffff;
+      border-color: var(--mint);
+    }
+
+    .kv-remove-btn,
+    .kv-add-btn {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      flex-shrink: 0;
+      border: 1.5px solid var(--border);
+      background: #fff;
+      border-radius: var(--radius-sm);
+      cursor: pointer;
+      color: var(--text-sub);
+      transition: all var(--transition);
+    }
+
+    .kv-remove-btn {
+      width: 24px;
+      height: 24px;
+      font-size: 16px;
+      line-height: 1;
+    }
+
+    .kv-remove-btn:hover {
+      border-color: var(--coral-btn);
+      color: var(--coral-btn);
+    }
+
+    .kv-add-btn {
+      align-self: flex-start;
+      width: auto;
+      padding: 5px 12px;
+      font-size: 12px;
+      font-weight: 700;
+    }
+
+    .kv-add-btn:hover {
+      border-color: var(--mint);
+      color: var(--text-main);
+      background: var(--mint-light);
+    }
+
+    .kv-empty-hint {
+      font-size: 12px;
+      color: var(--text-light);
+      padding: 4px 0;
     }
 
     /* ===================================================
@@ -595,8 +701,8 @@
       align-items: center;
       gap: 6px;
       padding: 8px 18px;
-      border: none;
-      border-radius: 50px;
+      border: 1.5px solid transparent;
+      border-radius: 8px;
       font-family: inherit;
       font-size: 13px;
       font-weight: 600;
@@ -605,7 +711,7 @@
     }
 
     .btn:focus-visible {
-      outline: 3px solid var(--lavender);
+      outline: 2px solid var(--lavender);
       outline-offset: 2px;
     }
 
@@ -618,69 +724,72 @@
     .btn-sm { padding: 6px 14px; font-size: 12px; }
 
     .btn-primary {
-      background: linear-gradient(135deg, var(--blue-btn), var(--mint));
+      background: #171717;
       color: #fff;
-      box-shadow: 0 2px 10px rgba(91,164,232,0.3);
+      border-color: #171717;
     }
 
     .btn-primary:hover:not(:disabled) {
-      transform: translateY(-1px);
-      box-shadow: 0 4px 14px rgba(91,164,232,0.4);
+      background: #262626;
+      border-color: #262626;
     }
 
     .btn-edit {
-      background: #e8f9f3;
-      color: var(--green-btn);
-      border: 1.5px solid #b8edd9;
+      background: #fff;
+      color: #4b5563;
+      border-color: var(--border);
     }
 
     .btn-edit:hover:not(:disabled) {
-      background: var(--green-btn);
-      color: #fff;
+      border-color: #a3a3a3;
+      color: var(--text-main);
+      background: #f5f5f5;
     }
 
     .btn-delete {
-      background: #fde8e8;
-      color: var(--coral-btn);
-      border: 1.5px solid #f5c8c8;
+      background: #fff;
+      color: #4b5563;
+      border-color: var(--border);
     }
 
     .btn-delete:hover:not(:disabled) {
-      background: var(--coral-btn);
-      color: #fff;
+      border-color: #f87171;
+      color: #ef4444;
+      background: #fef2f2;
     }
 
     .btn-cancel {
-      background: #f0eeff;
+      background: #fff;
       color: var(--text-sub);
-      border: 1.5px solid var(--lavender-mid);
+      border-color: var(--border);
     }
 
     .btn-cancel:hover:not(:disabled) {
-      background: var(--lavender-mid);
+      border-color: #a3a3a3;
       color: var(--text-main);
+      background: #f5f5f5;
     }
 
     .btn-save {
-      background: linear-gradient(135deg, var(--blue-btn), var(--mint));
+      background: #171717;
       color: #fff;
-      box-shadow: 0 2px 10px rgba(91,164,232,0.3);
+      border-color: #171717;
     }
 
     .btn-save:hover:not(:disabled) {
-      transform: translateY(-1px);
-      box-shadow: 0 4px 14px rgba(91,164,232,0.4);
+      background: #262626;
+      border-color: #262626;
     }
 
     .btn-danger {
-      background: linear-gradient(135deg, #f07a7a, #e05555);
+      background: #dc2626;
       color: #fff;
-      box-shadow: 0 2px 10px rgba(240,122,122,0.35);
+      border-color: #dc2626;
     }
 
     .btn-danger:hover:not(:disabled) {
-      transform: translateY(-1px);
-      box-shadow: 0 4px 14px rgba(240,122,122,0.45);
+      background: #b91c1c;
+      border-color: #b91c1c;
     }
 
     /* ===================================================
@@ -715,7 +824,7 @@
       display: none;
       position: fixed;
       inset: 0;
-      background: rgba(60,50,110,0.4);
+      background: rgba(0,0,0,0.4);
       backdrop-filter: blur(2px);
       z-index: 1100;
       align-items: center;
@@ -773,7 +882,7 @@
       display: none;
       position: fixed;
       inset: 0;
-      background: rgba(60,50,110,0.4);
+      background: rgba(0,0,0,0.4);
       backdrop-filter: blur(2px);
       z-index: 1200;
       align-items: center;
@@ -822,7 +931,7 @@
       outline: none;
       color: var(--text-main);
     }
-    .key-select-search:focus { border-color: var(--mint); box-shadow: 0 0 0 3px rgba(109,213,194,0.18); }
+    .key-select-search:focus { border-color: var(--mint); box-shadow: 0 0 0 3px rgba(115,115,115,0.18); }
 
     .key-select-list { flex: 1; overflow-y: auto; padding: 4px 8px 8px; }
 
@@ -861,6 +970,10 @@
       flex: 1;
     }
 
+    .date-pair-cell .detail-label {
+      flex-basis: 46px;
+    }
+
     /* ===================================================
        Responsive (mobile stacked)
     =================================================== */
@@ -875,21 +988,22 @@
 </head>
 
 <body>
-<div id="app" role="application" style="display:none">
+<div id="app" role="application" style="display:flex; flex-direction:column">
 
-  <!-- Tab Bar -->
-  <nav class="tab-bar" role="tablist" aria-label="메인 탭">
-    <button
-      class="tab-btn active"
-      role="tab"
-      aria-selected="true"
-      aria-controls="panel-tokens"
-      id="tab-tokens"
-      data-tab="tokens"
-    >Key 관리</button>
-    <span class="tab-bar-spacer"></span>
-    <button class="btn-logout" id="btn-logout">⏻ 로그아웃</button>
-  </nav>
+  <!-- App Header -->
+  <header class="app-header">
+    <a href="/dashboard" class="app-logo">
+      <span class="app-logo-icon" aria-hidden="true">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 2l-2 2m-7.61 7.61a5.5 5.5 0 11-7.778 7.778 5.5 5.5 0 017.777-7.777zm0 0L15.5 7.5m0 0l3 3L22 7l-3-3m-3.5 3.5L19 4"/></svg>
+      </span>
+      <span class="app-title">KEY 관리</span>
+    </a>
+    <div class="app-header-spacer"></div>
+    <div class="app-header-actions">
+      <span class="app-user-email" id="user-email"></span>
+      <button type="button" class="btn-header-link" id="btn-logout">닫기</button>
+    </div>
+  </header>
 
   <!-- Tab Content -->
   <div class="tab-content">
@@ -898,8 +1012,6 @@
     <section
       class="tab-panel active"
       id="panel-tokens"
-      role="tabpanel"
-      aria-labelledby="tab-tokens"
     >
       <div class="main-layout">
 
@@ -975,11 +1087,9 @@
                   <input class="detail-input" id="d-key-name" type="text" maxlength="100" readonly />
                 </div>
                 <div class="detail-field">
-                  <span class="detail-label-row">
-                    <span class="detail-label">사용 계정 <span class="required">*</span></span>
-                    <button type="button" class="copy-btn" data-copy-target="d-account" title="복사" aria-label="사용 계정 복사"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect width="14" height="14" x="8" y="8" rx="2" ry="2"></rect><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"></path></svg></button>
-                  </span>
+                  <span class="detail-label">사용 계정 <span class="required">*</span></span>
                   <input class="detail-input" id="d-account" type="text" maxlength="100" readonly />
+                  <button type="button" class="copy-btn" data-copy-target="d-account" title="복사" aria-label="사용 계정 복사"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect width="14" height="14" x="8" y="8" rx="2" ry="2"></rect><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"></path></svg></button>
                 </div>
 
                 <!-- Row 2: KEY 유형 | URL -->
@@ -995,11 +1105,9 @@
                   </select>
                 </div>
                 <div class="detail-field">
-                  <span class="detail-label-row">
-                    <span class="detail-label">URL <span class="required">*</span></span>
-                    <button type="button" class="copy-btn" data-copy-target="d-url" title="복사" aria-label="URL 복사"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect width="14" height="14" x="8" y="8" rx="2" ry="2"></rect><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"></path></svg></button>
-                  </span>
+                  <span class="detail-label">URL <span class="required">*</span></span>
                   <input class="detail-input detail-input-url" id="d-url" type="text" maxlength="200" readonly />
+                  <button type="button" class="copy-btn" data-copy-target="d-url" title="복사" aria-label="URL 복사"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect width="14" height="14" x="8" y="8" rx="2" ry="2"></rect><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"></path></svg></button>
                 </div>
 
                 <!-- Row 3: 프로젝트명 | 프로젝트 URL -->
@@ -1008,33 +1116,26 @@
                   <input class="detail-input" id="d-project-name" type="text" maxlength="100" readonly />
                 </div>
                 <div class="detail-field">
-                  <span class="detail-label-row">
-                    <span class="detail-label">프로젝트 URL</span>
-                    <button type="button" class="copy-btn" data-copy-target="d-project-url" title="복사" aria-label="프로젝트 URL 복사"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect width="14" height="14" x="8" y="8" rx="2" ry="2"></rect><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"></path></svg></button>
-                  </span>
+                  <span class="detail-label">프로젝트 URL</span>
                   <input class="detail-input detail-input-url" id="d-project-url" type="text" maxlength="200" readonly />
+                  <button type="button" class="copy-btn" data-copy-target="d-project-url" title="복사" aria-label="프로젝트 URL 복사"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect width="14" height="14" x="8" y="8" rx="2" ry="2"></rect><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"></path></svg></button>
                 </div>
 
-                <!-- Row 4: Key (전체) -->
-                <div class="detail-field span-full">
-                  <span class="detail-label-row">
-                    <span class="detail-label">Key</span>
-                    <button type="button" class="copy-btn" data-copy-target="d-key-value" title="복사" aria-label="Key 복사"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect width="14" height="14" x="8" y="8" rx="2" ry="2"></rect><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"></path></svg></button>
-                  </span>
-                  <textarea class="detail-input detail-input-key" id="d-key-value" maxlength="1000" readonly></textarea>
+                <!-- Row 4: Key (전체) — 이름 붙은 값 목록(NAME/VALUE), 여러 개 추가/삭제 가능 -->
+                <div class="detail-field span-full align-top">
+                  <span class="detail-label">Key</span>
+                  <div class="key-values-list" id="d-key-values"></div>
                 </div>
 
                 <!-- Row 5: MCP 등록 방법 (전체) -->
-                <div class="detail-field span-full">
-                  <span class="detail-label-row">
-                    <span class="detail-label">MCP 등록 방법</span>
-                    <button type="button" class="copy-btn" data-copy-target="d-mcp-registration" title="복사" aria-label="MCP 등록 방법 복사"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect width="14" height="14" x="8" y="8" rx="2" ry="2"></rect><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"></path></svg></button>
-                  </span>
+                <div class="detail-field span-full align-top">
+                  <span class="detail-label">MCP 등록 방법</span>
                   <textarea class="detail-input detail-input-multiline" id="d-mcp-registration" maxlength="2000" readonly></textarea>
+                  <button type="button" class="copy-btn" data-copy-target="d-mcp-registration" title="복사" aria-label="MCP 등록 방법 복사"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect width="14" height="14" x="8" y="8" rx="2" ry="2"></rect><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"></path></svg></button>
                 </div>
 
                 <!-- Row 6: Key 생성 방법 (전체) -->
-                <div class="detail-field span-full">
+                <div class="detail-field span-full align-top">
                   <span class="detail-label">Key 생성 방법</span>
                   <textarea class="detail-input detail-input-multiline" id="d-key-creation" maxlength="2000" readonly></textarea>
                 </div>
@@ -1066,7 +1167,7 @@
                 </div>
 
                 <!-- Row 8: 설명 (전체) — rich text contenteditable -->
-                <div class="detail-field span-full">
+                <div class="detail-field span-full align-top">
                   <span class="detail-label">설명</span>
                   <div class="detail-input detail-input-rich" id="d-description" contenteditable="false"></div>
                 </div>
@@ -1128,9 +1229,21 @@
 <div id="toast" role="status" aria-live="polite" aria-atomic="true"></div>
 
 <!-- =====================================================
-     Supabase CDN
+     Supabase — hub과 동일한 @supabase/ssr 쿠키 기반 클라이언트를 써서
+     hub SSO 로그인 세션(JWT)을 그대로 재사용한다. tokens 테이블 RLS가
+     auth.jwt()의 email 클레임을 검사하므로, 별도 로그인 없이 hub 세션이
+     그대로 있어야 데이터가 보인다 (버전은 hub/package-lock.json과 일치).
 ===================================================== -->
-<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
+<script type="module">
+  import { createBrowserClient } from 'https://esm.sh/@supabase/ssr@0.12.4';
+  const client = createBrowserClient(
+    'https://trduvbgyfbzdkopdcana.supabase.co',
+    'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InRyZHV2Ymd5ZmJ6ZGtvcGRjYW5hIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzYyNjI3MjksImV4cCI6MjA5MTgzODcyOX0.b9P15zvzWbJw4KVS_Iz4ipoLttMlHXmj5I-kGrIm-A0',
+    { cookieOptions: { path: '/' } }
+  );
+  await client.auth.getSession();
+  window.dispatchEvent(new CustomEvent('sb-client-ready', { detail: client }));
+</script>
 
 <script>
 /*
@@ -1142,7 +1255,8 @@
  *   url                 varchar(200)  NOT NULL
  *   project_name        varchar(100)
  *   project_url         varchar(200)
- *   key_value           varchar(1000) NOT NULL
+ *   key_value           varchar(1000)         -- deprecated, key_values로 대체(과거 데이터 보존용, 앱에서 더 이상 쓰지 않음)
+ *   key_values          jsonb NOT NULL DEFAULT '[]'  -- [{name, value}, ...] — 항목 하나가 여러 개의 이름 붙은 값을 가질 수 있음(예: Supabase ANON/SERVICE_ROLE)
  *   usage_period        varchar(100)
  *   expiry_date         date
  *   key_creation_method varchar(2000)
@@ -1166,13 +1280,31 @@ const SUPABASE_URL      = 'https://trduvbgyfbzdkopdcana.supabase.co';
 const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InRyZHV2Ymd5ZmJ6ZGtvcGRjYW5hIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzYyNjI3MjksImV4cCI6MjA5MTgzODcyOX0.b9P15zvzWbJw4KVS_Iz4ipoLttMlHXmj5I-kGrIm-A0';
 
 let sbClient;
-try {
-  if (!window.supabase) throw new Error('Supabase CDN 스크립트 로드 실패');
-  sbClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
-} catch (initErr) {
-  document.getElementById('key-list-tbody').innerHTML =
-    `<tr class="list-state"><td colspan="3">⚠️ Supabase 초기화 오류: ${initErr.message}</td></tr>`;
+window.addEventListener('sb-client-ready', (e) => {
+  sbClient = e.detail;
+  if (typeof loadTokens === 'function') loadTokens();
+  initHeader();
+});
+
+// --------------------------------------------------
+// App Header — 로그인 이메일 표시 / 닫기
+// (career의 NavBar와 동일한 패턴 — hub SSO 세션을 그대로 재사용)
+// --------------------------------------------------
+const SUPER_ADMIN_EMAIL = 'peter.bae0311@gmail.com';
+
+async function initHeader() {
+  const { data: { user } } = await sbClient.auth.getUser();
+  const email = user?.email || '';
+  document.getElementById('user-email').textContent = email;
 }
+
+// hub 대시보드가 서브앱을 window.open(..., '_blank')으로 열기 때문에 close()가 통한다.
+// 대시보드를 거치지 않고 URL을 직접 열었을 때(닫기 실패)는 대시보드로 이동시킨다.
+// hub 세션 자체를 끝내는 게 아니므로 signOut은 호출하지 않는다.
+document.getElementById('btn-logout').addEventListener('click', () => {
+  window.close();
+  setTimeout(() => { window.location.href = '/dashboard'; }, 300);
+});
 
 // --------------------------------------------------
 // State
@@ -1181,7 +1313,9 @@ let panelMode          = 'empty';   // 'empty' | 'view' | 'new' | 'edit'
 let selectedRowId      = null;
 let currentDetailRecord = null;
 let tokensCache        = [];
+let initialLoadApplied = false;     // 화면 최초 로드 시 기본값 적용은 1회만
 let pendingDeleteId    = null;
+let currentKeyValues   = [];        // 현재 폼에 표시 중인 Key 값 목록 [{name, value}, ...]
 
 // Detail field IDs → DB column names
 const FIELD_MAP = {
@@ -1191,7 +1325,6 @@ const FIELD_MAP = {
   'd-url':             'url',
   'd-project-name':    'project_name',
   'd-project-url':     'project_url',
-  'd-key-value':       'key_value',
   'd-usage-period':    'usage_period',
   'd-expiry-date':     'expiry_date',
   'd-key-creation':    'key_creation_method',
@@ -1201,8 +1334,8 @@ const FIELD_MAP = {
 };
 
 const ALL_FIELD_IDS    = Object.keys(FIELD_MAP);
-const AUTO_RESIZE_IDS  = ['d-key-value', 'd-key-creation', 'd-mcp-registration'];
-const REQUIRED_IDS     = ['d-key-name', 'd-account', 'd-url', 'd-key-value'];
+const AUTO_RESIZE_IDS  = ['d-key-creation', 'd-mcp-registration'];
+const REQUIRED_IDS     = ['d-key-name', 'd-account', 'd-url'];
 const URL_FIELD_IDS    = ['d-url', 'd-project-url'];
 
 // --------------------------------------------------
@@ -1316,6 +1449,8 @@ async function loadTokens() {
   data.sort((a, b) => {
     const ac = (a.account  || '').localeCompare(b.account  || '', 'ko');
     if (ac !== 0) return ac;
+    const tc = (a.key_type || '').localeCompare(b.key_type || '', 'ko');
+    if (tc !== 0) return tc;
     return (a.key_name || '').localeCompare(b.key_name || '', 'ko');
   });
 
@@ -1328,6 +1463,24 @@ async function loadTokens() {
   }
 
   populateAccountFilterOptions();
+
+  // 화면 최초 로드 시 기본값: 계정 = peter.bae0311@gmail.com(목록에 있을 때만),
+  // KEY 유형은 이미 기본이 "전체". 이후 저장/삭제로 인한 재조회에서는 건드리지 않음.
+  if (!isEditing && !initialLoadApplied) {
+    initialLoadApplied = true;
+    const hasSuperAdminAccount = Array.from(filterAccountEl.options).some(o => o.value === SUPER_ADMIN_EMAIL);
+    if (hasSuperAdminAccount) filterAccountEl.value = SUPER_ADMIN_EMAIL;
+    applyFilters();
+    const firstRow = getFilteredTokens()[0];
+    if (firstRow) {
+      selectedRowId = firstRow.id;
+      showDetail(firstRow);
+      const rowEl = keyListTbody.querySelector(`tr[data-id="${firstRow.id}"]`);
+      if (rowEl) rowEl.classList.add('selected');
+    }
+    return;
+  }
+
   applyFilters();
 }
 
@@ -1417,6 +1570,97 @@ function setPanelMode(mode) {
   btnDetailSave.style.display   = (mode === 'new' || mode === 'edit') ? '' : 'none';
 
   setDetailReadonly(mode === 'view');
+  renderKeyValues(currentKeyValues, mode === 'view');
+}
+
+// --------------------------------------------------
+// Key 값 목록 (NAME/VALUE) — 항목 하나가 여러 개의 이름 붙은 값을 가질 수 있음
+// --------------------------------------------------
+const keyValuesContainer = document.getElementById('d-key-values');
+
+function makeKeyValueRow(name, value, readonly) {
+  const row = document.createElement('div');
+  row.className = 'kv-row';
+
+  const nameInput = document.createElement('input');
+  nameInput.className   = 'detail-input kv-name';
+  nameInput.type        = 'text';
+  nameInput.placeholder = 'NAME';
+  nameInput.value       = name || '';
+  nameInput.readOnly    = readonly;
+
+  const valueInput = document.createElement('input');
+  valueInput.className   = 'detail-input kv-value';
+  valueInput.type        = 'text';
+  valueInput.placeholder = 'VALUE';
+  valueInput.value       = value || '';
+  valueInput.readOnly    = readonly;
+
+  const copyBtn = document.createElement('button');
+  copyBtn.type = 'button';
+  copyBtn.className = 'copy-btn';
+  copyBtn.title = '복사';
+  copyBtn.setAttribute('aria-label', '값 복사');
+  copyBtn.innerHTML = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect width="14" height="14" x="8" y="8" rx="2" ry="2"></rect><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"></path></svg>';
+  copyBtn.addEventListener('click', async () => {
+    const text = valueInput.value || '';
+    if (!text.trim()) { showToast('복사할 내용이 없습니다.', 'error'); return; }
+    try {
+      await navigator.clipboard.writeText(text);
+      showToast('복사되었습니다.', 'success');
+    } catch (e) {
+      showToast('복사 실패: ' + e.message, 'error');
+    }
+  });
+
+  row.appendChild(nameInput);
+  row.appendChild(valueInput);
+  row.appendChild(copyBtn);
+
+  if (!readonly) {
+    const removeBtn = document.createElement('button');
+    removeBtn.type = 'button';
+    removeBtn.className = 'kv-remove-btn';
+    removeBtn.title = '삭제';
+    removeBtn.setAttribute('aria-label', '값 삭제');
+    removeBtn.textContent = '−';
+    removeBtn.addEventListener('click', () => row.remove());
+    row.appendChild(removeBtn);
+  }
+
+  return row;
+}
+
+function renderKeyValues(list, readonly) {
+  keyValuesContainer.innerHTML = '';
+  (list || []).forEach(kv => {
+    keyValuesContainer.appendChild(makeKeyValueRow(kv.name, kv.value, readonly));
+  });
+
+  if (!readonly) {
+    const addBtn = document.createElement('button');
+    addBtn.type = 'button';
+    addBtn.className = 'kv-add-btn';
+    addBtn.textContent = '+ 값 추가';
+    addBtn.addEventListener('click', () => {
+      keyValuesContainer.insertBefore(makeKeyValueRow('', '', false), addBtn);
+    });
+    keyValuesContainer.appendChild(addBtn);
+  } else if (!list || list.length === 0) {
+    const hint = document.createElement('div');
+    hint.className = 'kv-empty-hint';
+    hint.textContent = '등록된 값이 없습니다.';
+    keyValuesContainer.appendChild(hint);
+  }
+}
+
+function collectKeyValues() {
+  return [...keyValuesContainer.querySelectorAll('.kv-row')]
+    .map(row => {
+      const inputs = row.querySelectorAll('input');
+      return { name: inputs[0].value.trim(), value: inputs[1].value.trim() };
+    })
+    .filter(kv => kv.name || kv.value);
 }
 
 function setDetailReadonly(readonly) {
@@ -1446,13 +1690,13 @@ function showDetail(rec) {
   document.getElementById('d-url').value             = rec.url                 || '';
   document.getElementById('d-project-name').value    = rec.project_name        || '';
   document.getElementById('d-project-url').value     = rec.project_url         || '';
-  document.getElementById('d-key-value').value       = rec.key_value           || '';
   document.getElementById('d-usage-period').value    = rec.usage_period        || '';
   document.getElementById('d-expiry-date').value     = rec.expiry_date ? rec.expiry_date.slice(0, 10) : '';
   document.getElementById('d-renewal-date').value    = rec.renewal_date ? rec.renewal_date.slice(0, 10) : '';
   document.getElementById('d-key-creation').value    = rec.key_creation_method || '';
   document.getElementById('d-mcp-registration').value= rec.mcp_registration    || '';
   document.getElementById('d-description').innerHTML = rec.description         || '';
+  currentKeyValues = rec.key_values || [];
 
   setPanelMode('view');
   autoResizeAll();
@@ -1485,6 +1729,8 @@ function clearForm() {
     const el = document.getElementById(id);
     if (el) el.onclick = null;
   });
+  currentKeyValues = [];
+  keyValuesContainer.innerHTML = '';
 }
 
 // --------------------------------------------------
@@ -1530,13 +1776,13 @@ function startNewFromTemplate(rec) {
   document.getElementById('d-url').value              = rec.url                 || '';
   document.getElementById('d-project-name').value     = rec.project_name        || '';
   document.getElementById('d-project-url').value      = rec.project_url         || '';
-  document.getElementById('d-key-value').value        = rec.key_value           || '';
   document.getElementById('d-usage-period').value     = rec.usage_period        || '';
   document.getElementById('d-expiry-date').value      = rec.expiry_date ? rec.expiry_date.slice(0, 10) : '';
   document.getElementById('d-key-creation').value     = rec.key_creation_method || '';
   document.getElementById('d-mcp-registration').value = rec.mcp_registration    || '';
   document.getElementById('d-description').innerHTML  = rec.description         || '';
   document.getElementById('d-renewal-date').value     = todayStr();
+  currentKeyValues = rec.key_values || [];
   setPanelMode('new');
   autoResizeAll();
   document.getElementById('d-key-name').focus();
@@ -1623,7 +1869,6 @@ async function handleSave() {
   const keyName  = document.getElementById('d-key-name').value.trim();
   const account  = document.getElementById('d-account').value.trim();
   const url      = document.getElementById('d-url').value.trim();
-  const keyValue = document.getElementById('d-key-value').value.trim();
 
   if (!keyName)  { document.getElementById('d-key-name').focus();  showToast('Key 명칭은 필수입니다.', 'error'); return; }
   if (!account)  { document.getElementById('d-account').focus();   showToast('사용 계정은 필수입니다.', 'error'); return; }
@@ -1636,7 +1881,7 @@ async function handleSave() {
     url,
     project_name:        document.getElementById('d-project-name').value.trim()      || null,
     project_url:         document.getElementById('d-project-url').value.trim()       || null,
-    key_value:           keyValue,
+    key_values:          collectKeyValues(),
     usage_period:        document.getElementById('d-usage-period').value.trim()      || null,
     expiry_date:         document.getElementById('d-expiry-date').value              || null,
     renewal_date:        todayStr(),
@@ -1783,56 +2028,8 @@ document.addEventListener('keydown', e => {
   }
 });
 
-// --------------------------------------------------
-// Tab switching
-// --------------------------------------------------
-document.querySelectorAll('.tab-btn').forEach(btn => {
-  btn.addEventListener('click', () => {
-    const target = btn.dataset.tab;
-    document.querySelectorAll('.tab-btn').forEach(b => {
-      b.classList.remove('active');
-      b.setAttribute('aria-selected', 'false');
-    });
-    document.querySelectorAll('.tab-panel').forEach(p => p.classList.remove('active'));
-    btn.classList.add('active');
-    btn.setAttribute('aria-selected', 'true');
-    document.getElementById('panel-' + target).classList.add('active');
-  });
-});
-
-// loadTokens는 auth 모듈의 onLogin 콜백에서 호출됨
-</script>
-
-<!-- Auth 모듈 초기화 -->
-<script src="auth/auth-ui.js"></script>
-<script src="auth/auth.js"></script>
-<script>
-  (async () => {
-    const { signOut } = await window.initAuth({
-      supabaseUrl: SUPABASE_URL,
-      supabaseKey: SUPABASE_ANON_KEY,
-      onLogin: () => {
-        const app = document.getElementById('app');
-        if (app) { app.style.display = 'flex'; app.style.flexDirection = 'column'; }
-        if (typeof loadTokens === 'function') loadTokens();
-      },
-      onLogout: () => {
-        const app = document.getElementById('app');
-        if (app) app.style.display = 'none';
-      },
-    });
-
-    const btnLogout = document.getElementById('btn-logout');
-    if (btnLogout) {
-      btnLogout.addEventListener('click', async () => {
-        btnLogout.disabled = true;
-        btnLogout.textContent = '로그아웃 중...';
-        await signOut();
-        btnLogout.disabled = false;
-        btnLogout.textContent = '⏻ 로그아웃';
-      });
-    }
-  })();
+// hub SSO만으로 접근 가능 — loadTokens()는 위 sb-client-ready 리스너에서 호출됨
+// (tokens 테이블 RLS가 auth.jwt() email을 검사하므로 hub 세션이 준비된 뒤에만 조회 가능).
 </script>
 
 </body>

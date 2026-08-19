@@ -226,7 +226,7 @@ export async function POST(req: NextRequest) {
 
       const itemsToProcess = filteredItems.slice(0, 30);
 
-      // AI 없이 RSS 원문 그대로 일괄 저장 (번역은 팝업 on-demand)
+      // AI 없이 RSS 원문 그대로 일괄 저장 (번역 기능 제거됨)
       const rows = itemsToProcess.map((item) => ({
         subcategory_id: sub.id,
         title: item.title,

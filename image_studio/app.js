@@ -9,8 +9,14 @@
    1. SUPABASE INIT
    ============================================================ */
 // Supabase anon key는 클라이언트 공개 키 — git 노출 허용
-const SUPABASE_URL      = window.APP_CONFIG?.SUPABASE_URL      ?? 'https://mcshhvttsvfurrkpcbdf.supabase.co';
-const SUPABASE_ANON_KEY = window.APP_CONFIG?.SUPABASE_ANON_KEY ?? 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im1jc2hodnR0c3ZmdXJya3BjYmRmIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzM5ODI5MDgsImV4cCI6MjA4OTU1ODkwOH0.FRlSXHknfnYoZ4i4-_up8QvppoKHGo50koK9yDkXPUQ';
+// hub 자신의 Supabase 프로젝트를 그대로 씀 (mcshhvttsvfurrkpcbdf 프로젝트에서 이전, 2026-08-14).
+const SUPABASE_URL      = window.APP_CONFIG?.SUPABASE_URL      ?? 'https://trduvbgyfbzdkopdcana.supabase.co';
+const SUPABASE_ANON_KEY = window.APP_CONFIG?.SUPABASE_ANON_KEY ?? 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InRyZHV2Ymd5ZmJ6ZGtvcGRjYW5hIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzYyNjI3MjksImV4cCI6MjA5MTgzODcyOX0.b9P15zvzWbJw4KVS_Iz4ipoLttMlHXmj5I-kGrIm-A0';
+
+// OpenRouter/Groq(텍스트·비전) 및 HuggingFace(이미지 생성) 호출은 hub 프록시가 대행 —
+// 키는 hub의 Key 관리(manage_token)에 저장돼 있고 브라우저로는 절대 내려오지 않는다.
+const LLM_PROXY_URL   = '/api/image_studio/llm';
+const IMAGE_PROXY_URL = '/api/image_studio/image';
 
 let supabaseClient = null;
 try {
@@ -363,54 +369,21 @@ function buildAutoFillPrompt(keyword) {
 }
 
 async function callAutoFill(keyword) {
-  // 1. 서버사이드 API 우선 (Vercel 배포 환경)
-  try {
-    // BUG-8 fix: 클라이언트 타임아웃을 서버 maxDuration(60s)에 맞게 상향
-    const res = await fetch('/api/autofill', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ keyword }),
-      signal: AbortSignal.timeout(58_000),
-    });
-
-    if (res.ok) {
-      const data = await res.json();
-      if (data.imageName || data.targetAudience) return data;
-    } else if (res.status !== 404) {
-      // BUG-3 fix: 404(함수 미배포) 제외한 모든 오류는 즉시 throw — 클라이언트 폴백 없음
-      const body = await res.json().catch(() => ({}));
-      throw new Error(body.error ?? `서버 오류 ${res.status}`);
-    }
-    // 404 → 함수 미배포 환경 (npx serve 로컬 등) → 클라이언트 폴백으로 진행
-    console.warn('[autofill] /api/autofill 없음 (404) — 클라이언트 폴백');
-  } catch (e) {
-    // TypeError(네트워크 오류) · AbortError(타임아웃) 만 폴백 허용, 그 외는 재전파
-    if (e.name !== 'TypeError' && e.name !== 'AbortError') throw e;
-    console.warn('[autofill] /api/autofill 네트워크 오류 — 클라이언트 폴백:', e.message);
-  }
-
-  // 2. 클라이언트 직접 호출 폴백 (로컬 개발 환경, config.js 필요)
-  const { openrouterKey, groqKey } = getConfig();
   const prompt = buildAutoFillPrompt(keyword);
 
   let rawText;
   let orResult = null;
-
-  if (openrouterKey) {
-    try {
-      const models = await fetchFreeTextModels(openrouterKey);
-      console.log(`[autofill] Free text models: ${models.length}`);
-      orResult = await tryTextModels(models, prompt, openrouterKey);
-    } catch (e) { console.warn('[autofill] OpenRouter error:', e.message); }
-  }
+  try {
+    const models = await fetchFreeTextModels();
+    console.log(`[autofill] Free text models: ${models.length}`);
+    orResult = await tryTextModels(models, prompt);
+  } catch (e) { console.warn('[autofill] OpenRouter error:', e.message); }
 
   if (orResult) {
     rawText = orResult.text.trim();
   } else {
-    // BUG-6 fix: 빈 groqKey로 호출 방지
-    if (!groqKey) throw new Error('API 키가 없습니다. Vercel 환경변수(GROQ_API_KEY)를 확인하세요.');
     console.log('[autofill] OpenRouter 소진 → Groq 폴백');
-    const groqResult = await callGroqText(prompt, groqKey);
+    const groqResult = await callGroqText(prompt);
     rawText = groqResult.text.trim();
   }
 
@@ -478,21 +451,9 @@ keywordInput.addEventListener('keydown', (e) => {
    8. CLIENT-SIDE API — LLM + IMAGE GENERATION
    ============================================================ */
 
-/* ── Config ── */
-function getConfig() {
-  const cfg = window.APP_CONFIG ?? {};
-  return {
-    openrouterKey: cfg.OPENROUTER_API_KEY ?? '',
-    groqKey:       cfg.GROQ_API_KEY       ?? '',
-    hfToken:       cfg.HF_TOKEN           ?? '',
-  };
-}
-
-/* ── OpenRouter: 무료 텍스트 모델 목록 ── */
-async function fetchFreeTextModels(apiKey) {
-  const res = await fetch('https://openrouter.ai/api/v1/models', {
-    headers: { 'Authorization': `Bearer ${apiKey}`, 'Content-Type': 'application/json' }
-  });
+/* ── OpenRouter: 무료 텍스트 모델 목록 (공개 엔드포인트, 키 불필요) ── */
+async function fetchFreeTextModels() {
+  const res = await fetch('https://openrouter.ai/api/v1/models');
   if (!res.ok) throw new Error(`OpenRouter models fetch failed: ${res.status}`);
   const data = await res.json();
   return (data.data ?? []).filter(m => {
@@ -503,27 +464,22 @@ async function fetchFreeTextModels(apiKey) {
   });
 }
 
-async function callOpenRouterText(modelId, prompt, apiKey) {
-  const res = await fetch('https://openrouter.ai/api/v1/chat/completions', {
+async function callOpenRouterText(modelId, prompt) {
+  const res = await fetch(LLM_PROXY_URL, {
     method: 'POST',
-    headers: {
-      'Authorization': `Bearer ${apiKey}`,
-      'Content-Type': 'application/json',
-      'HTTP-Referer': 'https://prototype-05.vercel.app',
-      'X-Title': 'Prototype-05 Image Generator'
-    },
-    body: JSON.stringify({ model: modelId, messages: [{ role: 'user', content: prompt }], max_tokens: 500 })
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ provider: 'openrouter', model: modelId, messages: [{ role: 'user', content: prompt }], max_tokens: 500 })
   });
   if (!res.ok) throw new Error(`${res.status}`);
   const data = await res.json();
   return data.choices?.[0]?.message?.content;
 }
 
-async function tryTextModels(models, prompt, apiKey) {
+async function tryTextModels(models, prompt) {
   for (let i = 0; i < models.length; i += 10) {
     for (const model of models.slice(i, i + 10)) {
       try {
-        const text = await callOpenRouterText(model.id, prompt, apiKey);
+        const text = await callOpenRouterText(model.id, prompt);
         if (text) return { text, modelUsed: model.id };
       } catch (e) {
         console.warn(`[generate] model ${model.id} failed:`, e.message);
@@ -533,13 +489,13 @@ async function tryTextModels(models, prompt, apiKey) {
   return null;
 }
 
-async function callGroqText(prompt, apiKey) {
+async function callGroqText(prompt) {
   for (const model of ['llama-3.3-70b-versatile', 'llama-3.1-70b-versatile', 'llama3-70b-8192']) {
     try {
-      const res = await fetch('https://api.groq.com/openai/v1/chat/completions', {
+      const res = await fetch(LLM_PROXY_URL, {
         method: 'POST',
-        headers: { 'Authorization': `Bearer ${apiKey}`, 'Content-Type': 'application/json' },
-        body: JSON.stringify({ model, messages: [{ role: 'user', content: prompt }], max_tokens: 500 })
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ provider: 'groq', model, messages: [{ role: 'user', content: prompt }], max_tokens: 500 })
       });
       if (!res.ok) continue;
       const data = await res.json();
@@ -575,42 +531,32 @@ async function fetchImageAsBase64(url, fetchOptions = {}) {
   return `data:${contentType};base64,${btoa(binary)}`;
 }
 
-async function generateImageWithHF(prompt, width, height, hfToken) {
-  if (!hfToken) throw new Error('HF_TOKEN이 config.js에 설정되지 않았습니다');
+async function generateImageWithHF(prompt, width, height) {
   const w = snapDim(width), h = snapDim(height);
   console.log(`[HF] FLUX.1-schnell — ${w}x${h}`);
 
-  const res = await fetch(
-    'https://router.huggingface.co/hf-inference/models/black-forest-labs/FLUX.1-schnell',
-    {
-      method: 'POST',
-      headers: { 'Authorization': `Bearer ${hfToken}`, 'Content-Type': 'application/json', 'x-use-cache': 'false' },
-      body: JSON.stringify({
-        inputs: `${IMG_STYLE_PREFIX}, ${prompt}`,
-        parameters: {
-          width: w, height: h, num_inference_steps: 4,
-          negative_prompt: IMG_NEGATIVE,
-        },
-      }),
-      signal: AbortSignal.timeout(60_000),
-    }
-  );
+  const res = await fetch(IMAGE_PROXY_URL, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      prompt: `${IMG_STYLE_PREFIX}, ${prompt}`,
+      width: w,
+      height: h,
+      negativePrompt: IMG_NEGATIVE,
+    }),
+    signal: AbortSignal.timeout(60_000),
+  });
 
   if (!res.ok) {
-    const errText = await res.text().catch(() => '');
+    const body = await res.json().catch(() => ({}));
+    const message = body.error || `HF 프록시 오류 ${res.status}`;
     if (res.status === 403) throw Object.assign(new Error('HF 토큰 권한 부족 — Fine-grained 토큰 (Inference Providers 권한) 이 필요합니다'), { status: 403 });
-    throw Object.assign(new Error(`HF API ${res.status}: ${errText.substring(0, 120)}`), { status: res.status });
+    throw Object.assign(new Error(message), { status: res.status });
   }
 
-  const buffer = await res.arrayBuffer();
-  const bytes  = new Uint8Array(buffer);
-  let binary   = '';
-  for (let i = 0; i < bytes.length; i += 8192) {
-    binary += String.fromCharCode(...bytes.subarray(i, i + 8192));
-  }
-  const contentType = res.headers.get('content-type') || 'image/jpeg';
-  console.log(`[HF] generated: ${Math.round(buffer.byteLength / 1024)} KB`);
-  return `data:${contentType};base64,${btoa(binary)}`;
+  const { dataUrl } = await res.json();
+  console.log(`[HF] generated: ${Math.round(dataUrl.length * 0.75 / 1024)} KB`);
+  return dataUrl;
 }
 
 /* ── Pollinations.ai 이미지 생성 (무료, 인증 불필요) ── */
@@ -629,14 +575,16 @@ async function generateImageWithPollinations(prompt, width, height) {
 }
 
 /* ── 통합 이미지 생성: HF → Pollinations 폴백 ── */
-async function generateImage(prompt, width, height, hfToken) {
+async function generateImage(prompt, width, height) {
   try {
-    return await generateImageWithHF(prompt, width, height, hfToken);
+    return await generateImageWithHF(prompt, width, height);
   } catch (hfErr) {
-    const code = hfErr.status;
-    // 402(크레딧 소진), 429(요청 초과), 503(서비스 불가) → Pollinations로 폴백
-    if (code === 402 || code === 429 || code === 503 || code === 500) {
-      console.warn(`[HF] ${code} 오류 — Pollinations 폴백`, hfErr.message);
+    // HF의 provider/모델 가용성이 자주 바뀌어(실측: 410 deprecated, 400 unsupported 등
+    // 다양한 실패 사례 확인) 특정 코드만 골라 폴백하면 계속 새 케이스를 놓친다.
+    // 403(토큰 권한 부족)만 관리자가 직접 고쳐야 할 설정 문제라 예외로 남기고,
+    // 그 외에는 전부 Pollinations로 넘어간다.
+    if (hfErr.status !== 403) {
+      console.warn(`[HF] ${hfErr.status ?? 'unknown'} 오류 — Pollinations 폴백`, hfErr.message);
       return generateImageWithPollinations(prompt, width, height);
     }
     throw hfErr;
@@ -667,8 +615,6 @@ function parseSizeStr(sizeStr) {
 
 /* ── callGenerate (클라이언트 직접 호출) ── */
 async function callGenerate({ courseName, targetAudience, objectives, content, ratio, size }) {
-  const { openrouterKey, groqKey, hfToken } = getConfig();
-
   const llmPrompt = buildGeneratePrompt({
     courseName: courseName ?? '', targetAudience: targetAudience ?? '',
     objectives: objectives ?? '', content: content ?? '', ratio: ratio ?? '16:9',
@@ -676,20 +622,18 @@ async function callGenerate({ courseName, targetAudience, objectives, content, r
 
   let rawText, modelUsed;
   let orResult = null;
-  if (openrouterKey) {
-    try {
-      const models = await fetchFreeTextModels(openrouterKey);
-      console.log(`[generate] Free text models: ${models.length}`);
-      orResult = await tryTextModels(models, llmPrompt, openrouterKey);
-    } catch (e) { console.warn('[generate] OpenRouter error:', e.message); }
-  }
+  try {
+    const models = await fetchFreeTextModels();
+    console.log(`[generate] Free text models: ${models.length}`);
+    orResult = await tryTextModels(models, llmPrompt);
+  } catch (e) { console.warn('[generate] OpenRouter error:', e.message); }
 
   if (orResult) {
     rawText = orResult.text.trim();
     modelUsed = `openrouter/${orResult.modelUsed}`;
   } else {
     console.log('[generate] OpenRouter 소진 → Groq 폴백');
-    const groqResult = await callGroqText(llmPrompt, groqKey);
+    const groqResult = await callGroqText(llmPrompt);
     rawText = groqResult.text.trim();
     modelUsed = groqResult.modelUsed;
   }
@@ -704,15 +648,13 @@ async function callGenerate({ courseName, targetAudience, objectives, content, r
   } catch { /* raw text 그대로 사용 */ }
 
   const { width, height } = parseSizeStr(size ?? '1280x720');
-  const imageData = await generateImage(imagePrompt, width, height, hfToken);
+  const imageData = await generateImage(imagePrompt, width, height);
   return { imageData, prompt: imagePrompt, koreanDescription, modelUsed };
 }
 
-/* ── OpenRouter: 무료 비전 모델 목록 ── */
-async function fetchFreeVisionModels(apiKey) {
-  const res = await fetch('https://openrouter.ai/api/v1/models', {
-    headers: { 'Authorization': `Bearer ${apiKey}`, 'Content-Type': 'application/json' }
-  });
+/* ── OpenRouter: 무료 비전 모델 목록 (공개 엔드포인트, 키 불필요) ── */
+async function fetchFreeVisionModels() {
+  const res = await fetch('https://openrouter.ai/api/v1/models');
   if (!res.ok) throw new Error(`OpenRouter models fetch failed: ${res.status}`);
   const data = await res.json();
   return (data.data ?? []).filter(m => {
@@ -722,16 +664,12 @@ async function fetchFreeVisionModels(apiKey) {
   });
 }
 
-async function callOpenRouterVision(modelId, imageBase64, textPrompt, apiKey) {
-  const res = await fetch('https://openrouter.ai/api/v1/chat/completions', {
+async function callOpenRouterVision(modelId, imageBase64, textPrompt) {
+  const res = await fetch(LLM_PROXY_URL, {
     method: 'POST',
-    headers: {
-      'Authorization': `Bearer ${apiKey}`,
-      'Content-Type': 'application/json',
-      'HTTP-Referer': 'https://prototype-05.vercel.app',
-      'X-Title': 'Prototype-05 Image Corrector'
-    },
+    headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({
+      provider: 'openrouter',
       model: modelId,
       messages: [{ role: 'user', content: [
         { type: 'text', text: textPrompt },
@@ -745,17 +683,17 @@ async function callOpenRouterVision(modelId, imageBase64, textPrompt, apiKey) {
   return data.choices?.[0]?.message?.content;
 }
 
-async function tryVisionModels(models, imageBase64, prompt, apiKey) {
+async function tryVisionModels(models, imageBase64, prompt) {
   for (const model of models) {
     try {
-      const text = await callOpenRouterVision(model.id, imageBase64, prompt, apiKey);
+      const text = await callOpenRouterVision(model.id, imageBase64, prompt);
       if (text) return { text, modelUsed: model.id };
     } catch (e) { console.warn(`[correct] vision model ${model.id} failed:`, e.message); }
   }
   return null;
 }
 
-async function callGroqVision(imageBase64, prompt, apiKey) {
+async function callGroqVision(imageBase64, prompt) {
   // 최신 순으로 시도 — 모델 deprecated 시 자동으로 다음 모델로 폴백
   const GROQ_VISION_MODELS = [
     'meta-llama/llama-4-scout-17b-16e-instruct',
@@ -765,10 +703,11 @@ async function callGroqVision(imageBase64, prompt, apiKey) {
   ];
   for (const model of GROQ_VISION_MODELS) {
     try {
-      const res = await fetch('https://api.groq.com/openai/v1/chat/completions', {
+      const res = await fetch(LLM_PROXY_URL, {
         method: 'POST',
-        headers: { 'Authorization': `Bearer ${apiKey}`, 'Content-Type': 'application/json' },
+        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
+          provider: 'groq',
           model,
           messages: [{ role: 'user', content: [
             { type: 'text', text: prompt },
@@ -825,7 +764,6 @@ function parseVisionJson(raw) {
 
 /* ── callCorrect (클라이언트 직접 호출) ── */
 async function callCorrect({ imageBase64, imageName, ratio, size }) {
-  const { openrouterKey, groqKey, hfToken } = getConfig();
   const { width, height } = parseSizeStr(size ?? '1280x720');
 
   const MAX_BASE64_CHARS = 4 * 1024 * 1024;
@@ -847,18 +785,17 @@ async function callCorrect({ imageBase64, imageName, ratio, size }) {
     console.log(`[correct] vision image size: ${Math.round(visionImage.length / 1024)} KB (after resize)`);
 
     let visionResult = null;
-    if (openrouterKey) {
-      try {
-        const visionModels = await fetchFreeVisionModels(openrouterKey);
-        console.log(`[correct] Free vision models: ${visionModels.length}`);
-        visionResult = await tryVisionModels(visionModels, visionImage, VISION_PROMPT, openrouterKey);
-        if (visionResult) modelUsed = `openrouter/${visionResult.modelUsed}`;
-      } catch (e) { console.warn('[correct] OpenRouter vision error:', e.message); }
-    }
+    try {
+      const visionModels = await fetchFreeVisionModels();
+      console.log(`[correct] Free vision models: ${visionModels.length}`);
+      visionResult = await tryVisionModels(visionModels, visionImage, VISION_PROMPT);
+      if (visionResult) modelUsed = `openrouter/${visionResult.modelUsed}`;
+    } catch (e) { console.warn('[correct] OpenRouter vision error:', e.message); }
+
     if (!visionResult) {
       console.log('[correct] Groq vision 폴백');
       try {
-        visionResult = await callGroqVision(visionImage, VISION_PROMPT, groqKey);
+        visionResult = await callGroqVision(visionImage, VISION_PROMPT);
         if (visionResult) modelUsed = visionResult.modelUsed;
       } catch (e) { console.error('[correct] Groq vision 전체 실패:', e.message); }
     }
@@ -876,7 +813,7 @@ async function callCorrect({ imageBase64, imageName, ratio, size }) {
   const finalPrompt = improvedPrompt?.trim() ||
     `Photorealistic professional educational image, ${ratio ?? '16:9'} aspect ratio, DSLR photography, natural lighting, ultra-detailed`;
 
-  const correctedImageData = await generateImage(finalPrompt, width, height, hfToken);
+  const correctedImageData = await generateImage(finalPrompt, width, height);
   return { correctedImageData, correctionNotes: correctionNotes || '이미지 분석 없이 기본 프롬프트로 재생성되었습니다.', modelUsed };
 }
 

@@ -13,9 +13,8 @@ function optional(key: string): string | null {
 }
 
 export const serverEnv = {
-  // AI 자기소개서 작성 (없으면 AI 기능 비활성)
-  openrouterApiKey: optional('OPENROUTER_API_KEY'),
-  groqApiKey:       optional('GROQ_API_KEY'),
+  // AI 자기소개서 작성은 hub의 Key 관리를 거치는 프록시(src/lib/hubProxy.ts)를 통하므로
+  // career 자신의 .env에는 OPENROUTER_API_KEY/GROQ_API_KEY가 더 이상 필요 없다.
 
   // 채용공고 API (없으면 mock 데이터 반환)
   worknetApiKey:   optional('WORKNET_API_KEY'),

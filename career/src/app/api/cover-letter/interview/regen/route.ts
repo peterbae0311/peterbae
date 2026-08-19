@@ -1,10 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { serverEnv } from '@/lib/env.server';
+import { callHubLlm } from '@/lib/hubProxy';
 import { createServerSupabaseClient } from '@/lib/supabaseServer';
 import { DEFAULT_REGEN_PROMPT } from '@/lib/interviewPrompts';
-
-const OR_URL   = 'https://openrouter.ai/api/v1/chat/completions';
-const GROQ_URL = 'https://api.groq.com/openai/v1/chat/completions';
 
 const OR_MODELS = [
   'qwen/qwen3-next-80b-a3b-instruct:free',
@@ -23,24 +20,25 @@ function extractErrorMessage(errBody: string): string {
   }
 }
 
-async function fetchText(url: string, headers: Record<string, string>, body: Record<string, unknown>): Promise<{ text: string | null; error?: string }> {
+async function fetchText(
+  provider: 'openrouter' | 'groq',
+  model: string,
+  messages: { role: string; content: string }[],
+  opts: { maxTokens?: number; temperature?: number } = {},
+): Promise<{ text: string | null; error?: string }> {
   try {
-    const res = await fetch(url, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json', ...headers },
-      body: JSON.stringify(body),
-    });
+    const res = await callHubLlm(provider, model, messages, opts);
     if (!res.ok) {
       const errBody = await res.text();
       const message = extractErrorMessage(errBody);
-      console.error(`[interview/regen] ${body.model} 호출 실패: ${res.status} ${errBody.slice(0, 300)}`);
+      console.error(`[interview/regen] ${model} 호출 실패: ${res.status} ${errBody.slice(0, 300)}`);
       return { text: null, error: message };
     }
     const data = await res.json();
     return { text: (data.choices?.[0]?.message?.content ?? '').trim() || null };
   } catch (e) {
     const message = e instanceof Error ? e.message : String(e);
-    console.error(`[interview/regen] ${body.model} 호출 예외:`, e);
+    console.error(`[interview/regen] ${model} 호출 예외:`, e);
     return { text: null, error: message };
   }
 }
@@ -50,10 +48,6 @@ function sleep(ms: number) {
 }
 
 export async function POST(request: NextRequest) {
-  if (!serverEnv.openrouterApiKey && !serverEnv.groqApiKey) {
-    return NextResponse.json({ error: 'AI 기능을 사용하려면 .env에 API 키를 설정해주세요.' }, { status: 501 });
-  }
-
   const { question_id, question, company_name, recruitment_notice, notes, urls, prompt } = await request.json();
 
   if (!question?.trim()) {
@@ -87,30 +81,22 @@ export async function POST(request: NextRequest) {
   let sample_answer: string | null = null;
   let lastError: string | undefined;
 
-  if (serverEnv.openrouterApiKey) {
-    for (const model of OR_MODELS) {
-      const result = await fetchText(OR_URL, { Authorization: `Bearer ${serverEnv.openrouterApiKey}` }, {
-        model, max_tokens: 1000, messages,
-      });
-      sample_answer = result.text;
-      if (result.error) lastError = result.error;
-      if (sample_answer) break;
-    }
+  for (const model of OR_MODELS) {
+    const result = await fetchText('openrouter', model, messages, { maxTokens: 1000 });
+    sample_answer = result.text;
+    if (result.error) lastError = result.error;
+    if (sample_answer) break;
   }
 
-  if (!sample_answer && serverEnv.groqApiKey) {
-    let result = await fetchText(GROQ_URL, { Authorization: `Bearer ${serverEnv.groqApiKey}` }, {
-      model: GROQ_MODEL, max_tokens: 1000, temperature: 0.85, messages,
-    });
+  if (!sample_answer) {
+    let result = await fetchText('groq', GROQ_MODEL, messages, { maxTokens: 1000, temperature: 0.85 });
     sample_answer = result.text;
     if (result.error) lastError = result.error;
 
     // Groq가 마지막 보루이므로, 일시적 rate-limit 대비 1회 재시도
     if (!sample_answer) {
       await sleep(1500);
-      result = await fetchText(GROQ_URL, { Authorization: `Bearer ${serverEnv.groqApiKey}` }, {
-        model: GROQ_MODEL, max_tokens: 1000, temperature: 0.85, messages,
-      });
+      result = await fetchText('groq', GROQ_MODEL, messages, { maxTokens: 1000, temperature: 0.85 });
       sample_answer = result.text;
       if (result.error) lastError = result.error;
     }

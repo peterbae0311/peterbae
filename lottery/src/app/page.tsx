@@ -509,9 +509,7 @@ export default function Home() {
   const [conditions, setConditions] = useState<ConditionRow[]>(DEFAULT_CONDITIONS);
   const [isSavingConditions, setIsSavingConditions] = useState(false);
   const [saveConditionsMsg, setSaveConditionsMsg] = useState('');
-  const [isAutoSetting, setIsAutoSetting] = useState(false);
   const [conditionSort, setConditionSort] = useState<'asc' | 'desc' | null>(null);
-  const [autoSettingMsg, setAutoSettingMsg] = useState('');
 
   // Section 3 state
   const [gameCount, setGameCount] = useState(100);
@@ -1102,102 +1100,6 @@ export default function Home() {
     finally { setIsSavingConditions(false); setTimeout(() => setSaveConditionsMsg(''), 4000); }
   }, [conditions]);
 
-  const autoSetConditions = useCallback(async () => {
-    setIsAutoSetting(true);
-    setAutoSettingMsg('Claude가 조건을 생성하는 중...');
-    try {
-      // 1. Claude에게 조건 생성 요청
-      const genRes = await fetch('/lottery/api/lotto/auto-conditions', { method: 'POST' });
-      const genData = await genRes.json();
-      if (!genData.success) {
-        setAutoSettingMsg(`생성 실패: ${genData.error}`);
-        setTimeout(() => setAutoSettingMsg(''), 5000);
-        return;
-      }
-
-      const generated = genData.data.conditions as Array<{
-        conditionType: number; years: number; months: number;
-        maxConsec: number;
-        oddCount: number; sumMin: number; sumMax: number; minAC?: number;
-        minBands?: number; lowCount?: number; primeCount?: number; minUniqueTails?: number;
-      }>;
-
-      // 2. 조건 상태 초기화 후 새 조건 세팅
-      const newConditions: ConditionRow[] = generated.map((c) => ({
-        id: makeId(),
-        conditionType: c.conditionType as ConditionType,
-        years: c.years, months: c.months,
-        maxConsec: c.maxConsec,
-        oddCount: c.oddCount, sumMin: c.sumMin, sumMax: c.sumMax, minAC: c.minAC ?? 7,
-        minBands: c.minBands ?? 5, lowCount: c.lowCount ?? 3,
-        primeCount: c.primeCount ?? 2, minUniqueTails: c.minUniqueTails ?? 5,
-        ...BLANK_ROW,
-        isLoading: true,
-      }));
-      setConditions(newConditions);
-      setAutoSettingMsg(`${generated.length}개 조건 실행 중...`);
-
-      // 3. 모든 조건 병렬 실행
-      const executed = await Promise.all(
-        newConditions.map(async (row) => {
-          try {
-            const r = await fetch('/lottery/api/lotto/execute-condition', {
-              method: 'POST', headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify(rowToApiBody(row)),
-            });
-            const d = await r.json();
-            if (d.success && Array.isArray(d.data?.numbers)) {
-              return { ...row, numbers: d.data.numbers, frequencies: d.data.frequencies ?? null, roundsAnalyzed: d.data.rounds_analyzed ?? null, distribution: d.data.distribution ?? null, bonusNumbers: d.data.bonusNumbers ?? null, isLoading: false };
-            }
-          } catch { /* ignore */ }
-          return { ...row, isLoading: false };
-        })
-      );
-      setConditions(executed);
-
-      // 4. DB 저장
-      const toSave = executed.filter((c) => c.numbers !== null && (c.numbers as number[]).length === 6);
-      if (toSave.length > 0) {
-        const saveRes = await fetch('/lottery/api/lotto/save-conditions', {
-          method: 'POST', headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            conditions: toSave.map((c) => ({
-              condition_text: buildConditionText(c),
-              num1: (c.numbers as number[])[0], num2: (c.numbers as number[])[1],
-              num3: (c.numbers as number[])[2], num4: (c.numbers as number[])[3],
-              num5: (c.numbers as number[])[4], num6: (c.numbers as number[])[5],
-              full_data: {
-                ...rowToApiBody(c),
-                numbers: c.numbers, frequencies: c.frequencies,
-                roundsAnalyzed: c.roundsAnalyzed, distribution: c.distribution,
-                bonusNumbers: c.bonusNumbers,
-              },
-            })),
-          }),
-        });
-        const saveData = await saveRes.json();
-        if (saveData.success) {
-          // 앵커 스냅샷 저장
-          const anchorData = computeAnchorData(toSave);
-          await fetch('/lottery/api/lotto/anchor-config', {
-            method: 'POST', headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ target_round: 0, ...anchorData }),
-          }).catch(() => {/* ignore */});
-          setAutoSettingMsg(`자동설정 완료 — ${toSave.length}개 조건 저장됨`);
-        } else {
-          setAutoSettingMsg(`실행 완료, 저장 실패: ${saveData.error}`);
-        }
-      } else {
-        setAutoSettingMsg('실행 완료 (저장할 결과 없음)');
-      }
-    } catch (err) {
-      setAutoSettingMsg(`오류: ${err instanceof Error ? err.message : '알 수 없는 오류'}`);
-    } finally {
-      setIsAutoSetting(false);
-      setTimeout(() => setAutoSettingMsg(''), 5000);
-    }
-  }, []);
-
   // ---------------------------------------------------------------------------
   // Section 3: AI generation (Type 3)
   // ---------------------------------------------------------------------------
@@ -1580,18 +1482,15 @@ export default function Home() {
             <div className="flex-none px-4 py-3 border-b border-gray-100 flex items-center justify-between flex-wrap gap-2">
               <SectionHeader icon={<IconBarChart />} title="참고) 당첨 빈도 분석" small />
               <div className="flex items-center gap-2">
-                {(autoSettingMsg || saveConditionsMsg) && (
-                  <span className={`text-xs font-medium ${(autoSettingMsg || saveConditionsMsg).includes('완료') ? 'text-emerald-600' : (autoSettingMsg || saveConditionsMsg).includes('중') ? 'text-blue-500' : 'text-red-500'}`}>
-                    {autoSettingMsg || saveConditionsMsg}
+                {saveConditionsMsg && (
+                  <span className={`text-xs font-medium ${saveConditionsMsg.includes('완료') ? 'text-emerald-600' : saveConditionsMsg.includes('중') ? 'text-blue-500' : 'text-red-500'}`}>
+                    {saveConditionsMsg}
                   </span>
                 )}
-                <button onClick={autoSetConditions} disabled={isAutoSetting} className="px-3 py-1.5 text-xs font-semibold bg-violet-500 text-white rounded-lg hover:bg-violet-600 active:scale-95 transition-all disabled:opacity-40">
-                  {isAutoSetting ? '생성 중...' : '자동설정'}
-                </button>
-                <button onClick={saveConditions} disabled={isSavingConditions || isAutoSetting} className="px-3 py-1.5 text-xs font-semibold bg-emerald-500 text-white rounded-lg hover:bg-emerald-600 active:scale-95 transition-all disabled:opacity-40">
+                <button onClick={saveConditions} disabled={isSavingConditions} className="px-3 py-1.5 text-xs font-semibold bg-emerald-500 text-white rounded-lg hover:bg-emerald-600 active:scale-95 transition-all disabled:opacity-40">
                   {isSavingConditions ? '저장 중...' : '결과 저장'}
                 </button>
-                <button onClick={resetConditionNumbers} disabled={isAutoSetting} className="px-3 py-1.5 text-xs font-semibold bg-gray-100 text-gray-600 rounded-lg hover:bg-gray-200 active:scale-95 transition-all disabled:opacity-40">초기화</button>
+                <button onClick={resetConditionNumbers} className="px-3 py-1.5 text-xs font-semibold bg-gray-100 text-gray-600 rounded-lg hover:bg-gray-200 active:scale-95 transition-all disabled:opacity-40">초기화</button>
               </div>
             </div>
             <div className="overflow-x-auto overflow-y-auto max-h-72 md:max-h-none md:flex-1 md:min-h-0">

@@ -1,9 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { serverEnv } from '@/lib/env.server';
+import { callHubLlm } from '@/lib/hubProxy';
 import { appendSapGlossary } from '@/lib/sap-glossary';
-
-const OR_URL   = 'https://openrouter.ai/api/v1/chat/completions';
-const GROQ_URL = 'https://api.groq.com/openai/v1/chat/completions';
 
 // OpenRouter: 현재 유효한 무료 모델 (2026-07 기준)
 const OR_MODELS = [
@@ -15,14 +12,6 @@ const OR_MODELS = [
 const GROQ_MODEL = 'llama-3.3-70b-versatile';
 
 export async function POST(request: NextRequest) {
-  const apiKey = serverEnv.openrouterApiKey ?? serverEnv.groqApiKey;
-  if (!apiKey) {
-    return NextResponse.json(
-      { error: 'AI 기능을 사용하려면 .env에 OPENROUTER_API_KEY 또는 GROQ_API_KEY를 설정해주세요.' },
-      { status: 501 }
-    );
-  }
-
   const { company_name, recruitment_notice, notes, urls, question, char_limit } = await request.json();
 
   if (!question?.trim()) {
@@ -65,88 +54,61 @@ ${charInstruction}
   const maxTokens = Math.min((char_limit ?? 800) * 3, 4000);
 
   // OpenRouter 시도 (모델 순서대로)
-  if (serverEnv.openrouterApiKey) {
-    for (const model of OR_MODELS) {
-      try {
-        const res = await fetch(OR_URL, {
-          method: 'POST',
-          headers: {
-            'Authorization': `Bearer ${serverEnv.openrouterApiKey}`,
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify({ model, max_tokens: maxTokens, messages }),
-        });
-
-        if (res.ok) {
-          const data = await res.json();
-          let answer = sanitizeKorean((data.choices?.[0]?.message?.content ?? '').trim());
-          answer = appendSapGlossary(truncate(answer, char_limit));
-          return NextResponse.json({ answer, char_count: answer.length, model });
-        }
-
-        const errText = await res.text();
-        console.warn(`[generate] OR ${model} 실패 (${res.status}):`, errText.slice(0, 200));
-      } catch (e) {
-        console.warn(`[generate] OR ${model} 연결 오류:`, e);
-      }
-    }
-  }
-
-  // Groq 폴백
-  if (serverEnv.groqApiKey) {
+  for (const model of OR_MODELS) {
     try {
-      const res = await fetch(GROQ_URL, {
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${serverEnv.groqApiKey}`,
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({ model: GROQ_MODEL, max_tokens: maxTokens, temperature: 0.85, messages }),
-      });
+      const res = await callHubLlm('openrouter', model, messages, { maxTokens });
 
       if (res.ok) {
         const data = await res.json();
         let answer = sanitizeKorean((data.choices?.[0]?.message?.content ?? '').trim());
-        answer = truncate(answer, char_limit);
-
-        // 글자수 미달 시 2차 보완 요청
-        if (char_limit && answer.length < char_limit * 0.9) {
-          const needed = char_limit - answer.length;
-          const expandMessages = [
-            ...messages,
-            { role: 'assistant', content: answer },
-            { role: 'user', content: `현재 답변은 ${answer.length}자입니다. ${char_limit}자 기준으로 ${needed}자가 부족합니다. 기존 내용 끝에 이어서 구체적인 경험, 각오, 포부를 추가하여 총 ${char_limit}자를 채워 완성하세요. 추가 내용만 출력하세요.` },
-          ];
-          const res2 = await fetch(GROQ_URL, {
-            method: 'POST',
-            headers: {
-              'Authorization': `Bearer ${serverEnv.groqApiKey}`,
-              'Content-Type': 'application/json',
-            },
-            body: JSON.stringify({ model: GROQ_MODEL, max_tokens: needed * 3, temperature: 0.85, messages: expandMessages }),
-          });
-          if (res2.ok) {
-            const data2 = await res2.json();
-            const extra = sanitizeKorean((data2.choices?.[0]?.message?.content ?? '').trim());
-            answer = truncate(answer + ' ' + extra, char_limit);
-          }
-        }
-
-        answer = appendSapGlossary(answer);
-        return NextResponse.json({ answer, char_count: answer.length, model: GROQ_MODEL });
+        answer = appendSapGlossary(truncate(answer, char_limit));
+        return NextResponse.json({ answer, char_count: answer.length, model });
       }
 
       const errText = await res.text();
-      console.error('[generate] Groq 실패:', errText.slice(0, 300));
-      return NextResponse.json({ error: `AI 생성 오류: ${errText.slice(0, 200)}` }, { status: 500 });
+      console.warn(`[generate] OR ${model} 실패 (${res.status}):`, errText.slice(0, 200));
     } catch (e) {
-      const msg = e instanceof Error ? e.message : String(e);
-      console.error('[generate] Groq 연결 오류:', msg);
-      return NextResponse.json({ error: `연결 오류: ${msg}` }, { status: 500 });
+      console.warn(`[generate] OR ${model} 연결 오류:`, e);
     }
   }
 
-  return NextResponse.json({ error: 'AI 키가 설정되지 않았습니다.' }, { status: 501 });
+  // Groq 폴백
+  try {
+    const res = await callHubLlm('groq', GROQ_MODEL, messages, { maxTokens, temperature: 0.85 });
+
+    if (res.ok) {
+      const data = await res.json();
+      let answer = sanitizeKorean((data.choices?.[0]?.message?.content ?? '').trim());
+      answer = truncate(answer, char_limit);
+
+      // 글자수 미달 시 2차 보완 요청
+      if (char_limit && answer.length < char_limit * 0.9) {
+        const needed = char_limit - answer.length;
+        const expandMessages = [
+          ...messages,
+          { role: 'assistant', content: answer },
+          { role: 'user', content: `현재 답변은 ${answer.length}자입니다. ${char_limit}자 기준으로 ${needed}자가 부족합니다. 기존 내용 끝에 이어서 구체적인 경험, 각오, 포부를 추가하여 총 ${char_limit}자를 채워 완성하세요. 추가 내용만 출력하세요.` },
+        ];
+        const res2 = await callHubLlm('groq', GROQ_MODEL, expandMessages, { maxTokens: needed * 3, temperature: 0.85 });
+        if (res2.ok) {
+          const data2 = await res2.json();
+          const extra = sanitizeKorean((data2.choices?.[0]?.message?.content ?? '').trim());
+          answer = truncate(answer + ' ' + extra, char_limit);
+        }
+      }
+
+      answer = appendSapGlossary(answer);
+      return NextResponse.json({ answer, char_count: answer.length, model: GROQ_MODEL });
+    }
+
+    const errText = await res.text();
+    console.error('[generate] Groq 실패:', errText.slice(0, 300));
+    return NextResponse.json({ error: `AI 생성 오류: ${errText.slice(0, 200)}` }, { status: 500 });
+  } catch (e) {
+    const msg = e instanceof Error ? e.message : String(e);
+    console.error('[generate] Groq 연결 오류:', msg);
+    return NextResponse.json({ error: `연결 오류: ${msg}` }, { status: 500 });
+  }
 }
 
 function sanitizeKorean(text: string): string {

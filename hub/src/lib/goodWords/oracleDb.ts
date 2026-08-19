@@ -15,6 +15,9 @@ const POOL_ALIAS = 'good-words';
 
 oracledb.outFormat = oracledb.OUT_FORMAT_OBJECT;
 oracledb.autoCommit = true;
+// good_words_prompt_config.system_prompt은 CLOB — 지정 안 하면 Lob 스트림 객체로 반환되어
+// JSON.stringify 시 순환 참조 에러가 난다(실측 확인). 문자열로 바로 받도록 설정.
+oracledb.fetchAsString = [oracledb.CLOB];
 
 // Next.js dev 모드 재컴파일 시 모듈 스코프 변수가 초기화되는 문제 회피 — image_slideshow와
 // 동일한 이유로 globalThis에 캐싱(oracleDb.ts 주석 참고).

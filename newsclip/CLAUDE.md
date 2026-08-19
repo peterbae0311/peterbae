@@ -77,14 +77,12 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 - API: `POST /api/categories` → `lib/ai.ts:generateSubcategories()`
 
 ### 기사 수집
-- 「기사 보기」 버튼 → `POST /api/articles` → RSS 피드 fetch → AI 요약/번역 → DB upsert
+- 「기사 보기」 버튼 → `POST /api/articles` → RSS 피드 fetch → DB upsert (AI 요약/번역 없이 원문 그대로 저장)
 - `lib/rss.ts:fetchMultipleRss()` — 병렬 fetch, 중복 제거, 최신순 정렬
-- `lib/ai.ts:summarizeArticle()` — Groq로 빠른 요약, 실패 시 OpenRouter 폴백
 
-### 번역
-- Groq API 우선 사용 (속도), 실패 시 OpenRouter 폴백
-- 이미 한국어 비율 30% 이상이면 번역 생략
-- 팝업 내 「한국어 번역」 버튼: 전문 번역 on-demand
+### 요약/번역 (제거됨, 2026-08-15)
+- `summarizeArticle()`/`translateToKorean()` 둘 다 삭제 — 서버에 `.env` 자체가 없어 배포 환경에서 항상 실패 상태였고(`GROQ_API_KEY`/`OPENROUTER_API_KEY` undefined), 어차피 어떤 라우트도 더 이상 호출하지 않는 죽은 코드였음
+- 팝업은 DB에 저장된 원문(`article.summary`/`article.full_content`)만 표시
 
 ### 보안
 - AI/외부 API 키는 서버 전용 환경변수만 사용 (API Route에서만 호출)

@@ -5,23 +5,6 @@ import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { supabase, NavTab, NavTabBuiltinKey } from '@/lib/supabase';
 
-// hub 앱(별도 배포)의 최고관리자 계정과 반드시 동일한 값이어야 함.
-const SUPER_ADMIN_EMAIL = 'peter.bae0311@gmail.com';
-
-// hub의 src/lib/jwt.ts와 동일 — 로그인 이력(login_history)을 짝짓는 session_id 추출용.
-// 서명 검증 없음, 상관관계 키로만 사용.
-function decodeSessionId(accessToken: string): string | null {
-  try {
-    const payload = accessToken.split('.')[1];
-    if (!payload) return null;
-    const base64 = payload.replace(/-/g, '+').replace(/_/g, '/');
-    const claims = JSON.parse(atob(base64)) as { session_id?: string };
-    return claims.session_id ?? null;
-  } catch {
-    return null;
-  }
-}
-
 const BUILTIN_ICONS: Record<NavTabBuiltinKey, React.ReactNode> = {
   resume: (
     <svg className="w-4 h-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -108,20 +91,12 @@ export default function NavBar() {
     return href === '/' ? pathname === '/' : pathname.startsWith(href);
   };
 
-  async function handleLogout() {
-    const { data: { session } } = await supabase.auth.getSession();
-    const sessionId = session ? decodeSessionId(session.access_token) : null;
-    if (sessionId) {
-      // 절대 경로로 호출 — nginx가 /api/auth/를 hub로 라우팅하므로 career에 같은 라우트가 없어도 된다.
-      await fetch('/api/auth/logout-event', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ sessionId }),
-      }).catch(() => {});
-    }
-    await supabase.auth.signOut();
-    // 로그인 화면은 이제 career가 아니라 별도 hub 앱에 있으므로 절대 경로로 이동.
-    window.location.href = '/login';
+  // hub 대시보드가 서브앱을 window.open(..., '_blank')으로 열기 때문에 close()가 통한다.
+  // 대시보드를 거치지 않고 URL을 직접 열었을 때(닫기 실패)는 대시보드로 이동시킨다.
+  // hub 세션 자체를 끝내는 게 아니므로 signOut은 호출하지 않는다.
+  function handleClose() {
+    window.close();
+    setTimeout(() => { window.location.href = '/dashboard'; }, 300);
   }
 
   return (
@@ -169,22 +144,14 @@ export default function NavBar() {
           </button>
         </nav>
 
-        {/* 로그인 계정 + 로그아웃 */}
+        {/* 로그인 계정 + 닫기 */}
         <div className="ml-auto flex items-center gap-3 px-4">
-          {email === SUPER_ADMIN_EMAIL && (
-            <a
-              href="/admin"
-              className="text-xs text-gray-600 border border-gray-200/80 rounded-md px-3 py-1.5 hover:border-neutral-500 hover:text-neutral-900 hover:bg-neutral-100/60 transition-colors"
-            >
-              Admin
-            </a>
-          )}
           {email && <span className="text-xs text-gray-500">{email}</span>}
           <button
-            onClick={handleLogout}
+            onClick={handleClose}
             className="text-xs text-gray-600 border border-gray-200/80 rounded-md px-3 py-1.5 hover:border-neutral-500 hover:text-neutral-900 hover:bg-neutral-100/60 transition-colors"
           >
-            로그아웃
+            닫기
           </button>
         </div>
       </div>
