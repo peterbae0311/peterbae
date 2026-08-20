@@ -229,7 +229,7 @@ export default function RefineObjectivesPage() {
         {courses === null ? (
           <p className="text-xs text-gray-400 py-3">불러오는 중...</p>
         ) : courses.length === 0 ? (
-          <p className="text-xs text-gray-400 py-3">등록된 과정이 없습니다. "학습목표 생성" 버튼으로 과정을 추가하세요.</p>
+          <p className="text-xs text-gray-400 py-3">등록된 과정이 없습니다. &quot;학습목표 생성&quot; 버튼으로 과정을 추가하세요.</p>
         ) : (
           <div className="space-y-3">
             {courses.map((course) => {
@@ -907,7 +907,7 @@ function PromptModal({
     <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50 px-4">
       <div className="bg-white rounded-lg shadow-xl w-[1000px] h-[800px] max-w-full max-h-[90vh] flex flex-col">
         <div className="shrink-0 flex items-center justify-between px-5 py-3 border-b border-gray-200">
-          <span className="text-sm font-bold text-gray-800">"{course.name}" 학습목표 프롬프트</span>
+          <span className="text-sm font-bold text-gray-800">&quot;{course.name}&quot; 학습목표 프롬프트</span>
           <button onClick={onClose} className="text-gray-400 hover:text-gray-700 text-lg leading-none">✕</button>
         </div>
         <div className="flex-1 min-h-0 px-5 py-4 flex flex-col space-y-2">
