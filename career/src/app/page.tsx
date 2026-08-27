@@ -446,6 +446,21 @@ export default function CoverLetterPage() {
                     <col />
                   </colgroup>
                   <tbody>
+                    {/* 회사명 */}
+                    <tr className="bg-neutral-100/20">
+                      <td className="pl-4 pr-3 py-4 text-right text-sm font-semibold text-gray-700 whitespace-nowrap align-top pt-5">
+                        회사명 <span className="text-red-500">*</span>
+                      </td>
+                      <td className="pl-3 py-4 pr-8">
+                        <input
+                          value={refForm.company_name}
+                          onChange={e => setRefForm(f => ({ ...f, company_name: e.target.value }))}
+                          className="w-full px-3 py-2 border border-gray-200/80 bg-white/60 rounded-lg text-sm text-gray-700 focus:outline-none focus:border-neutral-500 focus:ring-1 focus:ring-neutral-500 transition-colors"
+                          placeholder="회사명을 입력하세요"
+                        />
+                      </td>
+                    </tr>
+
                     {/* 모집 요강 */}
                     <tr className="bg-white/40">
                       <td className="pl-4 pr-3 py-4 text-right text-sm font-semibold text-gray-700 whitespace-nowrap align-top pt-5">
@@ -477,6 +492,18 @@ export default function CoverLetterPage() {
                           </div>
                           {/* 행 목록 — 3행 초과 시 스크롤 */}
                           <div className="overflow-y-auto" style={{ maxHeight: '108px' }}>
+                            {urls.length === 0 && (
+                              <div className="flex">
+                                <div className="flex-1 px-4 py-2 text-center text-gray-400">등록된 URL이 없습니다</div>
+                                <div className="w-20 shrink-0 px-2 py-1 text-center whitespace-nowrap flex items-center justify-center">
+                                  <button
+                                    onClick={() => setUrls(us => [...us, { title: '', url: '', sort_order: us.length }])}
+                                    className="text-gray-500 hover:text-neutral-900 text-lg leading-none p-1.5 rounded hover:bg-neutral-100 transition-colors"
+                                    title="행 추가"
+                                  >⊕</button>
+                                </div>
+                              </div>
+                            )}
                             {urls.map((u, i) => (
                               <div key={i} className="flex border-b border-gray-100 last:border-0">
                                 <div className="w-44 shrink-0 px-2 py-1 border-r border-gray-200/70">
