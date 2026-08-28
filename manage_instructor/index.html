@@ -5127,6 +5127,31 @@
   const LIKERT_OPTIONS = ['매우 그렇다', '그렇다', '보통이다', '아니다', '매우 아니다'];
   const LIKERT_SCORES  = [5, 4, 3, 2, 1];
 
+  // 전문분야 프로파일 텍스트 (AI 분석 주요 데이터로 활용)
+  function _fieldsProfileText() {
+    if (!_fieldsList.length) return '없음';
+    return _fieldsList.map((f, i) => {
+      const lines = [`[전문분야 ${i+1}] ${f.field_name || ''}`];
+      if (f.field_definition) lines.push(`  정의: ${f.field_definition}`);
+      if (f.main_tasks)       lines.push(`  주요업무: ${f.main_tasks}`);
+      if (f.task_content)     lines.push(`  업무내용: ${f.task_content}`);
+      if (f.knowledge)        lines.push(`  전문지식: ${f.knowledge}`);
+      if (f.skills_tools)     lines.push(`  Skill/Tool: ${f.skills_tools}`);
+      if (f.work_experience)  lines.push(`  업무경험: ${f.work_experience}`);
+      return lines.join('\n');
+    }).join('\n');
+  }
+
+  // 교육 이수 이력 텍스트 (AI 분석 보조 데이터로 활용)
+  function _lecturesHistoryText() {
+    if (!_lecturesList.length) return '없음';
+    return _lecturesList.map(l => {
+      const period = (l.start_date || l.end_date) ? `${l.start_date || ''}~${l.end_date || ''}` : '';
+      const extra = [l.duration ? `강의시간: ${l.duration}` : '', period].filter(Boolean).join(', ');
+      return `- ${l.course_name}${extra ? ` (${extra})` : ''}`;
+    }).join('\n');
+  }
+
   async function generateSurveyQuestions(projects, onProgress = null) {
     if (!Array.isArray(projects) || projects.length === 0) throw new Error('프로젝트가 없습니다.');
     const projectsText = projects.map((p, i) =>
@@ -5135,22 +5160,36 @@
     const qualsText = _qualsList.length > 0
       ? _qualsList.map(q => `- [${q.qual_category}] ${q.name}${q.grade ? ` (${q.grade})` : ''}${q.acquired_date ? ` 취득: ${q.acquired_date}` : ''}`).join('\n')
       : '없음';
+    const fieldsText = _fieldsProfileText();
+    const lecturesText = _lecturesHistoryText();
     const messages = [{
       role: 'user',
-      content: `아래 프로젝트 경험과 자격 정보를 분석하여 해당 직무에 적합한 역량 카테고리를 직접 도출하고, 역량 진단을 위한 자기 평가 설문 문항을 만들어주세요.
+      content: `당신은 HRD 전문가이자 역량진단 설계 전문가입니다. 실무 프로젝트 경험을 심층 분석하여 신뢰도 높은 자기진단 설문을 설계합니다.
 
-작성 규칙:
-- 모든 문항과 카테고리명은 반드시 한국어로 작성하세요. 영어 사용 금지.
-- 각 문항은 "나는 ~할 수 있다" 또는 "나는 ~을 잘 한다" 형식의 1인칭 자기 평가 문장
-- 프로젝트 내용과 역할을 바탕으로 이 사람에게 실제로 의미 있는 역량 카테고리 5~7개를 도출 (예: 교수설계역량, 데이터분석역량, 강의전달역량 등 직무 맞춤으로 자유롭게 작성)
-- 카테고리당 문항 1개, 총 문항 수는 카테고리 수와 동일 (최소 5문항 이상)
-- 정답·오답 없이 역량 수준을 진단하는 문항
+프로젝트 경험과 자격 정보를 근거로 해당 직무에 실제로 의미 있는 역량 카테고리를 스스로 도출하고, 각 카테고리의 수준을 진단할 수 있는 자기평가 설문 문항을 설계한다.
+이 설문 결과는 이후 강점/성장 방향 분석의 근거 데이터로 재사용된다.
+
+[임직원의 전문 분야 프로파일]
+${fieldsText}
 
 [프로젝트 정보]
 ${projectsText}
 
-[자격 정보]
+[보유 자격 정보]
 ${qualsText}
+
+[교육 이수 이력]
+${lecturesText}
+
+작성 규칙:
+- (중요) 전문 분야 프로파일을 주요 정보로 활용하고, 프로젝트 이력, 자격사항, 기타 정보 및 설문 응답 정보는 보조 정보로 활용함.
+- 모든 문항과 카테고리명은 반드시 한국어로 작성하세요. 영어 사용 금지.
+- 각 문항은 "나는 ~할 수 있다" 또는 "나는 ~을 잘 한다" 형식의 1인칭 자기 평가 문장
+- 프로젝트 내용과 역할을 바탕으로 이 사람에게 실제로 의미 있는 역량 카테고리 5~7개를 도출 (예: 교수설계역량, 데이터분석역량, 강의전달역량 등 직무 맞춤으로 자유롭게 작성)
+- 카테고리당 문항 1개, 총 문항 수는 카테고리 수와 동일 (최소 5문항 이상)
+- 카테고리 간 의미 중복 금지 (서로 다른 역량 축을 다뤄야 함)
+- 정답·오답이 없는 수준 진단형 문항으로 작성, 특정 응답을 유도하는 표현 금지
+- 프로젝트/자격 정보에 실제로 근거가 있는 카테고리만 도출 (근거 없는 일반론적 카테고리 금지)
 
 JSON만 출력하세요. 다른 설명 없이 아래 형식으로만 출력:
 {"questions":[{"question":"자기 평가 문항","category":"역량 카테고리명"}]}`
@@ -5185,6 +5224,8 @@ JSON만 출력하세요. 다른 설명 없이 아래 형식으로만 출력:
     const qualsText = _qualsList.length > 0
       ? _qualsList.map(q => `- [${q.qual_category}] ${q.name}${q.grade ? ` (${q.grade})` : ''}${q.acquired_date ? ` 취득: ${q.acquired_date}` : ''}`).join('\n')
       : '없음';
+    const fieldsText = _fieldsProfileText();
+    const lecturesText = _lecturesHistoryText();
 
     const messages = [{
       role: 'user',
@@ -5193,46 +5234,50 @@ JSON만 출력하세요. 다른 설명 없이 아래 형식으로만 출력:
 10년 이상의 역량 진단 경험을 바탕으로 강사의 성장을 돕는 전문적인 분석을 수행합니다.
 
 ## [Block 2. 목적 및 컨텍스트]
-아래 데이터를 종합하여 강사의 현재 강점과 성장 방향을 분석합니다.
-- 부정적 평가나 약점 지적이 아닌, 성장 가능성 중심의 시각으로 분석하세요.
-- 강점은 데이터에서 반복적으로 나타나는 패턴을 근거로 도출하세요.
-- 성장 방향은 강점을 더욱 발전시키거나 보완할 수 있는 영역을 제안하세요.
+- 전문분야 프로파일, 프로젝트 경험, 자격, 역량진단 설문 응답을 종합하여 강사의 현재 강점과 성장 방향을 분석한다.
+- 부정적 평가나 약점 지적이 아닌, 성장 가능성 중심의 시각으로 분석하며, 강점은 반복적으로 나타나는 패턴을 근거로, 성장 방향은 강점을 더욱 발전시키거나 보완할 수 있는 영역으로 도출한다.
 
 ## [Block 3. 입력 데이터]
+
+[임직원의 전문 분야 프로파일]
+${fieldsText}
 
 [프로젝트 경험]
 ${projectsText}
 
-[보유 자격]
+[보유 자격 정보]
 ${qualsText}
 
-[역량 진단 설문 응답]
+[역량진단 설문 응답]
 ${surveyText}
 
-## [Block 4. 분석 기준]
-- 강점: 프로젝트 역할·성과·설문 응답에서 반복적으로 나타나는 역량 패턴을 기반으로 도출
-- 성장 방향: 설문 점수가 상대적으로 낮거나 프로젝트 이력에서 경험이 부족한 영역을 기반으로 도출
+[교육 이수 이력]
+${lecturesText}
+
+## [Block 4. 작성 규칙]
+(중요) 전문 분야 프로파일을 주요 정보로 활용하고, 프로젝트 이력·자격사항·설문 응답·교육 이수 이력은 보조 정보로 활용함.
+
+1) 강점 작성 규칙
+- strengths 3개 생성
+- 전문분야 프로파일에서 드러나는 전문성이 프로젝트·설문 응답에서 실제로 반복 발휘된 패턴을 근거로 도출 (근거 없는 일반론적 강점 금지)
+- title: 4~8자, 행동·상황이 드러나는 구체적 표현 (예: 현장 즉시 적용, 팀원 설득력, 성과 가시화). "~역량", "~능력", "~기술" 단독 사용 금지
+- description: 사례 근거 포함 2문장, 존댓말 컨설팅 문체로 강점의 가치와 차별성을 적극적으로 표현. 예) "복잡한 이해관계자 환경에서도 명확한 방향을 제시하며 프로젝트를 성공으로 이끄신 역량은 탁월합니다. 이 강점은 조직 내 핵심 리더로서의 가능성을 강하게 뒷받침합니다." (50자 이상 100자 이내)
+
+2) 성장 방향 작성 규칙
+- weaknesses 3개 생성
+- 설문 점수가 상대적으로 낮거나 프로젝트 이력에서 경험이 부족한 영역, 또는 전문분야 프로파일 대비 보완이 필요한 영역을 근거로 도출
+- title: 4~8자의 구체적 표현 (예: 데이터 기반 의사결정, 글로벌 커뮤니케이션)
+- description: 약점 지적 금지, 존댓말 컨설팅 문체로 성장 가능성과 기대 효과를 2문장으로 적극적으로 제안. 예) "데이터 기반의 의사결정 방식을 체계화하신다면 현재의 탁월한 실행력이 한층 더 강력해질 것입니다. 이를 통해 전략적 신뢰도와 설득력을 동시에 높이실 수 있습니다." (50자 이상 100자 이내)
+
+3) 공통 규칙
 - 강점과 성장 방향은 서로 연결되도록 구성 (강점을 활용하여 성장할 수 있는 방향 권장)
+- 강점 title과 성장 방향 title이 유사하거나 겹치지 않도록 할 것
 - 강사 직무에 실질적으로 유의미한 역량 중심으로 선별
+- 모든 내용은 한국어로 작성
 
 ## [Block 5. 출력 형식]
 JSON만 출력하세요. 다른 설명 없이 아래 형식으로만 출력:
-{"strengths":[{"title":"강점 제목","description":"강점 설명"}],"weaknesses":[{"title":"제안 제목","description":"제안 설명"}]}
-
-[강점 작성 규칙]
-- strengths 3개 생성
-- title: 프로젝트/설문에서 관찰된 행동·패턴을 중심으로 4~8자로 작성 (예: 현장 즉시 적용, 팀원 설득력, 성과 가시화)
-- title 금지 형태: "~역량", "~능력", "~기술" 단독 사용 금지. 반드시 구체적 행동/상황이 드러나는 표현 사용
-- description: 해당 강점을 프로젝트 사례 근거와 함께 2문장으로 설명. 존댓말 컨설팅 문체로 강점의 가치와 차별성을 적극적으로 표현. 예) "복잡한 이해관계자 환경에서도 명확한 방향을 제시하며 프로젝트를 성공으로 이끄신 역량은 탁월합니다. 이 강점은 조직 내 핵심 리더로서의 가능성을 강하게 뒷받침합니다." (50자 이상 100자 이내)
-
-[성장 방향 작성 규칙]
-- weaknesses 3개 생성
-- title: 성장 방향을 4~8자의 구체적 표현으로 작성 (예: 데이터 기반 의사결정, 글로벌 커뮤니케이션)
-- description: 약점 지적 금지. 존댓말 컨설팅 문체로 성장 가능성과 기대 효과를 2문장으로 적극적으로 제안. 예) "데이터 기반의 의사결정 방식을 체계화하신다면 현재의 탁월한 실행력이 한층 더 강력해질 것입니다. 이를 통해 전략적 신뢰도와 설득력을 동시에 높이실 수 있습니다." (50자 이상 100자 이내)
-
-[공통 규칙]
-- 강점 title과 성장 방향 title이 유사하거나 겹치지 않도록 할 것
-- 모든 내용은 한국어로 작성`
+{"strengths":[{"title":"강점 제목","description":"강점 설명"}],"weaknesses":[{"title":"제안 제목","description":"제안 설명"}]}`
     }];
     const rawContent = await _callWithFallback(messages, 3000);
     const result = _extractJSON(rawContent);
@@ -5266,29 +5311,45 @@ JSON만 출력하세요. 다른 설명 없이 아래 형식으로만 출력:
     const strengthsText = Array.isArray(strengths)
       ? strengths.map(s => (typeof s === 'string' ? s : (s.content || '')).split('\n')[0].trim()).filter(Boolean).join('\n')
       : '-';
+    const qualsText = _qualsList.length > 0
+      ? _qualsList.map(q => `- [${q.qual_category}] ${q.name}${q.grade ? ` (${q.grade})` : ''}${q.acquired_date ? ` 취득: ${q.acquired_date}` : ''}`).join('\n')
+      : '없음';
+    const fieldsText = _fieldsProfileText();
+    const lecturesText = _lecturesHistoryText();
     const messages = [{
       role: 'user',
-      content: `아래 프로젝트 경험과 강점 데이터를 기반으로 전문 역량 항목 5개를 생성해주세요.
-모든 내용은 반드시 한국어로 작성하세요. 영어 사용 금지.
-각 항목은 역량 제목(title)과 역량 설명(description)으로 구성됩니다.
+      content: `당신은 HRD 전문가이자 역량진단 설계 전문가입니다. 실무 프로젝트 경험과 전문분야 프로파일을 심층 분석하여 신뢰도 높은 전문역량을 도출합니다.
 
-[title 작성 규칙]
-- 구체적인 기술·도메인 영역 중심의 전문 역량명으로 작성 (20자 이내, 필수)
-- 예시: "클라우드 인프라 설계", "데이터 분석 파이프라인 구축", "보안 정책 수립 및 운영", "교육과정 체계화"
-- 아래 [강점 제목 목록]과 동일하거나 의미가 유사한 제목 사용 금지
-- 강점은 행동/패턴 중심 표현이므로, 전문 역량은 반드시 구체적 기술/도메인 중심으로 명확히 구분할 것
+전문분야 프로파일과 강점 분석 결과를 근거로, 이 사람을 구체적인 기술·도메인 영역에서 규정하는 "전문 역량" 항목을 도출한다.
+강점(행동/패턴 중심)과는 명확히 구분되는, 실제 보유 전문성을 보여주는 역량명·역량 설명을 생성한다.
 
-[description 작성 규칙]
-- 이 역량이 왜 중요한지, 어떤 상황에서 발휘되는지 2문장으로 설명 (필수, 절대 빈값 금지, 존칭 없이 "~한다", "~이다" 형태의 평서문으로 작성)
+[임직원의 전문 분야 프로파일]
+${fieldsText}
 
-[강점 제목 목록 - 아래 표현과 겹치거나 유사한 전문 역량 제목 생성 금지]
+[강점 제목 목록 - 직전 단계 강점/성장방향 분석 결과]
 ${strengthsText}
 
 [프로젝트 정보]
 ${projectsText}
 
+[보유 자격 정보]
+${qualsText}
+
+[교육 이수 이력]
+${lecturesText}
+
+작성 규칙:
+- (중요) 전문 분야 프로파일을 주요 정보로 활용하고, 프로젝트 이력·자격사항·교육 이수 이력·강점 목록은 보조 정보로 활용함.
+- 전 내용 한국어만 허용, 영어 사용 금지
+- title: 구체적인 기술·도메인 영역 중심의 전문 역량명으로 작성 (20자 이내, 필수)
+- 예시: "클라우드 인프라 설계", "데이터 분석 파이프라인 구축", "보안 정책 수립 및 운영", "교육과정 체계화"
+- 전문 역량 항목 5개 도출
+- 강점 제목 목록과 동일하거나 의미가 유사한 title 생성 금지 (강점은 행동/패턴 중심, 전문역량은 기술/도메인 중심으로 명확히 구분)
+- 전문분야 프로파일 및 자격·교육 이력에 실제로 근거가 있는 역량만 도출 (근거 없는 일반론적 역량명 금지)
+- description: 이 역량이 왜 중요한지, 어떤 상황에서 발휘되는지 2문장으로 설명 (필수, 절대 빈값 금지, 존칭 없이 "~한다", "~이다" 형태의 평서문으로 작성)
+
 JSON만 출력하세요. 다른 설명 없이 아래 형식으로만 출력:
-{"goals":[{"title":"역량명1","description":"역량 설명1"},{"title":"역량명2","description":"역량 설명2"}]}`
+{"goals":[{"title":"역량명1","description":"역량 설명1"}, ...]}`
     }];
     const rawContent = await _callWithFallback(messages, 2000);
     const result = _extractJSON(rawContent);
@@ -5296,7 +5357,7 @@ JSON만 출력하세요. 다른 설명 없이 아래 형식으로만 출력:
               || (Array.isArray(result) ? result : null);
     if (!Array.isArray(raw) || raw.length === 0) throw new Error('전문 역량 목록을 찾을 수 없습니다.');
     // 객체 배열 정규화: {title, description} 형태 보장
-    const goals = raw.slice(0, 10).map(g => {
+    const goals = raw.slice(0, 5).map(g => {
       if (typeof g === 'string') return { title: g, description: '' };
       return { title: g.title || g.name || g.역량 || '', description: g.description || g.desc || g.설명 || '' };
     }).filter(g => g.title);
@@ -6477,6 +6538,8 @@ JSON만 출력하세요. 다른 설명 없이 아래 형식으로만 출력:
 
   let _lastSurveyData = null; // 마지막 설문 데이터 저장 (재시도용)
   let _qualsList = []; // 자격 정보 캐시 (AI 분석 기초 데이터)
+  let _fieldsList = []; // 전문분야 프로파일 캐시 (AI 분석 주요 데이터)
+  let _lecturesList = []; // 교육 이수 이력 캐시 (AI 분석 기초 데이터)
 
   async function runSwAnalysis(questions, answers) {
     _lastSurveyData = { questions, answers };
@@ -7358,6 +7421,8 @@ JSON만 출력하세요. 다른 설명 없이 아래 형식으로만 출력:
         if (_targetCard) {
           await db.update('instructor_lectures', _targetCard.dataset.id, data);
           _refreshLectureCard(_targetCard, data);
+          const idx = _lecturesList.findIndex(l => String(l.id) === String(_targetCard.dataset.id));
+          if (idx >= 0) _lecturesList[idx] = { ..._lecturesList[idx], ...data };
         } else {
           data.sort_order = list.querySelectorAll('.lecture-card').length;
           const res = await db.insert('instructor_lectures', data);
@@ -7368,6 +7433,7 @@ JSON만 출력하세요. 다른 설명 없이 아래 형식으로만 출력:
           list.appendChild(card);
           _attachLectureHandlers(card);
           _updateLectureCount();
+          _lecturesList.push({ ...data, id: newId });
           card.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
         }
       } catch (e) { showToast('저장 오류: ' + e.message, 'error'); return; }
@@ -7410,6 +7476,7 @@ JSON만 출력하세요. 다른 설명 없이 아래 형식으로만 출력:
       if (id) { try { await db.remove('instructor_lectures', id); } catch (e) { showToast('삭제 오류: ' + e.message, 'error'); return; } }
       card.remove();
       _updateLectureCount();
+      _lecturesList = _lecturesList.filter(l => String(l.id) !== String(id));
     });
   }
 
@@ -7418,6 +7485,7 @@ JSON만 출력하세요. 다른 설명 없이 아래 형식으로만 출력:
     if (!profileId) return;
     try {
       const rows = await db.select('instructor_lectures', `profile_id=eq.${profileId}&order=sort_order.asc,id.asc`);
+      _lecturesList = Array.isArray(rows) ? rows : [];
       const list = document.getElementById('lectureList');
       list.innerHTML = '';
       if (Array.isArray(rows)) {
@@ -7549,6 +7617,8 @@ JSON만 출력하세요. 다른 설명 없이 아래 형식으로만 출력:
           const id = _targetCard.dataset.id;
           await db.update('expertise_fields', id, data);
           _refreshCardView(_targetCard, data);
+          const idx = _fieldsList.findIndex(f => String(f.id) === String(id));
+          if (idx >= 0) _fieldsList[idx] = { ..._fieldsList[idx], ...data, id };
         } else {
           // 신규
           data.sort_order = list.querySelectorAll('.field-card').length;
@@ -7561,6 +7631,7 @@ JSON만 출력하세요. 다른 설명 없이 아래 형식으로만 출력:
           list.appendChild(card);
           _attachFieldHandlers(card);
           _updateFieldsCount();
+          _fieldsList.push({ ...data, id: newId });
           card.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
         }
       } catch (e) { showToast('저장 오류: ' + e.message, 'error'); return; }
@@ -7613,6 +7684,7 @@ JSON만 출력하세요. 다른 설명 없이 아래 형식으로만 출력:
       if (id) { try { await db.remove('expertise_fields', id); } catch (e) { showToast('삭제 오류: ' + e.message, 'error'); return; } }
       card.remove();
       _updateFieldsCount();
+      _fieldsList = _fieldsList.filter(f => String(f.id) !== String(id));
     });
   }
 
@@ -7624,6 +7696,7 @@ JSON만 출력하세요. 다른 설명 없이 아래 형식으로만 출력:
     try {
       const rows = await db.select('expertise_fields', `profile_id=eq.${profileId}&order=sort_order.asc,id.asc`);
       if (overlay) overlay.remove();
+      _fieldsList = Array.isArray(rows) ? rows : [];
       if (Array.isArray(rows)) {
         rows.forEach(r => {
           const tmp = document.createElement('div');
