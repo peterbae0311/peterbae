@@ -26,10 +26,18 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: 'app_key가 필요합니다.' }, { status: 400 });
   }
 
+  // CI가 실제 배포된 커밋의 커밋 일시(git log -1 --format=%cI)를 넘긴다 — CI 스텝이
+  // 실행된 시각(빌드/큐 대기 등으로 실제 코드 변경 시점과 어긋날 수 있음)이 아니라
+  // "이 코드가 언제 커밋됐는지"를 보여주기 위함. 안 넘어오거나 파싱 불가하면 지금 시각으로 대체.
+  const deployedAtRaw = typeof body?.deployed_at === 'string' ? body.deployed_at : '';
+  const deployedAt = deployedAtRaw && !Number.isNaN(new Date(deployedAtRaw).getTime())
+    ? new Date(deployedAtRaw).toISOString()
+    : new Date().toISOString();
+
   const admin = createAdminClient();
   const { error } = await admin
     .from('app_deployments')
-    .upsert({ app_key: appKey, deployed_at: new Date().toISOString() }, { onConflict: 'app_key' });
+    .upsert({ app_key: appKey, deployed_at: deployedAt }, { onConflict: 'app_key' });
 
   if (error) {
     return NextResponse.json({ error: error.message }, { status: 500 });

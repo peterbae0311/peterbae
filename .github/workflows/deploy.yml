@@ -127,10 +127,11 @@ jobs:
           ssh -o StrictHostKeyChecking=no -i ~/.ssh/deploy_key "$DEPLOY_USER@$DEPLOY_HOST" "bash ~/deploy/remote-swap.sh career /tmp/career.tar.gz"
       - name: Record deploy timestamp
         run: |
+          COMMIT_TIME=$(git log -1 --format=%cI)
           curl -s -m 10 -X POST "https://$DEPLOY_HOST/api/dashboard/record-deploy" \
             -H "Content-Type: application/json" \
             -H "Authorization: Bearer ${{ secrets.DASHBOARD_DEPLOY_SECRET }}" \
-            -d '{"app_key":"career"}' || true
+            -d "{\"app_key\":\"career\",\"deployed_at\":\"$COMMIT_TIME\"}" || true
 
   lottery:
     needs: changes
@@ -169,10 +170,11 @@ jobs:
           ssh -o StrictHostKeyChecking=no -i ~/.ssh/deploy_key "$DEPLOY_USER@$DEPLOY_HOST" "bash ~/deploy/remote-swap.sh lottery /tmp/lottery.tar.gz"
       - name: Record deploy timestamp
         run: |
+          COMMIT_TIME=$(git log -1 --format=%cI)
           curl -s -m 10 -X POST "https://$DEPLOY_HOST/api/dashboard/record-deploy" \
             -H "Content-Type: application/json" \
             -H "Authorization: Bearer ${{ secrets.DASHBOARD_DEPLOY_SECRET }}" \
-            -d '{"app_key":"lottery"}' || true
+            -d "{\"app_key\":\"lottery\",\"deployed_at\":\"$COMMIT_TIME\"}" || true
 
   newsclip:
     needs: changes
@@ -211,10 +213,11 @@ jobs:
           ssh -o StrictHostKeyChecking=no -i ~/.ssh/deploy_key "$DEPLOY_USER@$DEPLOY_HOST" "bash ~/deploy/remote-swap.sh newsclip /tmp/newsclip.tar.gz"
       - name: Record deploy timestamp
         run: |
+          COMMIT_TIME=$(git log -1 --format=%cI)
           curl -s -m 10 -X POST "https://$DEPLOY_HOST/api/dashboard/record-deploy" \
             -H "Content-Type: application/json" \
             -H "Authorization: Bearer ${{ secrets.DASHBOARD_DEPLOY_SECRET }}" \
-            -d '{"app_key":"newsclip"}' || true
+            -d "{\"app_key\":\"newsclip\",\"deployed_at\":\"$COMMIT_TIME\"}" || true
 
   us_stock_market:
     needs: changes
@@ -253,10 +256,11 @@ jobs:
           ssh -o StrictHostKeyChecking=no -i ~/.ssh/deploy_key "$DEPLOY_USER@$DEPLOY_HOST" "bash ~/deploy/remote-swap.sh us_stock_market /tmp/us_stock_market.tar.gz"
       - name: Record deploy timestamp
         run: |
+          COMMIT_TIME=$(git log -1 --format=%cI)
           curl -s -m 10 -X POST "https://$DEPLOY_HOST/api/dashboard/record-deploy" \
             -H "Content-Type: application/json" \
             -H "Authorization: Bearer ${{ secrets.DASHBOARD_DEPLOY_SECRET }}" \
-            -d '{"app_key":"us_stock_market"}' || true
+            -d "{\"app_key\":\"us_stock_market\",\"deployed_at\":\"$COMMIT_TIME\"}" || true
 
   expo:
     needs: changes
@@ -295,10 +299,11 @@ jobs:
           ssh -o StrictHostKeyChecking=no -i ~/.ssh/deploy_key "$DEPLOY_USER@$DEPLOY_HOST" "bash ~/deploy/remote-swap.sh expo /tmp/expo.tar.gz"
       - name: Record deploy timestamp
         run: |
+          COMMIT_TIME=$(git log -1 --format=%cI)
           curl -s -m 10 -X POST "https://$DEPLOY_HOST/api/dashboard/record-deploy" \
             -H "Content-Type: application/json" \
             -H "Authorization: Bearer ${{ secrets.DASHBOARD_DEPLOY_SECRET }}" \
-            -d '{"app_key":"expo"}' || true
+            -d "{\"app_key\":\"expo\",\"deployed_at\":\"$COMMIT_TIME\"}" || true
 
   hub:
     needs: changes
@@ -339,11 +344,12 @@ jobs:
         # hub 배포 한 번이 hub 자신뿐 아니라 hub 내부에서 직접 서빙하는 대시보드 카드들
         # (good-words, refine_objectives)도 같이 갱신한다 — 이 앱들은 별도 배포 job이 없다.
         run: |
+          COMMIT_TIME=$(git log -1 --format=%cI)
           for app_key in hub good-words refine_objectives; do
             curl -s -m 10 -X POST "https://$DEPLOY_HOST/api/dashboard/record-deploy" \
               -H "Content-Type: application/json" \
               -H "Authorization: Bearer ${{ secrets.DASHBOARD_DEPLOY_SECRET }}" \
-              -d "{\"app_key\":\"$app_key\"}" || true
+              -d "{\"app_key\":\"$app_key\",\"deployed_at\":\"$COMMIT_TIME\"}" || true
           done
 
   # 빌드가 필요 없는 정적 HTML 사이트 9개 — nginx 문서 루트로 직접 rsync.
@@ -377,7 +383,8 @@ jobs:
       - name: Record deploy timestamp
         if: github.event_name != 'push' || needs.changes.outputs[matrix.site] == 'true'
         run: |
+          COMMIT_TIME=$(git log -1 --format=%cI)
           curl -s -m 10 -X POST "https://$DEPLOY_HOST/api/dashboard/record-deploy" \
             -H "Content-Type: application/json" \
             -H "Authorization: Bearer ${{ secrets.DASHBOARD_DEPLOY_SECRET }}" \
-            -d "{\"app_key\":\"${{ matrix.site }}\"}" || true
+            -d "{\"app_key\":\"${{ matrix.site }}\",\"deployed_at\":\"$COMMIT_TIME\"}" || true
