@@ -37,7 +37,7 @@ function formatDateTime(value: string | null): string {
 
 export default function AdminPage() {
   const [viewerEmail, setViewerEmail] = useState<string | null | undefined>(undefined);
-  const [tab, setTab] = useState<'access' | 'history'>('access');
+  const [tab, setTab] = useState<'access' | 'history' | 'subagents'>('access');
 
   useEffect(() => {
     (async () => {
@@ -88,9 +88,17 @@ export default function AdminPage() {
           >
             로그인 이력 관리
           </button>
+          <button
+            onClick={() => setTab('subagents')}
+            className={`px-4 py-2.5 text-sm font-semibold border-b-2 transition-colors ${
+              tab === 'subagents' ? 'border-neutral-900 text-neutral-900' : 'border-transparent text-gray-400 hover:text-gray-600'
+            }`}
+          >
+            Sub Agents
+          </button>
         </div>
 
-        {tab === 'access' ? <AccountsTab /> : <LoginHistoryTab />}
+        {tab === 'access' ? <AccountsTab /> : tab === 'history' ? <LoginHistoryTab /> : <SubAgentsTab />}
       </div>
     </div>
   );
@@ -431,5 +439,296 @@ function LoginHistoryTab() {
         </div>
       </div>
     </section>
+  );
+}
+
+interface SubAgent {
+  id: string;
+  sortOrder: number;
+  nameEn: string;
+  nameKo: string;
+  color: string;
+  coreResponsibility: string;
+  keyDeliverables: string;
+  priorityNote: string;
+}
+
+function SubAgentsTab() {
+  const [agents, setAgents] = useState<SubAgent[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState('');
+  // null = 닫힘, 'new' = 신규 등록 팝업, SubAgent = 해당 레코드 수정 팝업.
+  const [modalTarget, setModalTarget] = useState<SubAgent | 'new' | null>(null);
+
+  const loadAgents = useCallback(async () => {
+    const res = await fetch('/api/admin/sub-agents');
+    const data = await res.json();
+    if (!res.ok) {
+      setLoadError(data.error ?? 'Sub Agent 목록을 불러오지 못했습니다.');
+      setLoading(false);
+      return;
+    }
+    setAgents(data.agents as SubAgent[]);
+    setLoadError('');
+    setLoading(false);
+  }, []);
+
+  useEffect(() => { loadAgents(); }, [loadAgents]);
+
+  async function deleteAgent(agent: SubAgent) {
+    if (!confirm(`"${agent.nameKo}"(${agent.nameEn}) 에이전트를 삭제하시겠습니까?`)) return;
+    const res = await fetch(`/api/admin/sub-agents?id=${encodeURIComponent(agent.id)}`, { method: 'DELETE' });
+    const data = await res.json();
+    if (!res.ok) {
+      alert(data.error ?? '삭제에 실패했습니다.');
+      return;
+    }
+    await loadAgents();
+  }
+
+  if (loading) {
+    return <p className="text-sm text-gray-400 py-6">불러오는 중...</p>;
+  }
+
+  const nextSortOrder = agents.length > 0 ? Math.max(...agents.map(a => a.sortOrder)) + 1 : 1;
+
+  return (
+    <div>
+      <div className="flex items-center justify-between mb-3">
+        <h2 className="text-sm font-bold text-gray-700">등록된 에이전트 ({agents.length})</h2>
+        <button
+          onClick={() => setModalTarget('new')}
+          className="px-3 py-2 text-xs text-gray-600 border border-gray-200/80 rounded-lg hover:border-neutral-500 hover:text-neutral-900 hover:bg-neutral-100/60 transition-colors"
+        >
+          + 신규 에이전트 등록
+        </button>
+      </div>
+
+      {loadError && <p className="text-sm text-red-500 mb-3">{loadError}</p>}
+
+      {agents.length === 0 ? (
+        <p className="text-sm text-gray-400">아직 등록된 에이전트가 없습니다.</p>
+      ) : (
+        <div className="rounded-2xl border border-white/60 bg-white/70 backdrop-blur-xl shadow-glass overflow-hidden">
+          <div className="overflow-x-auto">
+            <table className="w-full text-sm">
+              <thead>
+                <tr className="border-b border-gray-200 text-left text-xs text-gray-500">
+                  <th className="sticky top-0 z-10 bg-white px-4 py-3 font-semibold whitespace-nowrap">No.</th>
+                  <th className="sticky top-0 z-10 bg-white px-4 py-3 font-semibold whitespace-nowrap">색상</th>
+                  <th className="sticky top-0 z-10 bg-white px-4 py-3 font-semibold whitespace-nowrap">에이전트(EN)</th>
+                  <th className="sticky top-0 z-10 bg-white px-4 py-3 font-semibold whitespace-nowrap">에이전트(KO)</th>
+                  <th className="sticky top-0 z-10 bg-white px-4 py-3 font-semibold">핵심 책임</th>
+                  <th className="sticky top-0 z-10 bg-white px-4 py-3 font-semibold">주요 산출물</th>
+                  <th className="sticky top-0 z-10 bg-white px-4 py-3 font-semibold">우선순위/비고</th>
+                  <th className="sticky top-0 z-10 bg-white px-4 py-3 font-semibold whitespace-nowrap">관리</th>
+                </tr>
+              </thead>
+              <tbody>
+                {agents.map(agent => (
+                  <tr
+                    key={agent.id}
+                    onDoubleClick={() => setModalTarget(agent)}
+                    title="더블클릭하면 수정 팝업이 열립니다"
+                    className="border-b border-gray-100 last:border-0 cursor-pointer transition-colors hover:bg-neutral-50/60"
+                  >
+                    <td className="px-4 py-2.5 text-gray-500 whitespace-nowrap">{agent.sortOrder}</td>
+                    <td className="px-4 py-2.5 whitespace-nowrap">
+                      {agent.color && (
+                        <span
+                          className="inline-block w-3 h-3 rounded-full border border-gray-200/80 align-middle"
+                          style={{ backgroundColor: agent.color }}
+                          title={agent.color}
+                        />
+                      )}
+                    </td>
+                    <td className="px-4 py-2.5 font-medium text-neutral-900 whitespace-nowrap">{agent.nameEn}</td>
+                    <td className="px-4 py-2.5 text-gray-700 whitespace-nowrap">{agent.nameKo}</td>
+                    <td className="px-4 py-2.5 text-gray-600 min-w-[220px]">{agent.coreResponsibility || '-'}</td>
+                    <td className="px-4 py-2.5 text-gray-600 min-w-[160px]">{agent.keyDeliverables || '-'}</td>
+                    <td className="px-4 py-2.5 text-gray-500 min-w-[200px]">{agent.priorityNote || '-'}</td>
+                    <td className="px-4 py-2.5 whitespace-nowrap">
+                      <div className="flex items-center gap-2">
+                        <button
+                          onClick={e => { e.stopPropagation(); setModalTarget(agent); }}
+                          className="text-xs text-gray-600 border border-gray-200/80 rounded-lg px-3 py-2 hover:border-neutral-500 hover:text-neutral-900 hover:bg-neutral-100/60 transition-colors"
+                        >
+                          수정
+                        </button>
+                        <button
+                          onClick={e => { e.stopPropagation(); deleteAgent(agent); }}
+                          className="text-xs text-gray-600 border border-gray-200/80 rounded-lg px-3 py-2 hover:border-red-400 hover:text-red-500 hover:bg-red-50/60 transition-colors"
+                        >
+                          삭제
+                        </button>
+                      </div>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      )}
+
+      {modalTarget && (
+        <SubAgentModal
+          agent={modalTarget === 'new' ? null : modalTarget}
+          nextSortOrder={nextSortOrder}
+          onSaved={async () => { setModalTarget(null); await loadAgents(); }}
+          onClose={() => setModalTarget(null)}
+        />
+      )}
+    </div>
+  );
+}
+
+function SubAgentModal({
+  agent, nextSortOrder, onSaved, onClose,
+}: {
+  agent: SubAgent | null;
+  nextSortOrder: number;
+  onSaved: () => void;
+  onClose: () => void;
+}) {
+  const [form, setForm] = useState({
+    sortOrder: String(agent?.sortOrder ?? nextSortOrder),
+    nameEn: agent?.nameEn ?? '',
+    nameKo: agent?.nameKo ?? '',
+    color: agent?.color ?? '',
+    coreResponsibility: agent?.coreResponsibility ?? '',
+    keyDeliverables: agent?.keyDeliverables ?? '',
+    priorityNote: agent?.priorityNote ?? '',
+  });
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState('');
+
+  async function save() {
+    if (!form.nameEn.trim() || !form.nameKo.trim()) return;
+    setSaving(true);
+    setError('');
+
+    const payload = {
+      id: agent?.id,
+      sortOrder: Number(form.sortOrder),
+      nameEn: form.nameEn.trim(),
+      nameKo: form.nameKo.trim(),
+      color: form.color.trim(),
+      coreResponsibility: form.coreResponsibility.trim(),
+      keyDeliverables: form.keyDeliverables.trim(),
+      priorityNote: form.priorityNote.trim(),
+    };
+
+    const res = await fetch('/api/admin/sub-agents', {
+      method: agent ? 'PATCH' : 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload),
+    });
+    const data = await res.json();
+    setSaving(false);
+
+    if (!res.ok) {
+      setError(data.error ?? '저장에 실패했습니다.');
+      return;
+    }
+    onSaved();
+  }
+
+  return (
+    <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50">
+      <div className="bg-white rounded-lg shadow-xl w-[560px] max-w-[92vw] max-h-[85vh] flex flex-col">
+        <div className="shrink-0 flex items-center justify-between px-5 py-3 border-b border-gray-200">
+          <span className="text-sm font-bold text-gray-800">{agent ? '에이전트 수정' : '신규 에이전트 등록'}</span>
+          <button onClick={onClose} className="text-gray-400 hover:text-gray-700 text-lg leading-none">✕</button>
+        </div>
+
+        <div className="flex-1 overflow-y-auto px-5 py-4">
+          <div className="flex gap-3 mb-4">
+            <div className="w-20 shrink-0">
+              <label className="text-sm font-semibold text-gray-700 mb-1.5 block">No.</label>
+              <input
+                type="number"
+                value={form.sortOrder}
+                onChange={e => setForm(f => ({ ...f, sortOrder: e.target.value }))}
+                className="w-full px-3 py-2.5 border border-gray-200/80 bg-white/60 rounded-lg text-base text-gray-700 focus:outline-none focus:border-neutral-500 focus:ring-1 focus:ring-neutral-500 transition-colors"
+              />
+            </div>
+            <div className="flex-1">
+              <label className="text-sm font-semibold text-gray-700 mb-1.5 block">색상</label>
+              <div className="flex items-center gap-2">
+                <span
+                  className="w-8 h-8 shrink-0 rounded-lg border border-gray-200/80"
+                  style={{ backgroundColor: form.color || 'transparent' }}
+                />
+                <input
+                  type="text"
+                  value={form.color}
+                  onChange={e => setForm(f => ({ ...f, color: e.target.value }))}
+                  placeholder="예: Red"
+                  className="w-full px-4 py-2.5 border border-gray-200/80 bg-white/60 rounded-lg text-base text-gray-700 placeholder:text-xs placeholder:text-gray-400 focus:outline-none focus:border-neutral-500 focus:ring-1 focus:ring-neutral-500 transition-colors"
+                />
+              </div>
+            </div>
+          </div>
+
+          <label className="text-sm font-semibold text-gray-700 mb-1.5 block">에이전트(EN)</label>
+          <input
+            type="text"
+            value={form.nameEn}
+            onChange={e => setForm(f => ({ ...f, nameEn: e.target.value }))}
+            placeholder="예: backend-architect"
+            className="w-full mb-4 px-4 py-2.5 border border-gray-200/80 bg-white/60 rounded-lg text-base text-gray-700 placeholder:text-xs placeholder:text-gray-400 focus:outline-none focus:border-neutral-500 focus:ring-1 focus:ring-neutral-500 transition-colors"
+          />
+
+          <label className="text-sm font-semibold text-gray-700 mb-1.5 block">에이전트(KO)</label>
+          <input
+            type="text"
+            value={form.nameKo}
+            onChange={e => setForm(f => ({ ...f, nameKo: e.target.value }))}
+            placeholder="예: 백엔드 개발자"
+            className="w-full mb-4 px-4 py-2.5 border border-gray-200/80 bg-white/60 rounded-lg text-base text-gray-700 placeholder:text-xs placeholder:text-gray-400 focus:outline-none focus:border-neutral-500 focus:ring-1 focus:ring-neutral-500 transition-colors"
+          />
+
+          <label className="text-sm font-semibold text-gray-700 mb-1.5 block">핵심 책임</label>
+          <textarea
+            value={form.coreResponsibility}
+            onChange={e => setForm(f => ({ ...f, coreResponsibility: e.target.value }))}
+            rows={3}
+            className="w-full mb-4 px-4 py-2.5 border border-gray-200/80 bg-white/60 rounded-lg text-sm text-gray-700 focus:outline-none focus:border-neutral-500 focus:ring-1 focus:ring-neutral-500 transition-colors resize-none"
+          />
+
+          <label className="text-sm font-semibold text-gray-700 mb-1.5 block">주요 산출물</label>
+          <textarea
+            value={form.keyDeliverables}
+            onChange={e => setForm(f => ({ ...f, keyDeliverables: e.target.value }))}
+            rows={2}
+            className="w-full mb-4 px-4 py-2.5 border border-gray-200/80 bg-white/60 rounded-lg text-sm text-gray-700 focus:outline-none focus:border-neutral-500 focus:ring-1 focus:ring-neutral-500 transition-colors resize-none"
+          />
+
+          <label className="text-sm font-semibold text-gray-700 mb-1.5 block">우선순위/비고</label>
+          <textarea
+            value={form.priorityNote}
+            onChange={e => setForm(f => ({ ...f, priorityNote: e.target.value }))}
+            rows={2}
+            className="w-full px-4 py-2.5 border border-gray-200/80 bg-white/60 rounded-lg text-sm text-gray-700 focus:outline-none focus:border-neutral-500 focus:ring-1 focus:ring-neutral-500 transition-colors resize-none"
+          />
+
+          {error && <p className="text-sm text-red-500 mt-3">{error}</p>}
+        </div>
+
+        <div className="shrink-0 flex items-center justify-end gap-2 px-5 py-3 border-t border-gray-200">
+          <button onClick={onClose} className="px-3 py-2 text-xs text-gray-600 border border-gray-200/80 rounded-lg hover:border-neutral-500 hover:text-neutral-900 hover:bg-neutral-100/60 transition-colors">
+            취소
+          </button>
+          <button
+            onClick={save}
+            disabled={saving || !form.nameEn.trim() || !form.nameKo.trim()}
+            className="px-3 py-2 text-xs text-gray-600 border border-gray-200/80 rounded-lg hover:border-neutral-500 hover:text-neutral-900 hover:bg-neutral-100/60 disabled:opacity-50 transition-colors"
+          >
+            {saving ? '저장 중...' : '저장'}
+          </button>
+        </div>
+      </div>
+    </div>
   );
 }
