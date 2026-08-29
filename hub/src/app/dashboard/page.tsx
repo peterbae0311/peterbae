@@ -10,6 +10,7 @@ interface CardOverride {
   app_key: string;
   custom_label: string | null;
   custom_description: string | null;
+  custom_image: string | null;
   sort_order: number;
 }
 
@@ -18,7 +19,92 @@ interface CardData {
   path: string;
   label: string;
   description: string;
+  image: string | null;
   sortOrder: number;
+}
+
+const CARD_IMAGE_WIDTH = 560;
+const CARD_IMAGE_HEIGHT = 374;
+
+function loadImageElement(src: string): Promise<HTMLImageElement> {
+  return new Promise((resolve, reject) => {
+    const img = new Image();
+    img.onload = () => resolve(img);
+    img.onerror = () => reject(new Error('이미지를 불러오지 못했습니다.'));
+    img.src = src;
+  });
+}
+
+// 원본 비율과 무관하게 3:2(560x374) 프레임에 cover 방식으로 중앙을 잘라 webp로 인코딩한다
+// — 로컬 선택 이미지뿐 아니라 AI 생성 이미지(정사각형으로 생성 — generate-image/route.ts 참고)도
+// 동일하게 통과시켜 항상 같은 규격/포맷으로 저장한다. 7:3(560x240)이었을 때는 정사각형
+// 생성본에서 57%를 잘라내 피사체가 과도하게 잘린 느낌이 있어 3:2(33% crop)로 완화했다.
+async function cropToCardWebp(src: string): Promise<string> {
+  const img = await loadImageElement(src);
+  const canvas = document.createElement('canvas');
+  canvas.width = CARD_IMAGE_WIDTH;
+  canvas.height = CARD_IMAGE_HEIGHT;
+  const ctx = canvas.getContext('2d');
+  if (!ctx) throw new Error('이미지 처리를 지원하지 않는 브라우저입니다.');
+  const targetRatio = CARD_IMAGE_WIDTH / CARD_IMAGE_HEIGHT;
+  const srcRatio = img.width / img.height;
+  let sx = 0, sy = 0, sw = img.width, sh = img.height;
+  if (srcRatio > targetRatio) {
+    sw = img.height * targetRatio;
+    sx = (img.width - sw) / 2;
+  } else {
+    sh = img.width / targetRatio;
+    sy = (img.height - sh) / 2;
+  }
+  ctx.drawImage(img, sx, sy, sw, sh, 0, 0, CARD_IMAGE_WIDTH, CARD_IMAGE_HEIGHT);
+  return canvas.toDataURL('image/webp', 0.85);
+}
+
+// 등록된 이미지가 없을 때의 기본 표시 — 사진 대신 아이콘으로 (사진을 넓고 낮은 배너에
+// 채우면 피사체 비율에 따라 과도하게 눌려 보이는 문제가 있어, 이미지가 아예 없는 경우는
+// 왜곡 걱정 없는 아이콘 플레이스홀더로 대체한다).
+function AppIconPlaceholder() {
+  return (
+    <div className="w-full h-[187px] shrink-0 flex items-center justify-center bg-gradient-to-br from-neutral-100 to-neutral-200">
+      <svg width="36" height="36" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" className="text-neutral-400">
+        <rect x="3" y="3" width="7" height="7" rx="1.5" />
+        <rect x="14" y="3" width="7" height="7" rx="1.5" />
+        <rect x="3" y="14" width="7" height="7" rx="1.5" />
+        <rect x="14" y="14" width="7" height="7" rx="1.5" />
+      </svg>
+    </div>
+  );
+}
+
+function formatRelativeTime(iso: string): string {
+  const diffSec = Math.max(0, Math.floor((Date.now() - new Date(iso).getTime()) / 1000));
+  if (diffSec < 60) return '방금 전';
+  const diffMin = Math.floor(diffSec / 60);
+  if (diffMin < 60) return `${diffMin}분 전`;
+  const diffHour = Math.floor(diffMin / 60);
+  if (diffHour < 24) return `${diffHour}시간 전`;
+  const diffDay = Math.floor(diffHour / 24);
+  if (diffDay < 30) return `${diffDay}일 전`;
+  const diffMonth = Math.floor(diffDay / 30);
+  if (diffMonth < 12) return `${diffMonth}개월 전`;
+  return `${Math.floor(diffMonth / 12)}년 전`;
+}
+
+function CopyIcon() {
+  return (
+    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <rect x="9" y="9" width="13" height="13" rx="2" />
+      <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1" />
+    </svg>
+  );
+}
+
+function CheckIcon() {
+  return (
+    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M20 6 9 17l-5-5" />
+    </svg>
+  );
 }
 
 export default function DashboardPage() {
@@ -28,6 +114,7 @@ export default function DashboardPage() {
   const [copiedKey, setCopiedKey] = useState<string | null>(null);
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [orderedCards, setOrderedCards] = useState<CardData[] | null>(null);
+  const [deployTimes, setDeployTimes] = useState<Record<string, string>>({});
   const [dragKey, setDragKey] = useState<string | null>(null);
   const [dragOverKey, setDragOverKey] = useState<string | null>(null);
   const [dragPos, setDragPos] = useState<{ x: number; y: number } | null>(null);
@@ -45,7 +132,7 @@ export default function DashboardPage() {
   const loadOverrides = useCallback(async (userEmail: string) => {
     const { data } = await supabase
       .from('dashboard_cards')
-      .select('app_key, custom_label, custom_description, sort_order')
+      .select('app_key, custom_label, custom_description, custom_image, sort_order')
       .eq('email', userEmail);
     const map: Record<string, CardOverride> = {};
     (data ?? []).forEach(row => { map[row.app_key as string] = row as CardOverride; });
@@ -73,6 +160,17 @@ export default function DashboardPage() {
       await loadOverrides(userEmail);
     })();
   }, [loadOverrides]);
+
+  // 배포 시각은 개인화 데이터가 아니라 앱 전역 속성이라 로그인 여부와 무관하게 별도로 불러온다
+  // (app_deployments는 RLS로 누구나 읽을 수 있게 열어둠 — GitHub Actions가 배포 완료 시 기록).
+  useEffect(() => {
+    (async () => {
+      const { data } = await supabase.from('app_deployments').select('app_key, deployed_at');
+      const map: Record<string, string> = {};
+      (data ?? []).forEach(row => { map[row.app_key as string] = row.deployed_at as string; });
+      setDeployTimes(map);
+    })();
+  }, []);
 
   async function copyUrl(key: string, path: string) {
     await navigator.clipboard.writeText(fullUrl(path));
@@ -105,6 +203,7 @@ export default function DashboardPage() {
         path: app.path,
         label: o?.custom_label || app.label,
         description: o?.custom_description || '',
+        image: o?.custom_image || null,
         sortOrder: o?.sort_order ?? i,
       };
     })
@@ -148,7 +247,7 @@ export default function DashboardPage() {
       <div className="max-w-[1500px] mx-auto">
         <div className="flex items-center justify-between mb-8">
           <div>
-            <h1 className="text-2xl font-black tracking-tighter text-neutral-900">모노레포</h1>
+            <h1 className="text-2xl font-black tracking-tighter text-neutral-900">앱 대시보드</h1>
             <p className="text-sm text-gray-500 mt-1">{email}로 로그인됨</p>
           </div>
           <div className="flex items-center gap-2">
@@ -187,10 +286,10 @@ export default function DashboardPage() {
           <div
             className={
               orderedCards.length <= 3
-                ? 'flex flex-wrap justify-center gap-x-[33px] gap-y-4'
-                : 'grid gap-x-[33px] gap-y-4'
+                ? 'flex flex-wrap justify-center gap-x-[25px] gap-y-6'
+                : 'grid gap-x-[25px] gap-y-6'
             }
-            style={orderedCards.length <= 3 ? undefined : { gridTemplateColumns: 'repeat(4, 350px)' }}
+            style={orderedCards.length <= 3 ? undefined : { gridTemplateColumns: 'repeat(5, 280px)' }}
           >
             {orderedCards.map(card => (
               <div
@@ -209,7 +308,7 @@ export default function DashboardPage() {
                 onDragEnd={() => { setDragKey(null); setDragOverKey(null); setDragPos(null); draggedCardRef.current = null; }}
                 onClick={() => window.open(card.path, '_blank', 'noopener,noreferrer')}
                 className={
-                  'group w-full sm:w-[350px] flex flex-col rounded-xl border px-5 py-4 transition-all duration-200 cursor-pointer active:cursor-grabbing '
+                  'group w-full sm:w-[280px] flex flex-col rounded-xl border overflow-hidden transition-all duration-200 cursor-pointer active:cursor-grabbing '
                   + (dragKey === card.key
                     ? 'bg-neutral-100/70 border-dashed border-neutral-400 '
                     : dragOverKey === card.key
@@ -217,20 +316,39 @@ export default function DashboardPage() {
                       : 'bg-white/70 hover:bg-white backdrop-blur-xl shadow-glass hover:shadow-lg hover:-translate-y-1 border-white/60 hover:border-neutral-300 ')
                 }
               >
-                <span className="font-bold text-neutral-900 group-hover:underline truncate">
-                  {card.label}
-                </span>
-                <p className="text-xs text-gray-500 mt-1 line-clamp-1 min-h-[1rem]">
-                  {card.description}
-                </p>
-                <div className="mt-3 pt-3 border-t border-gray-100/80 flex items-center justify-between gap-2">
-                  <span className="text-xs text-gray-400 truncate">{card.path}</span>
-                  <button
-                    onClick={e => { e.stopPropagation(); copyUrl(card.key, card.path); }}
-                    className="shrink-0 text-xs text-gray-600 border border-gray-200/80 rounded-lg px-3 py-2 hover:border-neutral-500 hover:text-neutral-900 hover:bg-neutral-100/60 transition-colors"
+                {card.image ? (
+                  <img src={card.image} alt="" className="w-full h-[187px] object-cover shrink-0" />
+                ) : (
+                  <AppIconPlaceholder />
+                )}
+                <div className="flex-1 flex flex-col min-w-0 px-4 py-3">
+                  <span className="font-bold text-neutral-900 truncate" title={card.label}>
+                    {card.label}
+                  </span>
+                  <p
+                    className="text-xs text-gray-500 mt-1 line-clamp-2 min-h-[2.25rem]"
+                    title={card.description || undefined}
                   >
-                    {copiedKey === card.key ? '복사됨' : 'URL 복사'}
-                  </button>
+                    {card.description}
+                  </p>
+                  <div className="mt-2 pt-2 border-t border-gray-100/80 flex items-center justify-between gap-2">
+                    <span
+                      className="text-xs text-gray-400 truncate"
+                      title={deployTimes[card.key] ? `최종 배포: ${new Date(deployTimes[card.key]).toLocaleString('ko-KR')}` : undefined}
+                    >
+                      {deployTimes[card.key] ? formatRelativeTime(deployTimes[card.key]) : '배포 정보 없음'}
+                    </span>
+                    <button
+                      onClick={e => { e.stopPropagation(); copyUrl(card.key, card.path); }}
+                      title="URL 복사"
+                      className={
+                        'shrink-0 p-1.5 rounded-lg border border-gray-200/80 text-gray-600 hover:border-neutral-500 hover:bg-neutral-100/60 transition-opacity '
+                        + (copiedKey === card.key ? 'opacity-100' : 'opacity-40 group-hover:opacity-100 group-focus-within:opacity-100')
+                      }
+                    >
+                      {copiedKey === card.key ? <CheckIcon /> : <CopyIcon />}
+                    </button>
+                  </div>
                 </div>
               </div>
             ))}
@@ -274,9 +392,59 @@ function CardSettingsModal({
 }) {
   const [rows, setRows] = useState<CardData[]>(cards.map(c => ({ ...c })));
   const [saving, setSaving] = useState(false);
+  const [imageStatus, setImageStatus] = useState<Record<string, { busy: boolean; error: string | null }>>({});
+  const [previewImage, setPreviewImage] = useState<string | null>(null);
 
   function updateRow(key: string, changes: Partial<CardData>) {
     setRows(rs => rs.map(r => r.key === key ? { ...r, ...changes } : r));
+  }
+
+  function pickLocalImage(key: string) {
+    const input = document.createElement('input');
+    input.type = 'file';
+    input.accept = 'image/*';
+    input.onchange = async () => {
+      const file = input.files?.[0];
+      if (!file) return;
+      setImageStatus(s => ({ ...s, [key]: { busy: true, error: null } }));
+      try {
+        const reader = new FileReader();
+        const dataUrl = await new Promise<string>((resolve, reject) => {
+          reader.onload = () => resolve(reader.result as string);
+          reader.onerror = () => reject(new Error('파일을 읽지 못했습니다.'));
+          reader.readAsDataURL(file);
+        });
+        const webp = await cropToCardWebp(dataUrl);
+        updateRow(key, { image: webp });
+        setImageStatus(s => ({ ...s, [key]: { busy: false, error: null } }));
+      } catch (err) {
+        setImageStatus(s => ({ ...s, [key]: { busy: false, error: err instanceof Error ? err.message : '이미지 처리에 실패했습니다.' } }));
+      }
+    };
+    input.click();
+  }
+
+  async function generateImage(row: CardData) {
+    if (!row.label.trim()) {
+      setImageStatus(s => ({ ...s, [row.key]: { busy: false, error: '카드 제목을 먼저 입력해주세요.' } }));
+      return;
+    }
+    setImageStatus(s => ({ ...s, [row.key]: { busy: true, error: null } }));
+    try {
+      const res = await fetch('/api/dashboard/generate-image', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ label: row.label, description: row.description }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || '이미지 생성에 실패했습니다.');
+      // provider(HF/Pollinations)가 반환한 포맷/크기와 무관하게 규격을 통일한다.
+      const webp = await cropToCardWebp(data.dataUrl);
+      updateRow(row.key, { image: webp });
+      setImageStatus(s => ({ ...s, [row.key]: { busy: false, error: null } }));
+    } catch (err) {
+      setImageStatus(s => ({ ...s, [row.key]: { busy: false, error: err instanceof Error ? err.message : '이미지 생성에 실패했습니다.' } }));
+    }
   }
 
   function moveRow(index: number, direction: -1 | 1) {
@@ -294,6 +462,7 @@ function CardSettingsModal({
       app_key: r.key,
       custom_label: r.label.trim() || null,
       custom_description: r.description.trim() || null,
+      custom_image: r.image,
       sort_order: i,
     }));
     await supabase.from('dashboard_cards').upsert(payload, { onConflict: 'email,app_key' });
@@ -302,6 +471,7 @@ function CardSettingsModal({
   }
 
   return (
+    <>
     <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50">
       <div className="bg-white rounded-lg shadow-xl w-[520px] max-w-[92vw] max-h-[85vh] flex flex-col">
         <div className="shrink-0 flex items-center justify-between px-5 py-3 border-b border-gray-200">
@@ -339,6 +509,48 @@ function CardSettingsModal({
                   placeholder="설명 (선택)"
                   className="w-full px-2.5 py-1.5 border border-gray-200/80 bg-white/60 rounded-md text-xs text-gray-600 focus:outline-none focus:border-neutral-500 focus:ring-1 focus:ring-neutral-500 transition-colors"
                 />
+                <div className="flex items-center gap-2">
+                  {row.image ? (
+                    <img
+                      src={row.image}
+                      alt=""
+                      onClick={() => setPreviewImage(row.image)}
+                      className="w-20 h-[53px] object-cover rounded border border-gray-200/80 shrink-0 cursor-zoom-in hover:opacity-80 transition-opacity"
+                    />
+                  ) : (
+                    <div className="w-20 h-[53px] shrink-0 rounded border border-dashed border-gray-200 flex items-center justify-center text-[10px] text-gray-400">
+                      없음
+                    </div>
+                  )}
+                  <button
+                    type="button"
+                    onClick={() => pickLocalImage(row.key)}
+                    disabled={imageStatus[row.key]?.busy}
+                    className="shrink-0 text-[11px] text-gray-600 border border-gray-200/80 rounded-md px-2 py-1.5 hover:border-neutral-500 hover:bg-neutral-100/60 disabled:opacity-50 transition-colors"
+                  >
+                    이미지 선택
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => generateImage(row)}
+                    disabled={imageStatus[row.key]?.busy}
+                    className="shrink-0 text-[11px] text-gray-600 border border-gray-200/80 rounded-md px-2 py-1.5 hover:border-neutral-500 hover:bg-neutral-100/60 disabled:opacity-50 transition-colors"
+                  >
+                    {imageStatus[row.key]?.busy ? '생성 중...' : '이미지 생성'}
+                  </button>
+                  {row.image && !imageStatus[row.key]?.busy && (
+                    <button
+                      type="button"
+                      onClick={() => updateRow(row.key, { image: null })}
+                      className="shrink-0 text-[11px] text-gray-400 hover:text-red-500 transition-colors"
+                    >
+                      제거
+                    </button>
+                  )}
+                </div>
+                {imageStatus[row.key]?.error && (
+                  <p className="text-[11px] text-red-500">{imageStatus[row.key]?.error}</p>
+                )}
                 <p className="text-[11px] text-gray-400 truncate">{row.path}</p>
               </div>
             </div>
@@ -359,5 +571,26 @@ function CardSettingsModal({
         </div>
       </div>
     </div>
+
+    {previewImage && (
+      <div
+        className="fixed inset-0 bg-black/70 flex items-center justify-center z-[60] cursor-zoom-out"
+        onClick={() => setPreviewImage(null)}
+      >
+        <img
+          src={previewImage}
+          alt=""
+          className="rounded-lg shadow-2xl"
+          style={{ width: CARD_IMAGE_WIDTH, height: CARD_IMAGE_HEIGHT, maxWidth: '90vw', maxHeight: '90vh' }}
+        />
+        <button
+          onClick={() => setPreviewImage(null)}
+          className="absolute top-4 right-4 text-white/80 hover:text-white text-2xl leading-none"
+        >
+          ✕
+        </button>
+      </div>
+    )}
+    </>
   );
 }
