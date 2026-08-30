@@ -4,12 +4,12 @@ import { appendSapGlossary } from '@/lib/sap-glossary';
 
 // OpenRouter: 현재 유효한 무료 모델 (2026-07 기준)
 const OR_MODELS = [
-  'qwen/qwen3-next-80b-a3b-instruct:free',
-  'openai/gpt-oss-120b:free',
-  'meta-llama/llama-3.3-70b-instruct:free',
-  'nousresearch/hermes-3-llama-3.1-405b:free',
+  'z-ai/glm-5.2:free',
+  'minimax/minimax-m3:free',
+  'nvidia/nemotron-3-super-120b-a12b:free',
+  'google/gemma-4-31b-it:free',
 ];
-const GROQ_MODEL = 'llama-3.3-70b-versatile';
+const GROQ_MODEL = 'llama-3.1-8b-instant';
 
 export async function POST(request: NextRequest) {
   const { company_name, recruitment_notice, notes, urls, question, char_limit } = await request.json();

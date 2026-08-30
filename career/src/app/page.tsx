@@ -4,6 +4,7 @@ import { useState, useEffect, startTransition } from 'react';
 import { supabase, CoverLetterRef, CoverLetterQuestion } from '@/lib/supabase';
 import { Difficulty, DEFAULT_INTERVIEW_PROMPTS, DEFAULT_REGEN_PROMPT } from '@/lib/interviewPrompts';
 import { findSapTerms } from '@/lib/sap-glossary';
+import WrittenTestPanel from '@/components/WrittenTestPanel';
 
 type DraftUrl = { id?: string; title: string; url: string; sort_order: number };
 
@@ -42,6 +43,7 @@ export default function CoverLetterPage() {
   const [refs,       setRefs]       = useState<CoverLetterRef[]>([]);
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [tab,        setTab]        = useState<'ref' | 'questions' | 'interview'>('ref');
+  const [interviewSubTab, setInterviewSubTab] = useState<'oral' | 'written'>('oral');
 
   const [refForm, setRefForm] = useState({ company_name: '', recruitment_notice: '', notes: '' });
   const [urls,    setUrls]    = useState<DraftUrl[]>([]);
@@ -743,6 +745,34 @@ export default function CoverLetterPage() {
 
             {/* ── 탭: 면접 예상 질문 ─────────────────────────────── */}
             {tab === 'interview' && (
+              <div className="flex flex-col flex-1 overflow-hidden">
+
+                {/* 서브탭: 면접 질문 / 필기 예상 문제 */}
+                <div className="shrink-0 flex items-center gap-1 px-4 pt-2 border-b border-gray-100/80 bg-white/30">
+                  {([['oral', '면접 질문'], ['written', '필기 예상 문제']] as const).map(([id, label]) => (
+                    <button
+                      key={id}
+                      onClick={() => setInterviewSubTab(id)}
+                      className={`px-4 py-2 text-xs font-bold rounded-t-lg border-b-2 transition-all duration-200 ${
+                        interviewSubTab === id
+                          ? 'border-neutral-900 text-neutral-900'
+                          : 'border-transparent text-gray-400 hover:text-gray-700'
+                      }`}
+                    >
+                      {label}
+                    </button>
+                  ))}
+                </div>
+
+                {interviewSubTab === 'written' ? (
+                  <WrittenTestPanel
+                    key={selectedId}
+                    refId={selectedId!}
+                    companyName={selectedRef?.company_name ?? ''}
+                    recruitmentNotice={selectedRef?.recruitment_notice ?? ''}
+                    notes={selectedRef?.notes ?? ''}
+                  />
+                ) : (
               <div className="flex flex-1 overflow-hidden">
 
                 {/* 왼쪽: 난이도별 섹션 */}
@@ -975,6 +1005,8 @@ export default function CoverLetterPage() {
                   </div>
                 </div>
 
+              </div>
+                )}
               </div>
             )}
 

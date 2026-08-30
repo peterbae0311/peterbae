@@ -53,6 +53,34 @@ export interface CoverLetterQuestion {
   updated_at: string;
 }
 
+// ── 필기 예상 문제 ─────────────────────────────────────────
+
+export type WrittenTestQuestionType = 'choice4' | 'choice5' | 'short';
+
+export interface WrittenTestCategory {
+  id: string;
+  user_id: string;
+  ref_id: string;
+  name: string;
+  description: string | null;
+  sort_order: number;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface WrittenTestQuestion {
+  id: string;
+  user_id: string;
+  category_id: string;
+  type: WrittenTestQuestionType;
+  question: string;
+  choices: string[] | null;
+  answer: string;
+  explanation: string | null;
+  sort_order: number;
+  created_at: string;
+}
+
 // ── 이력서 ─────────────────────────────────────────────────
 
 export interface ResumeProfile {

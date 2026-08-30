@@ -4,12 +4,12 @@ import { createServerSupabaseClient } from '@/lib/supabaseServer';
 import { DIFF_LABEL, DEFAULT_INTERVIEW_PROMPT, type Difficulty } from '@/lib/interviewPrompts';
 
 const OR_MODELS = [
-  'qwen/qwen3-next-80b-a3b-instruct:free',
-  'openai/gpt-oss-120b:free',
-  'meta-llama/llama-3.3-70b-instruct:free',
-  'nousresearch/hermes-3-llama-3.1-405b:free',
+  'z-ai/glm-5.2:free',
+  'minimax/minimax-m3:free',
+  'nvidia/nemotron-3-super-120b-a12b:free',
+  'google/gemma-4-31b-it:free',
 ];
-const GROQ_MODEL = 'llama-3.3-70b-versatile';
+const GROQ_MODEL = 'llama-3.1-8b-instant';
 
 // 난이도별 sort_order 오프셋 (high→0, medium→10, low→20)
 const DIFF_OFFSET: Record<Difficulty, number> = { high: 0, medium: 10, low: 20 };
