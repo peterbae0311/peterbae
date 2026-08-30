@@ -183,7 +183,7 @@ export default function WrittenTestPanel({
   }
 
   return (
-    <div className="flex flex-col flex-1 overflow-hidden">
+    <div className="flex flex-col flex-1 min-h-0 overflow-hidden">
 
       {/* ── 상단: 카테고리 탭 + 관리/다운로드 버튼 ──────────────── */}
       <div className="shrink-0 flex items-center justify-between px-4 py-2 border-b border-gray-100/80 bg-white/40">
@@ -231,7 +231,7 @@ export default function WrittenTestPanel({
       </div>
 
       {/* ── 본문: 선택된 카테고리의 전체 문제 ────────────────────── */}
-      <div className="flex-1 overflow-y-auto px-8 py-6">
+      <div className="flex-1 min-h-0 overflow-y-auto px-8 py-6">
         {!activeCat ? (
           <div className="flex flex-col items-center justify-center h-full text-gray-400 gap-3">
             <p className="text-sm">생성된 문제가 없습니다. 카테고리 관리에서 문제를 생성하세요.</p>

@@ -357,14 +357,14 @@ export default function CoverLetterPage() {
   const answerOver = !!(selectedQ?.char_limit && answerLen > selectedQ.char_limit);
 
   return (
-    <div className="min-h-[calc(100vh-56px)] flex flex-col p-4 gap-4">
+    <div className="h-[calc(100vh-56px)] flex flex-col p-4 gap-4">
 
       {/* ── 페이지 제목 ──────────────────────────────────────────── */}
       <div className="flex items-center justify-between pb-4 border-b border-gray-200/70">
         <h1 className="text-2xl font-black tracking-tighter text-neutral-900">자기소개서 / 면접 준비</h1>
       </div>
 
-      <div className="flex flex-1 gap-4 overflow-hidden">
+      <div className="flex flex-1 min-h-0 gap-4 overflow-hidden">
 
       {/* ── 왼쪽: 회사 목록 ──────────────────────────────────────── */}
       <aside className="w-[20%] shrink-0 rounded-2xl border border-white/60 bg-white/70 backdrop-blur-xl shadow-glass flex flex-col overflow-hidden">
@@ -410,7 +410,7 @@ export default function CoverLetterPage() {
       </aside>
 
       {/* ── 오른쪽: 상세 영역 ─────────────────────────────────────── */}
-      <section className="flex-1 flex flex-col overflow-hidden rounded-2xl border border-white/60 bg-white/70 backdrop-blur-xl shadow-glass">
+      <section className="flex-1 min-h-0 flex flex-col overflow-hidden rounded-2xl border border-white/60 bg-white/70 backdrop-blur-xl shadow-glass">
         {!selectedId ? (
           <div className="flex flex-col items-center justify-center flex-1 text-gray-400 gap-3">
             <div className="w-16 h-16 bg-neutral-200 rounded-2xl flex items-center justify-center">
@@ -419,7 +419,7 @@ export default function CoverLetterPage() {
             <p className="text-sm">왼쪽에서 회사를 선택하거나 추가하세요</p>
           </div>
         ) : (
-          <div className="flex flex-col flex-1 overflow-hidden">
+          <div className="flex flex-col flex-1 min-h-0 overflow-hidden">
 
             {/* ── 탭 헤더 ────────────────────────────────────────── */}
             <div className="shrink-0 border-b border-gray-100/80 flex">
