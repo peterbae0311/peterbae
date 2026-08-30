@@ -9,7 +9,7 @@ const OR_MODELS = [
   'nvidia/nemotron-3-super-120b-a12b:free',
   'google/gemma-4-31b-it:free',
 ];
-const GROQ_MODEL = 'llama-3.1-8b-instant';
+const GROQ_MODEL = 'openai/gpt-oss-120b';
 
 function extractErrorMessage(errBody: string): string {
   try {
@@ -89,14 +89,14 @@ export async function POST(request: NextRequest) {
   }
 
   if (!sample_answer) {
-    let result = await fetchText('groq', GROQ_MODEL, messages, { maxTokens: 1000, temperature: 0.85 });
+    let result = await fetchText('groq', GROQ_MODEL, messages, { maxTokens: 3000, temperature: 0.85 });
     sample_answer = result.text;
     if (result.error) lastError = result.error;
 
     // Groq가 마지막 보루이므로, 일시적 rate-limit 대비 1회 재시도
     if (!sample_answer) {
       await sleep(1500);
-      result = await fetchText('groq', GROQ_MODEL, messages, { maxTokens: 1000, temperature: 0.85 });
+      result = await fetchText('groq', GROQ_MODEL, messages, { maxTokens: 3000, temperature: 0.85 });
       sample_answer = result.text;
       if (result.error) lastError = result.error;
     }

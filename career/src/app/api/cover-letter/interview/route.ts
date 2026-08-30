@@ -9,7 +9,7 @@ const OR_MODELS = [
   'nvidia/nemotron-3-super-120b-a12b:free',
   'google/gemma-4-31b-it:free',
 ];
-const GROQ_MODEL = 'llama-3.1-8b-instant';
+const GROQ_MODEL = 'openai/gpt-oss-120b';
 
 // 난이도별 sort_order 오프셋 (high→0, medium→10, low→20)
 const DIFF_OFFSET: Record<Difficulty, number> = { high: 0, medium: 10, low: 20 };

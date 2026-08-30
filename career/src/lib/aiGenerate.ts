@@ -7,7 +7,7 @@ const OR_MODELS = [
   'nvidia/nemotron-3-super-120b-a12b:free',
   'google/gemma-4-31b-it:free',
 ];
-const GROQ_MODEL = 'llama-3.1-8b-instant';
+const GROQ_MODEL = 'openai/gpt-oss-120b';
 
 function extractErrorMessage(errBody: string): string {
   try {

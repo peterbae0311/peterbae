@@ -9,7 +9,7 @@ const OR_MODELS = [
   'nvidia/nemotron-3-super-120b-a12b:free',
   'google/gemma-4-31b-it:free',
 ];
-const GROQ_MODEL = 'llama-3.1-8b-instant';
+const GROQ_MODEL = 'openai/gpt-oss-120b';
 
 const MIN_QUESTIONS = 4;
 const MAX_QUESTIONS = 60;
@@ -148,7 +148,7 @@ export async function POST(request: NextRequest) {
     ? Math.min(Math.max(rawCount, MIN_QUESTIONS), MAX_QUESTIONS)
     : DEFAULT_QUESTIONS;
   const { choice4: CHOICE4_COUNT, choice5: CHOICE5_COUNT } = splitCounts(TOTAL_COUNT);
-  const maxTokens = Math.min(TOTAL_COUNT * 300, 16000);
+  const maxTokens = Math.min(Math.max(TOTAL_COUNT * 300, 3000), 16000);
 
   const contextParts: string[] = [];
   if (company_name)       contextParts.push(`회사/기관명: ${company_name}`);

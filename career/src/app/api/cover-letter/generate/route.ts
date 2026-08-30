@@ -9,7 +9,7 @@ const OR_MODELS = [
   'nvidia/nemotron-3-super-120b-a12b:free',
   'google/gemma-4-31b-it:free',
 ];
-const GROQ_MODEL = 'llama-3.1-8b-instant';
+const GROQ_MODEL = 'openai/gpt-oss-120b';
 
 export async function POST(request: NextRequest) {
   const { company_name, recruitment_notice, notes, urls, question, char_limit } = await request.json();
