@@ -21,9 +21,15 @@ function isSystemPath(path: string): boolean {
     || path.startsWith('/api/admin/');
 }
 
+// /career, /image_slideshow 같은 브라우저 경로는 첫 세그먼트가 app_key다.
+// 그런데 /api/career/llm처럼 hub가 다른 앱을 대신 호출해주는 내부 API 경로는
+// 첫 세그먼트가 "api"라서, 그대로 쓰면 존재하지 않는 app_key "api"로 조회돼
+// 슈퍼관리자를 제외한 모든 계정이 항상 403을 받는다. 이 경우 두 번째 세그먼트를
+// app_key로 취급한다.
 function extractAppKey(path: string): string | null {
-  const seg = path.split('/').filter(Boolean)[0];
-  return seg || null;
+  const segs = path.split('/').filter(Boolean);
+  if (segs[0] === 'api' && segs[1]) return segs[1];
+  return segs[0] || null;
 }
 
 export async function GET(request: NextRequest) {

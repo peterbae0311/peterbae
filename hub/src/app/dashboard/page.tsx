@@ -129,13 +129,22 @@ export default function DashboardPage() {
     blankDragImageRef.current = img;
   }, []);
 
+  // 관리자가 등록한 값(이미지 등)을 전 계정 공통 기본값으로 쓰고, 각자 자신의 행이
+  // 있으면(개인화) 그게 우선한다 — RLS는 본인 행 + 관리자 행만 읽을 수 있게 열려 있음.
   const loadOverrides = useCallback(async (userEmail: string) => {
+    const emails = userEmail === SUPER_ADMIN_EMAIL ? [userEmail] : [userEmail, SUPER_ADMIN_EMAIL];
     const { data } = await supabase
       .from('dashboard_cards')
-      .select('app_key, custom_label, custom_description, custom_image, sort_order')
-      .eq('email', userEmail);
+      .select('email, app_key, custom_label, custom_description, custom_image, sort_order')
+      .in('email', emails);
     const map: Record<string, CardOverride> = {};
-    (data ?? []).forEach(row => { map[row.app_key as string] = row as CardOverride; });
+    // 관리자 행 먼저 채우고, 본인 행으로 덮어써서 개인화가 우선하도록 한다.
+    (data ?? [])
+      .filter(row => row.email === SUPER_ADMIN_EMAIL)
+      .forEach(row => { map[row.app_key as string] = row as CardOverride; });
+    (data ?? [])
+      .filter(row => row.email === userEmail)
+      .forEach(row => { map[row.app_key as string] = row as CardOverride; });
     setOverrides(map);
   }, []);
 
