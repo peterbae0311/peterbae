@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
+import { createPortal } from 'react-dom';
 import { supabase, WrittenTestCategory, WrittenTestQuestion } from '@/lib/supabase';
 
 function normalize(s: string): string {
@@ -340,8 +341,12 @@ export default function WrittenTestPanel({
         </div>
       )}
 
-      {/* ── 카테고리 관리 모달 ───────────────────────────────────── */}
-      {showManage && (
+      {/* ── 카테고리 관리 모달 ───────────────────────────────────────
+          backdrop-blur가 걸린 조상(section 등) 아래에서 position:fixed를
+          쓰면 그 조상이 fixed의 containing block이 되어버려(backdrop-filter는
+          transform/filter처럼 새 containing block을 만듦) 뷰포트 전체가 아닌
+          조상 박스 안에 갇힌다. document.body로 포탈링해 이를 피한다. */}
+      {showManage && typeof document !== 'undefined' && createPortal(
         <div
           className="fixed inset-0 bg-neutral-950/30 backdrop-blur-sm flex items-center justify-center z-50"
           onClick={() => setShowManage(false)}
@@ -418,7 +423,8 @@ export default function WrittenTestPanel({
               })}
             </div>
           </div>
-        </div>
+        </div>,
+        document.body,
       )}
     </div>
   );
