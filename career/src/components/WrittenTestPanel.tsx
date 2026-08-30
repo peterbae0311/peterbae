@@ -3,17 +3,15 @@
 import { useEffect, useState } from 'react';
 import { supabase, WrittenTestCategory, WrittenTestQuestion } from '@/lib/supabase';
 
-const TYPE_LABEL: Record<WrittenTestQuestion['type'], string> = {
-  choice4: '4지선다',
-  choice5: '5지선다',
-  short:   '단답형',
-};
-
 function normalize(s: string): string {
   return s.trim().toLowerCase().replace(/\s+/g, '');
 }
 
-type QuizItem = { catId: string; catName: string; q: WrittenTestQuestion };
+function isCorrect(q: WrittenTestQuestion, userAnswer: string | undefined): boolean {
+  if (!userAnswer) return false;
+  if (q.type === 'short') return normalize(userAnswer) === normalize(q.answer);
+  return userAnswer === q.answer;
+}
 
 export default function WrittenTestPanel({
   refId, companyName, recruitmentNotice, notes,
@@ -26,20 +24,30 @@ export default function WrittenTestPanel({
   const [categories,     setCategories]     = useState<WrittenTestCategory[]>([]);
   const [questionsByCat, setQuestionsByCat] = useState<Record<string, WrittenTestQuestion[]>>({});
   const [generatingId,   setGeneratingId]   = useState<string | null>(null);
-  const [mode,           setMode]           = useState<'manage' | 'quiz' | 'result'>('manage');
+  const [showManage,     setShowManage]     = useState(false);
+  const [generatingPdf,  setGeneratingPdf]  = useState(false);
 
-  const [order,   setOrder]   = useState<QuizItem[]>([]);
-  const [current, setCurrent] = useState(0);
-  const [answers, setAnswers] = useState<Record<string, string>>({});
+  const [activeCatId, setActiveCatId] = useState<string | null>(null);
+  const [answers,     setAnswers]     = useState<Record<string, string>>({});
+  const [graded,      setGraded]      = useState(false);
 
   useEffect(() => { fetchCategories(); }, [refId]);
+
+  const catsWithQuestions = categories.filter(c => (questionsByCat[c.id]?.length ?? 0) > 0);
+
+  useEffect(() => {
+    if (catsWithQuestions.length === 0) { setActiveCatId(null); return; }
+    if (!activeCatId || !catsWithQuestions.some(c => c.id === activeCatId)) {
+      setActiveCatId(catsWithQuestions[0].id);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [categories, questionsByCat]);
 
   async function fetchCategories() {
     const { data } = await supabase
       .from('written_test_categories').select('*').eq('ref_id', refId).order('sort_order');
     const cats = (data ?? []) as WrittenTestCategory[];
     setCategories(cats);
-    setMode('manage');
     if (cats.length > 0) fetchQuestions(cats.map(c => c.id));
     else setQuestionsByCat({});
   }
@@ -58,7 +66,7 @@ export default function WrittenTestPanel({
   async function addCategory() {
     const { data } = await supabase
       .from('written_test_categories')
-      .insert({ ref_id: refId, name: '새 카테고리', description: '', sort_order: categories.length })
+      .insert({ ref_id: refId, name: '', description: '', sort_order: categories.length })
       .select().single();
     if (data) setCategories(prev => [...prev, data as WrittenTestCategory]);
   }
@@ -71,7 +79,7 @@ export default function WrittenTestPanel({
     const cat = categories.find(c => c.id === id);
     if (!cat) return;
     await supabase.from('written_test_categories')
-      .update({ name: cat.name.trim() || '새 카테고리', description: cat.description })
+      .update({ name: cat.name, description: cat.description })
       .eq('id', id);
   }
 
@@ -114,292 +122,304 @@ export default function WrittenTestPanel({
   }
 
   const totalQuestions = Object.values(questionsByCat).reduce((sum, qs) => sum + qs.length, 0);
-
-  function startQuiz() {
-    const flat: QuizItem[] = [];
-    categories.forEach(cat => {
-      (questionsByCat[cat.id] ?? []).forEach(q => flat.push({ catId: cat.id, catName: cat.name, q }));
-    });
-    if (flat.length === 0) {
-      alert('생성된 문제가 없습니다. 먼저 카테고리별로 문제를 생성하세요.');
-      return;
-    }
-    setOrder(flat);
-    setAnswers({});
-    setCurrent(0);
-    setMode('quiz');
-  }
+  const activeIndex = catsWithQuestions.findIndex(c => c.id === activeCatId);
+  const activeCat   = catsWithQuestions[activeIndex] ?? null;
+  const activeQs    = activeCat ? (questionsByCat[activeCat.id] ?? []) : [];
+  const isFirstCat  = activeIndex <= 0;
+  const isLastCat   = activeIndex === catsWithQuestions.length - 1;
 
   function selectAnswer(qId: string, value: string) {
+    if (graded) return;
     setAnswers(prev => ({ ...prev, [qId]: value }));
   }
 
-  function goNext() {
-    if (current + 1 >= order.length) setMode('result');
-    else setCurrent(c => c + 1);
-  }
   function goPrev() {
-    setCurrent(c => Math.max(0, c - 1));
+    if (isFirstCat) return;
+    setActiveCatId(catsWithQuestions[activeIndex - 1].id);
+  }
+  function goNext() {
+    if (isLastCat) { setGraded(true); return; }
+    setActiveCatId(catsWithQuestions[activeIndex + 1].id);
   }
 
-  function isCorrect(item: QuizItem): boolean {
-    const userAnswer = answers[item.q.id];
-    if (!userAnswer) return false;
-    if (item.q.type === 'short') return normalize(userAnswer) === normalize(item.q.answer);
-    return userAnswer === item.q.answer;
+  function retake() {
+    setAnswers({});
+    setGraded(false);
+    if (catsWithQuestions.length > 0) setActiveCatId(catsWithQuestions[0].id);
   }
 
-  function downloadAll() {
-    const lines: string[] = [];
-    categories.forEach(cat => {
-      const qs = questionsByCat[cat.id] ?? [];
-      if (qs.length === 0) return;
-      lines.push(`■ ${cat.name}`);
-      if (cat.description?.trim()) lines.push(cat.description.trim());
-      lines.push('');
-      qs.forEach((q, i) => {
-        lines.push(`${i + 1}. [${TYPE_LABEL[q.type]}] ${q.question}`);
-        q.choices?.forEach((c, ci) => lines.push(`   ${String.fromCharCode(9312 + ci)} ${c}`));
-        lines.push(`정답: ${q.answer}`);
-        if (q.explanation?.trim()) lines.push(`해설: ${q.explanation.trim()}`);
-        lines.push('');
-      });
-      lines.push('');
-    });
-    const blob = new Blob([lines.join('\n')], { type: 'text/plain;charset=utf-8' });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = `${companyName || '필기예상문제'}_필기예상문제.txt`;
-    a.click();
-    URL.revokeObjectURL(url);
+  async function downloadPdf() {
+    setGeneratingPdf(true);
+    try {
+      const [{ pdf }, { WrittenTestPdfDocument }] = await Promise.all([
+        import('@react-pdf/renderer'),
+        import('@/lib/writtenTestPdf'),
+      ]);
+      const blob = await pdf(
+        <WrittenTestPdfDocument
+          companyName={companyName}
+          categories={categories}
+          questionsByCat={questionsByCat}
+          answers={answers}
+          graded={graded}
+        />
+      ).toBlob();
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `${companyName || '필기예상문제'}_필기예상문제.pdf`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+    } catch (err) {
+      console.error('[written-test] PDF 생성 실패:', err);
+      alert('PDF 생성 중 오류가 발생했습니다.');
+    } finally {
+      setGeneratingPdf(false);
+    }
   }
 
-  // ── 문제 풀이 화면 ─────────────────────────────────────────
-  if (mode === 'quiz') {
-    const item = order[current];
-    const selected = answers[item.q.id] ?? '';
-    return (
-      <div className="flex flex-col flex-1 overflow-hidden">
-        <div className="shrink-0 flex items-center justify-between px-5 py-3 border-b border-gray-100/80 bg-white/40">
-          <div className="flex items-center gap-2">
-            <span className="text-xs font-bold text-white bg-neutral-900 rounded-md px-2 py-0.5">{item.catName}</span>
-            <span className="text-xs text-gray-400">{TYPE_LABEL[item.q.type]}</span>
-          </div>
-          <div className="flex items-center gap-3">
-            <span className="text-xs text-gray-500">{current + 1} / {order.length}</span>
+  return (
+    <div className="flex flex-col flex-1 overflow-hidden">
+
+      {/* ── 상단: 카테고리 탭 + 관리/다운로드 버튼 ──────────────── */}
+      <div className="shrink-0 flex items-center justify-between px-4 py-2 border-b border-gray-100/80 bg-white/40">
+        <div className="flex items-center gap-1 overflow-x-auto">
+          {catsWithQuestions.map(cat => (
             <button
-              onClick={() => { if (confirm('풀던 문제를 종료하고 카테고리 관리로 돌아갈까요?')) setMode('manage'); }}
-              className="text-xs text-gray-500 hover:text-red-500 transition-colors"
+              key={cat.id}
+              onClick={() => setActiveCatId(cat.id)}
+              className={`shrink-0 px-4 py-2 text-sm font-bold rounded-t-lg border-b-2 transition-all duration-200 ${
+                activeCatId === cat.id
+                  ? 'border-neutral-900 text-neutral-900'
+                  : 'border-transparent text-gray-400 hover:text-gray-700'
+              }`}
             >
-              종료
+              {cat.name || '(제목 없음)'}
             </button>
-          </div>
-        </div>
-
-        <div className="flex-1 overflow-y-auto px-8 py-8">
-          <p className="text-lg font-bold text-gray-800 leading-relaxed mb-6 whitespace-pre-wrap">{item.q.question}</p>
-
-          {item.q.type !== 'short' ? (
-            <div className="space-y-2 max-w-xl">
-              {item.q.choices?.map((c, i) => (
-                <button
-                  key={i}
-                  onClick={() => selectAnswer(item.q.id, c)}
-                  className={`w-full text-left px-4 py-3 rounded-lg border text-sm transition-colors ${
-                    selected === c
-                      ? 'border-neutral-900 bg-neutral-100 text-neutral-900 font-semibold'
-                      : 'border-gray-200/80 bg-white/60 text-gray-700 hover:border-neutral-400'
-                  }`}
-                >
-                  <span className="inline-block w-6 text-gray-400">{String.fromCharCode(9312 + i)}</span>
-                  {c}
-                </button>
-              ))}
-            </div>
-          ) : (
-            <input
-              value={selected}
-              onChange={e => selectAnswer(item.q.id, e.target.value)}
-              className="w-full max-w-xl px-4 py-3 border border-gray-200/80 bg-white/60 rounded-lg text-sm text-gray-800 focus:outline-none focus:border-neutral-500 focus:ring-1 focus:ring-neutral-500 transition-colors"
-              placeholder="답을 입력하세요"
-            />
+          ))}
+          {catsWithQuestions.length === 0 && (
+            <span className="text-sm text-gray-400">카테고리 관리에서 카테고리를 만들고 문제를 생성하세요</span>
           )}
         </div>
+        <div className="flex items-center gap-2 shrink-0">
+          {graded && (
+            <button
+              onClick={retake}
+              className="text-xs text-gray-600 border border-gray-200/80 rounded-md px-3 py-1.5 hover:border-neutral-500 hover:text-neutral-900 hover:bg-neutral-100/60 transition-colors"
+            >
+              다시 응시
+            </button>
+          )}
+          <button
+            onClick={() => setShowManage(true)}
+            className="text-xs text-gray-600 border border-gray-200/80 rounded-md px-3 py-1.5 hover:border-neutral-500 hover:text-neutral-900 hover:bg-neutral-100/60 transition-colors"
+          >
+            카테고리 관리
+          </button>
+          <button
+            onClick={downloadPdf}
+            disabled={totalQuestions === 0 || generatingPdf}
+            className="text-xs text-white bg-neutral-900 rounded-md px-3 py-1.5 hover:bg-neutral-800 disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
+          >
+            {generatingPdf ? 'PDF 생성 중...' : '문제 및 결과 PDF 다운로드'}
+          </button>
+        </div>
+      </div>
 
+      {/* ── 본문: 선택된 카테고리의 전체 문제 ────────────────────── */}
+      <div className="flex-1 overflow-y-auto px-8 py-6">
+        {!activeCat ? (
+          <div className="flex flex-col items-center justify-center h-full text-gray-400 gap-3">
+            <p className="text-sm">생성된 문제가 없습니다. 카테고리 관리에서 문제를 생성하세요.</p>
+            <button
+              onClick={() => setShowManage(true)}
+              className="text-sm text-white bg-neutral-900 rounded-lg px-4 py-2 hover:bg-neutral-800 transition-colors"
+            >
+              카테고리 관리 열기
+            </button>
+          </div>
+        ) : (
+          <div className="space-y-8 max-w-3xl">
+            {graded && (
+              <p className="text-sm font-bold text-gray-700">
+                {activeCat.name} — {activeQs.filter(q => isCorrect(q, answers[q.id])).length} / {activeQs.length} 정답
+              </p>
+            )}
+            {activeQs.map((q, i) => {
+              const userAnswer = answers[q.id] ?? '';
+              const correct = graded ? isCorrect(q, userAnswer) : null;
+              return (
+                <div key={q.id}>
+                  <p className="font-bold text-gray-800 mb-2 leading-relaxed">
+                    {i + 1}. {q.question}
+                    {graded && (
+                      <span className={correct ? 'text-green-600 ml-2' : 'text-red-500 ml-2'}>
+                        {correct ? '✓' : '✗'}
+                      </span>
+                    )}
+                  </p>
+
+                  {q.type !== 'short' ? (
+                    <div className="space-y-1.5">
+                      {q.choices?.map((c, ci) => {
+                        const isSelected = userAnswer === c;
+                        const isAnswer   = graded && c === q.answer;
+                        const isWrongPick = graded && isSelected && !isAnswer;
+                        return (
+                          <button
+                            key={ci}
+                            onClick={() => selectAnswer(q.id, c)}
+                            disabled={graded}
+                            className={`w-full text-left px-3 py-2 rounded-lg border text-sm transition-colors ${
+                              isAnswer
+                                ? 'border-green-400 bg-green-50 text-green-800 font-semibold'
+                                : isWrongPick
+                                ? 'border-red-300 bg-red-50 text-red-700 font-semibold'
+                                : isSelected
+                                ? 'border-neutral-900 bg-neutral-100 text-neutral-900 font-semibold'
+                                : 'border-gray-200/80 bg-white/60 text-gray-700 hover:border-neutral-400 disabled:hover:border-gray-200/80'
+                            }`}
+                          >
+                            <span className="inline-block w-6 text-gray-400">{String.fromCharCode(9312 + ci)}</span>
+                            {c}
+                          </button>
+                        );
+                      })}
+                    </div>
+                  ) : (
+                    <input
+                      value={userAnswer}
+                      onChange={e => selectAnswer(q.id, e.target.value)}
+                      disabled={graded}
+                      className="w-full max-w-md px-3 py-2 border border-gray-200/80 bg-white/60 rounded-lg text-sm text-gray-800 focus:outline-none focus:border-neutral-500 focus:ring-1 focus:ring-neutral-500 disabled:bg-gray-50 transition-colors"
+                      placeholder="답을 입력하세요"
+                    />
+                  )}
+
+                  {graded && (
+                    <div className="mt-2 text-xs text-gray-500 space-y-0.5">
+                      <p>내 답변: {userAnswer || '(미응답)'}{q.type === 'short' && !correct && ` (정답: ${q.answer})`}</p>
+                      {q.explanation && <p>해설: {q.explanation}</p>}
+                    </div>
+                  )}
+                </div>
+              );
+            })}
+          </div>
+        )}
+      </div>
+
+      {/* ── 하단: 카테고리 이동 ──────────────────────────────────── */}
+      {activeCat && (
         <div className="shrink-0 flex items-center justify-between px-8 py-4 border-t border-gray-100/80">
           <button
             onClick={goPrev}
-            disabled={current === 0}
+            disabled={isFirstCat}
             className="px-5 py-2 text-sm text-gray-600 border border-gray-200/80 rounded-lg hover:bg-gray-50 disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
           >
             이전
           </button>
-          <button
-            onClick={goNext}
-            className="px-6 py-2 bg-gradient-to-r from-neutral-900 to-neutral-800 text-white text-sm font-medium rounded-lg shadow-glow-dark hover:shadow-lg hover:-translate-y-0.5 transition-all duration-200"
-          >
-            {current + 1 >= order.length ? '제출하고 결과 보기' : '다음'}
-          </button>
+          {!graded && (
+            <button
+              onClick={goNext}
+              className="px-6 py-2 bg-gradient-to-r from-neutral-900 to-neutral-800 text-white text-sm font-medium rounded-lg shadow-glow-dark hover:shadow-lg hover:-translate-y-0.5 transition-all duration-200"
+            >
+              {isLastCat ? '제출하고 결과 보기' : '다음'}
+            </button>
+          )}
+          {graded && !isLastCat && (
+            <button
+              onClick={goNext}
+              className="px-6 py-2 bg-gradient-to-r from-neutral-900 to-neutral-800 text-white text-sm font-medium rounded-lg shadow-glow-dark hover:shadow-lg hover:-translate-y-0.5 transition-all duration-200"
+            >
+              다음
+            </button>
+          )}
         </div>
-      </div>
-    );
-  }
+      )}
 
-  // ── 결과 화면 ─────────────────────────────────────────────
-  if (mode === 'result') {
-    const results = order.map(item => ({ ...item, correct: isCorrect(item) }));
-    const correctCount = results.filter(r => r.correct).length;
-    const resultsByCat = categories
-      .map(cat => ({ cat, items: results.filter(r => r.catId === cat.id) }))
-      .filter(g => g.items.length > 0);
+      {/* ── 카테고리 관리 모달 ───────────────────────────────────── */}
+      {showManage && (
+        <div
+          className="fixed inset-0 bg-neutral-950/30 backdrop-blur-sm flex items-center justify-center z-50"
+          onClick={() => setShowManage(false)}
+        >
+          <div
+            className="bg-white/90 backdrop-blur-2xl rounded-2xl border border-white/60 shadow-glass-lg w-[720px] max-w-[90vw] max-h-[85vh] flex flex-col"
+            onClick={e => e.stopPropagation()}
+          >
+            <div className="shrink-0 flex items-center justify-between px-5 py-3 border-b border-gray-100/80">
+              <span className="text-sm font-bold text-gray-800">카테고리 관리</span>
+              <button
+                onClick={() => setShowManage(false)}
+                className="text-gray-400 hover:text-gray-700 text-lg leading-none transition-colors"
+              >✕</button>
+            </div>
 
-    return (
-      <div className="flex flex-col flex-1 overflow-hidden">
-        <div className="shrink-0 flex items-center justify-between px-5 py-3 border-b border-gray-100/80 bg-white/40">
-          <span className="text-sm font-bold text-gray-800">
-            결과 — {correctCount} / {results.length} 정답 ({results.length ? Math.round(correctCount / results.length * 100) : 0}%)
-          </span>
-          <div className="flex items-center gap-2">
-            <button
-              onClick={downloadAll}
-              className="text-xs text-gray-600 border border-gray-200/80 rounded-md px-3 py-1 hover:border-neutral-500 hover:text-neutral-900 hover:bg-neutral-100/60 transition-colors"
-            >
-              문제 다운로드
-            </button>
-            <button
-              onClick={startQuiz}
-              className="text-xs text-gray-600 border border-gray-200/80 rounded-md px-3 py-1 hover:border-neutral-500 hover:text-neutral-900 hover:bg-neutral-100/60 transition-colors"
-            >
-              다시 응시
-            </button>
-            <button
-              onClick={() => setMode('manage')}
-              className="text-xs text-white bg-neutral-900 rounded-md px-3 py-1 hover:bg-neutral-800 transition-colors"
-            >
-              카테고리 관리로
-            </button>
+            <div className="shrink-0 flex justify-end px-5 pt-4">
+              <button
+                onClick={addCategory}
+                className="text-xs text-white bg-neutral-900 rounded-md px-3 py-1.5 hover:bg-neutral-800 transition-colors"
+              >
+                카테고리 추가
+              </button>
+            </div>
+
+            <div className="flex-1 overflow-y-auto px-5 py-4 space-y-3">
+              {categories.length === 0 && (
+                <p className="text-center text-gray-400 text-sm py-10">카테고리 추가 버튼으로 첫 카테고리를 등록하세요</p>
+              )}
+              {categories.map(cat => {
+                const qs = questionsByCat[cat.id] ?? [];
+                const isGenerating = generatingId === cat.id;
+                return (
+                  <div key={cat.id} className="border border-gray-200/80 rounded-xl bg-white/60 overflow-hidden">
+                    <div className="flex items-center gap-2 px-4 py-2.5 bg-neutral-50/80 border-b border-gray-100/80">
+                      <input
+                        value={cat.name}
+                        onChange={e => updateCategoryLocal(cat.id, { name: e.target.value })}
+                        onBlur={() => saveCategory(cat.id)}
+                        className="flex-1 bg-transparent text-sm font-bold text-gray-800 focus:outline-none"
+                        placeholder="카테고리 제목을 입력하세요."
+                      />
+                      {qs.length > 0 && (
+                        <span className="text-xs text-gray-400 whitespace-nowrap">문제 {qs.length}개 생성됨</span>
+                      )}
+                      <button
+                        onClick={() => generateQuestions(cat)}
+                        disabled={generatingId !== null || !cat.name.trim()}
+                        className="flex items-center gap-1 shrink-0 text-xs text-gray-600 border border-gray-200/80 rounded-md px-2 py-1 hover:border-neutral-500 hover:text-neutral-900 hover:bg-white disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                      >
+                        {isGenerating && <span className="w-3 h-3 border-2 border-current border-t-transparent rounded-full animate-spin" />}
+                        {isGenerating ? '생성 중...' : qs.length > 0 ? '문제 재생성' : '문제 생성'}
+                      </button>
+                      <button
+                        onClick={() => deleteCategory(cat.id)}
+                        className="shrink-0 text-gray-400 hover:text-red-500 text-lg leading-none p-1 rounded hover:bg-red-50 transition-colors"
+                        title="카테고리 삭제"
+                      >
+                        ⊖
+                      </button>
+                    </div>
+                    <div className="px-4 py-3">
+                      <textarea
+                        value={cat.description ?? ''}
+                        onChange={e => updateCategoryLocal(cat.id, { description: e.target.value })}
+                        onBlur={() => saveCategory(cat.id)}
+                        rows={3}
+                        className="w-full px-3 py-2 border border-gray-200/80 bg-white/60 rounded-lg text-sm text-gray-700 focus:outline-none focus:border-neutral-500 focus:ring-1 focus:ring-neutral-500 resize-y transition-colors"
+                        placeholder="카테고리 설명을 입력하세요."
+                      />
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
           </div>
         </div>
-
-        <div className="flex-1 overflow-y-auto px-6 py-5 space-y-6">
-          {resultsByCat.map(({ cat, items }) => {
-            const catCorrect = items.filter(i => i.correct).length;
-            return (
-              <div key={cat.id}>
-                <div className="flex items-center gap-2 mb-3">
-                  <span className="text-sm font-bold text-gray-800">{cat.name}</span>
-                  <span className="text-xs text-gray-400">{catCorrect} / {items.length} 정답</span>
-                </div>
-                <div className="space-y-3">
-                  {items.map((r, i) => (
-                    <div
-                      key={r.q.id}
-                      className={`px-4 py-3 rounded-lg border text-sm ${
-                        r.correct ? 'border-green-200/80 bg-green-50/50' : 'border-red-200/80 bg-red-50/50'
-                      }`}
-                    >
-                      <div className="flex items-start gap-2">
-                        <span className={`shrink-0 font-bold ${r.correct ? 'text-green-600' : 'text-red-500'}`}>
-                          {r.correct ? '✓' : '✗'}
-                        </span>
-                        <div className="flex-1 min-w-0">
-                          <p className="font-semibold text-gray-800 mb-1.5">{i + 1}. {r.q.question}</p>
-                          <p className="text-gray-600">내 답변: {answers[r.q.id] || <span className="text-gray-400">(미응답)</span>}</p>
-                          {!r.correct && <p className="text-gray-600">정답: {r.q.answer}</p>}
-                          {r.q.explanation && <p className="text-gray-500 text-xs mt-1.5">해설: {r.q.explanation}</p>}
-                        </div>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            );
-          })}
-        </div>
-      </div>
-    );
-  }
-
-  // ── 카테고리 관리 화면 ────────────────────────────────────
-  return (
-    <div className="flex flex-col flex-1 overflow-hidden">
-      <div className="shrink-0 flex items-center justify-between px-5 py-3 border-b border-gray-100/80 bg-white/40">
-        <span className="text-sm font-bold text-gray-800">카테고리 관리</span>
-        <div className="flex items-center gap-2">
-          <button
-            onClick={addCategory}
-            className="text-xs text-gray-600 border border-gray-200/80 rounded-md px-3 py-1 hover:border-neutral-500 hover:text-neutral-900 hover:bg-neutral-100/60 transition-colors"
-          >
-            + 카테고리 추가
-          </button>
-          <button
-            onClick={downloadAll}
-            disabled={totalQuestions === 0}
-            className="text-xs text-gray-600 border border-gray-200/80 rounded-md px-3 py-1 hover:border-neutral-500 hover:text-neutral-900 hover:bg-neutral-100/60 disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
-          >
-            전체 다운로드
-          </button>
-          <button
-            onClick={startQuiz}
-            disabled={totalQuestions === 0}
-            className="text-xs text-white bg-neutral-900 rounded-md px-3 py-1 hover:bg-neutral-800 disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
-          >
-            시험 응시
-          </button>
-        </div>
-      </div>
-
-      <div className="flex-1 overflow-y-auto px-5 py-4 space-y-3">
-        {categories.length === 0 && (
-          <p className="text-center text-gray-400 text-sm py-10">+ 카테고리 추가 버튼으로 첫 카테고리를 등록하세요</p>
-        )}
-        {categories.map(cat => {
-          const qs = questionsByCat[cat.id] ?? [];
-          const isGenerating = generatingId === cat.id;
-          return (
-            <div key={cat.id} className="border border-gray-200/80 rounded-xl bg-white/60 overflow-hidden">
-              <div className="flex items-center gap-2 px-4 py-2.5 bg-neutral-50/80 border-b border-gray-100/80">
-                <input
-                  value={cat.name}
-                  onChange={e => updateCategoryLocal(cat.id, { name: e.target.value })}
-                  onBlur={() => saveCategory(cat.id)}
-                  className="flex-1 bg-transparent text-sm font-bold text-gray-800 focus:outline-none"
-                  placeholder="카테고리명"
-                />
-                {qs.length > 0 && (
-                  <span className="text-xs text-gray-400 whitespace-nowrap">문제 {qs.length}개 생성됨</span>
-                )}
-                <button
-                  onClick={() => generateQuestions(cat)}
-                  disabled={generatingId !== null || !cat.name.trim()}
-                  className="flex items-center gap-1 shrink-0 text-xs text-gray-600 border border-gray-200/80 rounded-md px-2 py-1 hover:border-neutral-500 hover:text-neutral-900 hover:bg-white disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
-                >
-                  {isGenerating && <span className="w-3 h-3 border-2 border-current border-t-transparent rounded-full animate-spin" />}
-                  {isGenerating ? '생성 중...' : qs.length > 0 ? '문제 재생성' : '문제 생성'}
-                </button>
-                <button
-                  onClick={() => deleteCategory(cat.id)}
-                  className="shrink-0 text-gray-400 hover:text-red-500 text-lg leading-none p-1 rounded hover:bg-red-50 transition-colors"
-                  title="카테고리 삭제"
-                >
-                  ⊖
-                </button>
-              </div>
-              <div className="px-4 py-3">
-                <textarea
-                  value={cat.description ?? ''}
-                  onChange={e => updateCategoryLocal(cat.id, { description: e.target.value })}
-                  onBlur={() => saveCategory(cat.id)}
-                  rows={3}
-                  className="w-full px-3 py-2 border border-gray-200/80 bg-white/60 rounded-lg text-sm text-gray-700 focus:outline-none focus:border-neutral-500 focus:ring-1 focus:ring-neutral-500 resize-y transition-colors"
-                  placeholder="카테고리 설명 — 출제 범위, 참고할 지식/맥락 등을 입력하세요 (AI가 문제 생성 시 참고합니다)"
-                />
-              </div>
-            </div>
-          );
-        })}
-      </div>
+      )}
     </div>
   );
 }

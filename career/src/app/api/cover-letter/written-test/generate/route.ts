@@ -77,10 +77,18 @@ async function fetchText(
   }
 }
 
+// 일부 모델이 한글 응답 중간에 한자를 섞어 내보내는 경우가 있어 제거한다.
+function sanitizeKorean(text: string): string {
+  return text
+    .replace(/[一-鿿㐀-䶿]/g, '')
+    .replace(/ {2,}/g, ' ')
+    .trim();
+}
+
 function mapItem(raw: Record<string, unknown>, i: number, categoryId: string) {
   const type = typeForIndex(i);
-  const question = String(raw.question ?? '').trim();
-  const explanation = String(raw.explanation ?? '').trim();
+  const question = sanitizeKorean(String(raw.question ?? '').trim());
+  const explanation = sanitizeKorean(String(raw.explanation ?? '').trim());
 
   if (type === 'short') {
     return {
@@ -88,14 +96,14 @@ function mapItem(raw: Record<string, unknown>, i: number, categoryId: string) {
       type,
       question,
       choices: null,
-      answer: String(raw.answer ?? '').trim(),
+      answer: sanitizeKorean(String(raw.answer ?? '').trim()),
       explanation,
       sort_order: i,
     };
   }
 
   const expected = type === 'choice4' ? 4 : 5;
-  const choices = toStrArr(raw.choices).map(c => c.trim()).filter(Boolean).slice(0, expected);
+  const choices = toStrArr(raw.choices).map(c => sanitizeKorean(c.trim())).filter(Boolean).slice(0, expected);
   while (choices.length < expected) choices.push(`선택지 ${choices.length + 1}`);
 
   const rawIdx = Number(raw.answer_index);

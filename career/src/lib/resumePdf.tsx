@@ -4,8 +4,8 @@ import type { ResumeCareer, ResumeProject, ResumeEducation, ResumeSkill, ResumeC
 Font.register({
   family: 'Pretendard',
   fonts: [
-    { src: '/fonts/Pretendard-Regular.ttf', fontWeight: 'normal' },
-    { src: '/fonts/Pretendard-Bold.ttf', fontWeight: 'bold' },
+    { src: '/career/fonts/Pretendard-Regular.ttf', fontWeight: 'normal' },
+    { src: '/career/fonts/Pretendard-Bold.ttf', fontWeight: 'bold' },
   ],
 });
 
