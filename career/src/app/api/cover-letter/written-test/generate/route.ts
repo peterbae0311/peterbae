@@ -11,15 +11,21 @@ const OR_MODELS = [
 ];
 const GROQ_MODEL = 'llama-3.1-8b-instant';
 
-// 문항 순서 고정: 0~11 4지선다(12), 12~16 5지선다(5), 17~19 단답형(3) = 총 20문제
-const CHOICE4_COUNT = 12;
-const CHOICE5_COUNT = 5;
-const SHORT_COUNT = 3;
-const TOTAL_COUNT = CHOICE4_COUNT + CHOICE5_COUNT + SHORT_COUNT;
+const MIN_QUESTIONS = 4;
+const MAX_QUESTIONS = 60;
+const DEFAULT_QUESTIONS = 20;
 
-function typeForIndex(i: number): WrittenTestQuestionType {
-  if (i < CHOICE4_COUNT) return 'choice4';
-  if (i < CHOICE4_COUNT + CHOICE5_COUNT) return 'choice5';
+// 4지선다 60% : 5지선다 25% : 단답형 15% 비율로 배분 (기본 20문제 기준 12/5/3과 동일)
+function splitCounts(total: number): { choice4: number; choice5: number; short: number } {
+  const choice4 = Math.round(total * 0.6);
+  const choice5 = Math.round(total * 0.25);
+  const short = Math.max(0, total - choice4 - choice5);
+  return { choice4, choice5, short };
+}
+
+function typeForIndex(i: number, choice4: number, choice5: number): WrittenTestQuestionType {
+  if (i < choice4) return 'choice4';
+  if (i < choice4 + choice5) return 'choice5';
   return 'short';
 }
 
@@ -85,8 +91,10 @@ function sanitizeKorean(text: string): string {
     .trim();
 }
 
-function mapItem(raw: Record<string, unknown>, i: number, categoryId: string) {
-  const type = typeForIndex(i);
+function mapItem(
+  raw: Record<string, unknown>, i: number, categoryId: string, choice4: number, choice5: number,
+) {
+  const type = typeForIndex(i, choice4, choice5);
   const question = sanitizeKorean(String(raw.question ?? '').trim());
   const explanation = sanitizeKorean(String(raw.explanation ?? '').trim());
 
@@ -128,11 +136,19 @@ export async function POST(request: NextRequest) {
     company_name,
     recruitment_notice,
     notes,
+    question_count,
   } = await request.json();
 
   if (!category_id || !category_name?.trim()) {
     return NextResponse.json({ error: '카테고리 정보가 없습니다.' }, { status: 400 });
   }
+
+  const rawCount = Number(question_count);
+  const TOTAL_COUNT = Number.isInteger(rawCount)
+    ? Math.min(Math.max(rawCount, MIN_QUESTIONS), MAX_QUESTIONS)
+    : DEFAULT_QUESTIONS;
+  const { choice4: CHOICE4_COUNT, choice5: CHOICE5_COUNT } = splitCounts(TOTAL_COUNT);
+  const maxTokens = Math.min(TOTAL_COUNT * 300, 16000);
 
   const contextParts: string[] = [];
   if (company_name)       contextParts.push(`회사/기관명: ${company_name}`);
@@ -190,20 +206,20 @@ ${category_description?.trim() || '(설명 없음)'}
   let lastError: string | undefined;
 
   for (const model of OR_MODELS) {
-    const result = await fetchText('openrouter', model, messages, { maxTokens: 6000 });
+    const result = await fetchText('openrouter', model, messages, { maxTokens });
     text = result.text;
     if (result.error) lastError = result.error;
     if (text) break;
   }
 
   if (!text) {
-    let result = await fetchText('groq', GROQ_MODEL, messages, { maxTokens: 6000, temperature: 0.7 });
+    let result = await fetchText('groq', GROQ_MODEL, messages, { maxTokens, temperature: 0.7 });
     text = result.text;
     if (result.error) lastError = result.error;
 
     if (!text) {
       await sleep(1500);
-      result = await fetchText('groq', GROQ_MODEL, messages, { maxTokens: 6000, temperature: 0.7 });
+      result = await fetchText('groq', GROQ_MODEL, messages, { maxTokens, temperature: 0.7 });
       text = result.text;
       if (result.error) lastError = result.error;
     }
@@ -219,7 +235,8 @@ ${category_description?.trim() || '(설명 없음)'}
     return NextResponse.json({ questions: [], error: '응답을 해석하지 못했습니다 (형식 오류)' });
   }
 
-  const mapped = raw.slice(0, TOTAL_COUNT).map((q, i) => mapItem(q as Record<string, unknown>, i, category_id));
+  const mapped = raw.slice(0, TOTAL_COUNT).map((q, i) =>
+    mapItem(q as Record<string, unknown>, i, category_id, CHOICE4_COUNT, CHOICE5_COUNT));
   // AI가 개수를 못 채운 경우를 대비해 부족분은 생성하지 않고 있는 만큼만 저장한다.
 
   const supabase = await createServerSupabaseClient();

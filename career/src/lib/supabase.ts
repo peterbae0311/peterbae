@@ -63,6 +63,7 @@ export interface WrittenTestCategory {
   ref_id: string;
   name: string;
   description: string | null;
+  question_count: number;
   sort_order: number;
   created_at: string;
   updated_at: string;

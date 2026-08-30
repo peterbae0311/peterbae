@@ -81,7 +81,7 @@ export default function WrittenTestPanel({
     const cat = categories.find(c => c.id === id);
     if (!cat) return;
     await supabase.from('written_test_categories')
-      .update({ name: cat.name, description: cat.description })
+      .update({ name: cat.name, description: cat.description, question_count: cat.question_count })
       .eq('id', id);
   }
 
@@ -109,6 +109,7 @@ export default function WrittenTestPanel({
           company_name:          companyName,
           recruitment_notice:    recruitmentNotice,
           notes:                 notes,
+          question_count:        cat.question_count,
         }),
       });
       const data = await res.json();
@@ -396,6 +397,17 @@ export default function WrittenTestPanel({
                       {qs.length > 0 && (
                         <span className="text-xs text-gray-400 whitespace-nowrap">문제 {qs.length}개 생성됨</span>
                       )}
+                      <input
+                        type="number"
+                        value={cat.question_count}
+                        onChange={e => updateCategoryLocal(cat.id, { question_count: Number(e.target.value) })}
+                        onBlur={() => saveCategory(cat.id)}
+                        min={4}
+                        max={60}
+                        step={1}
+                        title="생성할 문제 개수"
+                        className="shrink-0 w-14 px-2 py-1 border border-gray-200/80 rounded-md text-xs text-center text-gray-700 focus:outline-none focus:border-neutral-500 focus:ring-1 focus:ring-neutral-500 transition-colors"
+                      />
                       <button
                         onClick={() => generateQuestions(cat)}
                         disabled={generatingId !== null || !cat.name.trim()}
