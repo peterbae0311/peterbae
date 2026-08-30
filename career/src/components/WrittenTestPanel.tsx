@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { supabase, WrittenTestCategory, WrittenTestQuestion } from '@/lib/supabase';
 
@@ -26,6 +26,7 @@ export default function WrittenTestPanel({
   const [questionsByCat, setQuestionsByCat] = useState<Record<string, WrittenTestQuestion[]>>({});
   const [generatingId,   setGeneratingId]   = useState<string | null>(null);
   const [showManage,     setShowManage]     = useState(false);
+  const backdropMouseDownRef = useRef(false);
   const [generatingPdf,  setGeneratingPdf]  = useState(false);
 
   const [activeCatId, setActiveCatId] = useState<string | null>(null);
@@ -349,7 +350,10 @@ export default function WrittenTestPanel({
       {showManage && typeof document !== 'undefined' && createPortal(
         <div
           className="fixed inset-0 bg-neutral-950/30 backdrop-blur-sm flex items-center justify-center z-50"
-          onClick={() => setShowManage(false)}
+          onMouseDown={e => { backdropMouseDownRef.current = e.target === e.currentTarget; }}
+          onClick={e => {
+            if (e.target === e.currentTarget && backdropMouseDownRef.current) setShowManage(false);
+          }}
         >
           <div
             className="bg-white/90 backdrop-blur-2xl rounded-2xl border border-white/60 shadow-glass-lg w-[720px] max-w-[90vw] max-h-[85vh] flex flex-col"
