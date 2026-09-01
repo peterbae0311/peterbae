@@ -328,7 +328,7 @@
     }
     .prof-intro-box {
       border: 1px solid var(--color-border); border-radius: var(--radius-md);
-      padding: 16px 20px; background: var(--color-card);
+      padding: 16px 20px; background: var(--color-card); margin-bottom: 20px;
     }
     .prof-intro-text { font-size: 13px; color: var(--color-text); line-height: 1.8; }
     .prof-field-chips { display: flex; flex-wrap: wrap; gap: 8px; }
@@ -361,14 +361,14 @@
     .prof-quote-box {
       background: linear-gradient(135deg, #f5f0ff 0%, #eff6ff 100%);
       border: 1px solid #ddd6fe; border-radius: var(--radius-lg);
-      padding: 16px 20px; text-align: center;
+      padding: 16px 20px; text-align: center; margin-bottom: 16px;
       font-size: 13px; font-weight: 700; color: #6d28d9; line-height: 1.6;
     }
 
     .prof-timeline { padding-left: 34px; }
-    .prof-timeline-items { position: relative; }
+    .prof-timeline-items { position: relative; --tl-top: 6px; --tl-bottom: 6px; }
     .prof-timeline-items::before {
-      content: ''; position: absolute; left: -17px; top: 6px; bottom: 6px; width: 2px;
+      content: ''; position: absolute; left: -17px; top: var(--tl-top); bottom: var(--tl-bottom); width: 2px;
       background: var(--color-border);
     }
     .prof-timeline-item { position: relative; margin-bottom: 22px; }
@@ -439,6 +439,15 @@
       transition: all var(--transition);
     }
     .mock-btn-primary:hover { background: var(--color-primary-dark); border-color: var(--color-primary-dark); }
+
+    .prof-cta-row { display: flex; justify-content: center; }
+    .btn-goto-basic {
+      display: inline-flex; align-items: center; gap: 8px;
+      padding: 14px 32px; font-size: 14px; font-weight: 700; color: #fff;
+      background: var(--color-primary); border: none; border-radius: var(--radius-md);
+      cursor: pointer; box-shadow: var(--shadow-sm); transition: all var(--transition);
+    }
+    .btn-goto-basic:hover { background: var(--color-primary-dark); transform: translateY(-1px); box-shadow: var(--shadow-md); }
     .mock-btn-outline {
       padding: 8px 16px; font-size: 13px; font-weight: 600; color: var(--color-text-muted);
       background: transparent; border: 1px solid var(--color-border); border-radius: var(--radius-md); cursor: pointer;
@@ -3521,6 +3530,12 @@
         </div>
 
         <div class="prof-group">
+        <div class="prof-quote-box">"전략적 기획(워크샵) + 시스템 구축(HR Tech) + 행정 자동화(Ops)를 모두 경험한 All-round L&amp;D 전문가"</div>
+
+        <div class="prof-intro-box">
+          <p class="prof-intro-text">메모리 반도체 공정 개발 전문가로서 DRAM, NAND Flash 제조 공정 최적화 및 수율 개선 프로젝트를 다수 수행하였습니다. 반도체 제조 프로세스 전반에 대한 이해를 바탕으로 공정 기술, 품질 관리, 생산성 향상 교육을 강의할 수 있습니다.</p>
+        </div>
+
         <div class="prof-section">
           <div class="prof-section-title"><span class="dot-sep">·</span> 전문 역량 요약</div>
           <div class="prof-summary-box">
@@ -3533,25 +3548,16 @@
         </div>
 
         <div class="prof-section">
-          <div class="prof-section-title"><span class="dot-sep">·</span> 본인 소개</div>
-          <div class="prof-intro-box">
-            <p class="prof-intro-text">메모리 반도체 공정 개발 전문가로서 DRAM, NAND Flash 제조 공정 최적화 및 수율 개선 프로젝트를 다수 수행하였습니다. 반도체 제조 프로세스 전반에 대한 이해를 바탕으로 공정 기술, 품질 관리, 생산성 향상 교육을 강의할 수 있습니다.</p>
-          </div>
-        </div>
-
-        <div class="prof-section">
-          <div class="prof-section-title"><span class="dot-sep">·</span> 강의 분야</div>
+          <div class="prof-section-title"><span class="dot-sep">·</span> 전문 분야</div>
           <div class="prof-field-chips">
             <span class="prof-field-chip">DRAM</span>
             <span class="prof-field-chip">AI</span>
             <span class="prof-field-chip">CLOUD</span>
           </div>
         </div>
-        </div>
 
-        <div class="prof-group">
         <div class="prof-section">
-          <div class="prof-section-title"><span class="dot-sep">·</span> 전문역량</div>
+          <div class="prof-section-title"><span class="dot-sep">·</span> 전문 역량</div>
           <div class="prof-insight-grid">
             <div class="prof-insight-card">
               <div class="prof-insight-title">반도체 로직 설계 및 검증</div>
@@ -3637,7 +3643,6 @@
               <p class="prof-track-desc">퍼실리테이션 콘텐츠와 프로세스 혁신 경험을 바탕으로 현장을 바꾸는 전문가</p>
             </div>
           </div>
-          <div class="prof-quote-box">"전략적 기획(워크샵) + 시스템 구축(HR Tech) + 행정 자동화(Ops)를 모두 경험한 All-round L&amp;D 전문가"</div>
         </div>
         </div>
 
@@ -3769,6 +3774,10 @@
             </div>
           </div>
         </div>
+        </div>
+
+        <div class="prof-cta-row">
+          <button type="button" class="btn-goto-basic" id="btnGotoBasicInfo">사내 강사 정보 업데이트 하러 가기 →</button>
         </div>
 
       </div>
@@ -4085,6 +4094,23 @@
       const panel = document.querySelector(`.sub-tab-content[data-subtab-content="${target}"]`);
       if (panel) panel.classList.add('active');
     });
+  });
+
+  document.getElementById('btnGotoBasicInfo')?.addEventListener('click', () => {
+    document.querySelector('.sub-tab[data-subtab="basic"]')?.click();
+  });
+
+  // 프로젝트 타임라인 연결선이 정확히 첫/마지막 마커 중심에서 시작·종료되도록 보정
+  document.querySelectorAll('.prof-timeline-items').forEach(wrap => {
+    const dots = wrap.querySelectorAll('.prof-timeline-dot');
+    if (dots.length < 2) return;
+    const wrapRect = wrap.getBoundingClientRect();
+    const firstRect = dots[0].getBoundingClientRect();
+    const lastRect = dots[dots.length - 1].getBoundingClientRect();
+    const topOffset = (firstRect.top + firstRect.bottom) / 2 - wrapRect.top;
+    const bottomOffset = wrapRect.bottom - (lastRect.top + lastRect.bottom) / 2;
+    wrap.style.setProperty('--tl-top', topOffset + 'px');
+    wrap.style.setProperty('--tl-bottom', bottomOffset + 'px');
   });
 </script>
 </body>
