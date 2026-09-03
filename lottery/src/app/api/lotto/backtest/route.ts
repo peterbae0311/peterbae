@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createServerClient } from '@/lib/supabase';
 import {
-  type LottoRow, type GenerationMode, type FilterParams,
+  type LottoRow, type FilterParams,
   filterByCondition, getTopKNumbers, getTopBonusNumbers,
   generateCombinations, selectExpertPicks, getPrizeTier, calcROI,
 } from '@/lib/lotto-engine';
@@ -42,7 +42,6 @@ export async function POST(req: NextRequest) {
   let body: {
     startRound?: number;
     endRound?: number;
-    mode?: string;
     gamesPerRound?: number;
     conditionType?: number;
     years?: number;
@@ -57,7 +56,6 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ success: false, error: '잘못된 요청 형식' }, { status: 400 });
   }
 
-  const mode = (body.mode ?? 'anchor2') as GenerationMode;
   const gamesPerRound = Math.min(Math.max(Number(body.gamesPerRound ?? 5), 1), 20);
   const conditionParams: FilterParams = {
     conditionType: (Number(body.conditionType ?? 1)) as FilterParams['conditionType'],
@@ -107,12 +105,8 @@ export async function POST(req: NextRequest) {
     ? testRounds.filter((_, i) => i % Math.ceil(testRounds.length / 200) === 0)
     : testRounds;
 
-  // 앵커 수 결정
-  const anchorCount = mode === 'anchor2' ? 2 : mode === 'anchor3' ? 3 : mode === 'anchor' ? 4 : 0;
-
   interface RoundResult {
     round: number;
-    anchorNums: number[];
     combos: number[][];
     tiers: string[];
     bestTier: string;
@@ -131,20 +125,14 @@ export async function POST(req: NextRequest) {
     const filtered = filterByCondition(priorResults, conditionParams);
     const analysisData = filtered.length >= 10 ? filtered : priorResults;
 
-    const { numbers: topNums } = getTopKNumbers(analysisData, Math.max(anchorCount, 6));
+    const { numbers: topNums } = getTopKNumbers(analysisData, 6);
     const { numbers: bonusNums } = getTopBonusNumbers(analysisData);
 
-    const anchorNums = anchorCount > 0 ? topNums.slice(0, anchorCount) : [];
-
     // gamesPerRound개만 최종 사용하므로 후보군은 3배만 뽑아 selectExpertPicks가 고르게 한다
-    // (10배는 생성 비용(생성 로직이 count에 비선형으로 스케일링됨)에 비해 과했다)
-    const rawCombos = generateCombinations(mode, {
-      count: Math.min(gamesPerRound * 3, 50),
-      anchorNumbers: anchorNums,
-      bonusNumbers: bonusNums.slice(0, 5),
-    });
+    // (10배는 생성 비용에 비해 과했다)
+    const rawCombos = generateCombinations(Math.min(gamesPerRound * 3, 50));
 
-    const expertCombos = selectExpertPicks(rawCombos, anchorNums, bonusNums.slice(0, 5), topNums.slice(0, 6));
+    const expertCombos = selectExpertPicks(rawCombos, bonusNums.slice(0, 5), topNums.slice(0, 6));
     const combos = expertCombos.slice(0, gamesPerRound);
 
     if (combos.length === 0) continue;
@@ -161,7 +149,7 @@ export async function POST(req: NextRequest) {
     const bestTierIdx = Math.min(...tiers.map(t => TIER_ORDER.indexOf(t)));
     const bestTier = TIER_ORDER[bestTierIdx] ?? '낙첨';
 
-    roundResults.push({ round: targetRound, anchorNums, combos, tiers, bestTier });
+    roundResults.push({ round: targetRound, combos, tiers, bestTier });
     allTiers.push(...tiers);
   }
 
@@ -180,22 +168,9 @@ export async function POST(req: NextRequest) {
     : 0;
   const roi = calcROI(allTiers);
 
-  // 시뮬레이션 전체 회차에서 앵커로 쓰인 번호의 등장 빈도를 집계 — 가장 자주 앵커로
-  // 선택됐던 상위 anchorCount개를 "백테스트가 추천하는 앵커번호"로 반환 (앵커모드가 아니면 빈 배열)
-  const anchorTally: Record<number, number> = {};
-  for (const r of roundResults) {
-    r.anchorNums.forEach(n => { anchorTally[n] = (anchorTally[n] ?? 0) + 1; });
-  }
-  const recommendedAnchors = Object.entries(anchorTally)
-    .sort((a, b) => b[1] - a[1] || Number(a[0]) - Number(b[0]))
-    .slice(0, anchorCount)
-    .map(([n]) => Number(n))
-    .sort((a, b) => a - b);
-
   return NextResponse.json({
     success: true,
     data: {
-      mode,
       totalRounds,
       totalGames: allTiers.length,
       startRound: sampled[0] ?? startRound,
@@ -205,11 +180,9 @@ export async function POST(req: NextRequest) {
       hitRate5Plus: Math.round(hitRate5Plus * 10) / 10,
       hitRate3Plus: Math.round(hitRate3Plus * 10) / 10,
       roi: Math.round(roi * 10) / 10,
-      recommendedAnchors,
       // 최근 20회차 상세 결과 (UI 표시용)
       recentResults: roundResults.slice(-20).map(r => ({
         round: r.round,
-        anchorNums: r.anchorNums,
         bestTier: r.bestTier,
         tiers: r.tiers,
       })),

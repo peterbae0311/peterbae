@@ -18,10 +18,8 @@ export interface LottoRow {
   first_prize_amount: number | null;
 }
 
-export type GenerationMode = 'anchor2' | 'anchor3' | 'anchor' | 'no-consec' | 'two-consec' | 'random';
-
 export interface FilterParams {
-  conditionType: 1 | 4 | 5 | 6 | 7 | 8 | 9 | 10 | 11;
+  conditionType: 1 | 4 | 5 | 6 | 7 | 8 | 10 | 11;
   years?: number;
   months?: number;
   maxConsec?: number;      // 0=없음, 2=2개, 3+=3이상
@@ -30,15 +28,8 @@ export interface FilterParams {
   sumMax?: number;
   minAC?: number;          // conditionType 7: AC값 하한
   minBands?: number;       // conditionType 8: 최소 밴드 수 (4 or 5)
-  lowCount?: number;       // conditionType 9: 저번호(1~22) 개수
   primeCount?: number;     // conditionType 10: 소수 포함 개수
   minUniqueTails?: number; // conditionType 11: 최소 고유 끝수 개수
-}
-
-export interface GenerateParams {
-  count: number;
-  anchorNumbers?: number[];
-  bonusNumbers?: number[];
 }
 
 // ---------------------------------------------------------------------------
@@ -97,12 +88,10 @@ export function scoreCombo(combo: number[], bonusCandidates: number[] = [], topF
 
 export function selectExpertPicks(
   combos: number[][],
-  anchorNums: number[] = [],
   bonusCandidates: number[] = [],
   topFreqNums: number[] = [],
 ): number[][] {
   if (combos.length <= 5) return combos;
-  const anchorSet = new Set(anchorNums);
   // Build Sets ONCE — reused across all 350 _scoreCombo calls instead of
   // constructing 700 Sets (350 × bonusSet + 350 × freqSet) per invocation.
   const bonusSet = new Set(bonusCandidates);
@@ -113,9 +102,7 @@ export function selectExpertPicks(
       combo, i,
       // Math.random() * 10 노이즈: 비슷한 점수 조합의 풀 진입 순위를 매 호출마다 다르게
       // → 상위 20개 후보가 달라지고 그리디 결과도 달라짐
-      score: _scoreCombo(combo, bonusSet, freqSet)
-        + combo.filter(n => anchorSet.has(n)).length * 5
-        + Math.random() * 10,
+      score: _scoreCombo(combo, bonusSet, freqSet) + Math.random() * 10,
     }))
     .sort((a, b) => b.score - a.score || a.i - b.i);
 
@@ -123,20 +110,18 @@ export function selectExpertPicks(
   const poolSize = Math.min(scored.length, Math.max(20, Math.ceil(scored.length * 0.15)));
   const pool = scored.slice(0, poolSize);
 
-  // 다양성 우선 그리디 선택 — fill 슬롯 기준으로 패널티 계산 (앵커 제외)
-  // selectedFillSets: 외부 루프 iteration당 1회 생성 (내부 루프마다 재생성하던 것 제거)
+  // 다양성 우선 그리디 선택
+  // selectedSets: 외부 루프 iteration당 1회 생성 (내부 루프마다 재생성하던 것 제거)
   const selected: number[][] = [];
   const remaining = [...pool];
   while (selected.length < 5 && remaining.length > 0) {
-    const selectedFillSets = selected.map(sel =>
-      new Set(sel.filter(n => !anchorSet.has(n)))
-    );
+    const selectedSets = selected.map(sel => new Set(sel));
     let bestIdx = 0;
     let bestAdj = -Infinity;
     for (let i = 0; i < remaining.length; i++) {
-      const penalty = selectedFillSets.reduce((pen, selFillSet) => {
-        const fillShared = remaining[i].combo.filter(n => !anchorSet.has(n) && selFillSet.has(n)).length;
-        return pen + fillShared * 10;
+      const penalty = selectedSets.reduce((pen, selSet) => {
+        const shared = remaining[i].combo.filter(n => selSet.has(n)).length;
+        return pen + shared * 10;
       }, 0);
       const adj = remaining[i].score - penalty;
       if (adj > bestAdj) { bestAdj = adj; bestIdx = i; }
@@ -174,96 +159,6 @@ export function calcROI(gameTiers: string[], costPerGame = 1000): number {
   const totalCost = gameTiers.length * costPerGame;
   const totalPrize = gameTiers.reduce((s, t) => s + (PRIZE_AMOUNTS[t] ?? 0), 0);
   return totalCost === 0 ? 0 : (totalPrize - totalCost) / totalCost * 100;
-}
-
-// ---------------------------------------------------------------------------
-// Wheeling System
-// ---------------------------------------------------------------------------
-
-// Full wheel: chosen 숫자의 모든 C(n,6) 조합 (n=7~12)
-export function generateFullWheel(numbers: number[]): number[][] {
-  const s = [...numbers].sort((a, b) => a - b);
-  const n = s.length;
-  const result: number[][] = [];
-  for (let a = 0; a < n - 5; a++)
-    for (let b = a + 1; b < n - 4; b++)
-      for (let c = b + 1; c < n - 3; c++)
-        for (let d = c + 1; d < n - 2; d++)
-          for (let e = d + 1; e < n - 1; e++)
-            for (let f = e + 1; f < n; f++)
-              result.push([s[a], s[b], s[c], s[d], s[e], s[f]]);
-  return result;
-}
-
-// Budget wheel: 예산 내에서 커버리지 최대화 (다양성 우선 그리디)
-export function generateBudgetWheel(
-  numbers: number[],
-  budget: number,
-  bonusCandidates: number[] = [],
-  topFreqNums: number[] = [],
-): number[][] {
-  const allCombos = generateFullWheel(numbers);
-  if (allCombos.length <= budget) return allCombos;
-
-  // Build Sets once for batch scoring (same pattern as selectExpertPicks)
-  const bonusSet = new Set(bonusCandidates);
-  const freqSet = new Set(topFreqNums);
-  const scored = allCombos
-    .map((combo, i) => ({ combo, i, score: _scoreCombo(combo, bonusSet, freqSet) }))
-    .sort((a, b) => b.score - a.score || a.i - b.i);
-
-  const selected: number[][] = [];
-  const remaining = [...scored];
-  while (selected.length < budget && remaining.length > 0) {
-    // Pre-build Sets for selected combos once per outer iteration
-    // (avoids O(selected.length) Set constructions inside the inner loop)
-    const selectedSets = selected.map(sel => new Set(sel));
-    let bestIdx = 0, bestAdj = -Infinity;
-    for (let i = 0; i < remaining.length; i++) {
-      const penalty = selectedSets.reduce((pen, selSet) => {
-        const shared = remaining[i].combo.filter(n => selSet.has(n)).length;
-        return pen + Math.max(0, shared - 2) * 8;
-      }, 0);
-      const adj = remaining[i].score - penalty;
-      if (adj > bestAdj) { bestAdj = adj; bestIdx = i; }
-    }
-    selected.push(remaining[bestIdx].combo);
-    remaining.splice(bestIdx, 1);
-  }
-  return selected;
-}
-
-export interface WheelCoverage {
-  // "chosen 번호 중 drawn 번호 6개가 모두 포함된 시나리오" 기준
-  rate6: number;    // 1등 보장 시나리오 비율 (full wheel=100%)
-  rate5plus: number;  // 2~3등 가능 시나리오 비율
-  rate4plus: number;  // 4등+ 시나리오 비율
-  rate3plus: number;  // 5등+ 시나리오 비율
-  totalScenarios: number;
-}
-
-// 선택 번호 중 6개가 당첨번호인 모든 시나리오에서 최소 보장 등수 계산
-export function computeWheelCoverage(
-  chosenNums: number[],
-  wheelCombos: number[][],
-): WheelCoverage {
-  const scenarios = generateFullWheel(chosenNums); // all 6-subsets of chosen
-  let cnt3 = 0, cnt4 = 0, cnt5 = 0, cnt6 = 0;
-  for (const scenario of scenarios) {
-    const sset = new Set(scenario);
-    let best = 0;
-    for (const combo of wheelCombos) {
-      const m = combo.filter(n => sset.has(n)).length;
-      if (m > best) best = m;
-    }
-    if (best >= 3) cnt3++;
-    if (best >= 4) cnt4++;
-    if (best >= 5) cnt5++;
-    if (best >= 6) cnt6++;
-  }
-  const t = scenarios.length || 1;
-  const r = (n: number) => Math.round(n / t * 1000) / 10;
-  return { rate3plus: r(cnt3), rate4plus: r(cnt4), rate5plus: r(cnt5), rate6: r(cnt6), totalScenarios: t };
 }
 
 // ---------------------------------------------------------------------------
@@ -384,14 +279,6 @@ export function filterByCondition(results: LottoRow[], params: FilterParams): Lo
       return bandCount >= minBands;
     });
   }
-  if (conditionType === 9) {
-    // 저고비율: 1~22(저) 번호가 정확히 lowCount개인 회차
-    const lowCount = params.lowCount ?? 3;
-    return results.filter(r => {
-      const nums = [r.num1, r.num2, r.num3, r.num4, r.num5, r.num6].filter((n): n is number => n != null);
-      return nums.filter(n => n <= 22).length === lowCount;
-    });
-  }
   if (conditionType === 10) {
     // 소수 포함 수: 소수(2,3,5,...,43)가 정확히 primeCount개인 회차
     const primeCount = params.primeCount ?? 2;
@@ -430,135 +317,8 @@ export function uniformSample(pool: number[]): number[] {
   return result;
 }
 
-export function getMaxConsecRun(combo: number[]): number {
-  let maxRun = 1, curRun = 1;
-  for (let i = 1; i < combo.length; i++) {
-    if (combo[i] - combo[i - 1] === 1) { curRun++; maxRun = Math.max(maxRun, curRun); }
-    else curRun = 1;
-  }
-  return maxRun;
-}
-
-export function sharedCount(a: number[], b: number[]): number {
-  const s = new Set(b);
-  return a.filter(n => s.has(n)).length;
-}
-
-export function generateCombinations(mode: GenerationMode, params: GenerateParams): number[][] {
-  const { count, anchorNumbers = [], bonusNumbers = [] } = params;
+export function generateCombinations(count: number): number[][] {
   const fullPool = Array.from({ length: 45 }, (_, i) => i + 1);
-
-  if (mode === 'random') {
-    return Array.from({ length: count }, () => uniformSample(fullPool).sort((a, b) => a - b));
-  }
-
-  if (mode === 'no-consec') {
-    const combinations: number[][] = [];
-    for (let attempt = 0; attempt < 20000 && combinations.length < count; attempt++) {
-      const raw = uniformSample(fullPool).sort((a, b) => a - b);
-      if (getMaxConsecRun(raw) !== 1) continue;
-      if (combinations.some(r => sharedCount(raw, r) > 2)) continue;
-      combinations.push(raw);
-    }
-    return combinations;
-  }
-
-  if (mode === 'two-consec') {
-    const combinations: number[][] = [];
-    for (let attempt = 0; attempt < 20000 && combinations.length < count; attempt++) {
-      const raw = uniformSample(fullPool).sort((a, b) => a - b);
-      if (getMaxConsecRun(raw) !== 2) continue;
-      if (combinations.some(r => sharedCount(raw, r) > 2)) continue;
-      combinations.push(raw);
-    }
-    return combinations;
-  }
-
-  // anchor2 / anchor3 / anchor(4개)
-  const anchorCount = mode === 'anchor2' ? 2 : mode === 'anchor3' ? 3 : 4;
-  const anchorNums = anchorNumbers.slice(0, anchorCount);
-  if (anchorNums.length < anchorCount) return [];
-
-  const anchorSet = new Set(anchorNums);
-  const pool = fullPool.filter(n => !anchorSet.has(n));
-  const fillCount = 6 - anchorNums.length;
-  const combinations: number[][] = [];
-  const usedFills = new Set<string>();
-  const maxFillOverlap = Math.max(0, fillCount - 2);
-  // fillsCache: stores the sorted fill-only portion of each accepted combination.
-  // Eliminates O(combinations.length × fillCount) recomputation per attempt that
-  // combinations.map(c => c.filter(n => !anchorSet.has(n))) was causing:
-  //   Phase 1B alone: up to 40000 attempts × avg 227 combos × 4 filter ops ≈ 36M ops → 0.
-  const fillsCache: number[][] = [];
-
-  const bonusCandidates = bonusNumbers.filter(n => !anchorSet.has(n)).slice(0, 5);
-  const bonusTarget = bonusCandidates.length > 0 && fillCount >= 2
-    ? Math.max(bonusCandidates.length, Math.floor(count * 0.3))
-    : 0;
-
-  // Phase 1A: 각 보너스 후보 포함 조합
-  for (const bc of bonusCandidates) {
-    const reducedPool = pool.filter(n => n !== bc);
-    const perCandidate = Math.ceil(bonusTarget / bonusCandidates.length);
-    let bcCount = 0;
-    for (let attempt = 0; attempt < 10000 && combinations.length < count && bcCount < perCandidate; attempt++) {
-      const extraFill: number[] = [];
-      const poolCopy = [...reducedPool];
-      while (extraFill.length < fillCount - 1 && poolCopy.length > 0) {
-        const idx = Math.floor(Math.random() * poolCopy.length);
-        extraFill.push(poolCopy[idx]);
-        poolCopy.splice(idx, 1);
-      }
-      const sortedFill = [bc, ...extraFill].sort((a, b) => a - b);
-      const fillKey = sortedFill.join(',');
-      if (usedFills.has(fillKey)) continue;
-      // Build Set from candidate once — reused for all cached-fill comparisons
-      // (was: building new Set(pf) inside sharedCount for every cached fill)
-      const sortedFillSet = new Set(sortedFill);
-      if (fillsCache.some(pf => pf.filter(n => sortedFillSet.has(n)).length > maxFillOverlap)) continue;
-      usedFills.add(fillKey);
-      fillsCache.push(sortedFill);
-      combinations.push([...anchorNums, ...sortedFill].sort((a, b) => a - b));
-      bcCount++;
-    }
-  }
-
-  // Phase 1B: 일반 조합
-  for (let attempt = 0; attempt < 40000 && combinations.length < count; attempt++) {
-    const poolCopy = [...pool];
-    const fill: number[] = [];
-    while (fill.length < fillCount && poolCopy.length > 0) {
-      const idx = Math.floor(Math.random() * poolCopy.length);
-      fill.push(poolCopy[idx]);
-      poolCopy.splice(idx, 1);
-    }
-    const sortedFill = [...fill].sort((a, b) => a - b);
-    const fillKey = sortedFill.join(',');
-    if (usedFills.has(fillKey)) continue;
-    // Build Set from candidate once — reused for all cached-fill comparisons
-    const sortedFillSet = new Set(sortedFill);
-    if (fillsCache.some(pf => pf.filter(n => sortedFillSet.has(n)).length > maxFillOverlap)) continue;
-    usedFills.add(fillKey);
-    fillsCache.push(sortedFill);
-    combinations.push([...anchorNums, ...fill].sort((a, b) => a - b));
-  }
-
-  // Phase 2: 폴백 (중복 방지만)
-  if (combinations.length < count) {
-    for (let attempt = 0; attempt < 20000 && combinations.length < count; attempt++) {
-      const poolCopy = [...pool];
-      const fill: number[] = [];
-      while (fill.length < fillCount && poolCopy.length > 0) {
-        const idx = Math.floor(Math.random() * poolCopy.length);
-        fill.push(poolCopy[idx]);
-        poolCopy.splice(idx, 1);
-      }
-      const fillKey = [...fill].sort((a, b) => a - b).join(',');
-      if (usedFills.has(fillKey)) continue;
-      usedFills.add(fillKey);
-      combinations.push([...anchorNums, ...fill].sort((a, b) => a - b));
-    }
-  }
-
-  return combinations;
+  return Array.from({ length: count }, () => uniformSample(fullPool).sort((a, b) => a - b));
 }
+

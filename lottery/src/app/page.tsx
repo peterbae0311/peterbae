@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useState, useCallback, useRef, useMemo, type ReactNode } from 'react';
-import { scoreCombo, selectExpertPicks, getPrizeTier, computeWheelCoverage } from '@/lib/lotto-engine';
+import { scoreCombo, selectExpertPicks, getPrizeTier } from '@/lib/lotto-engine';
 
 // ---------------------------------------------------------------------------
 // Types
@@ -23,7 +23,7 @@ interface LottoResult {
   first_prize_amount: number | null;
 }
 
-type ConditionType = 1 | 4 | 5 | 6 | 7 | 8 | 9 | 10 | 11;
+type ConditionType = 1 | 4 | 5 | 6 | 7 | 8 | 10 | 11;
 
 interface ConditionRow {
   id: string;
@@ -36,7 +36,6 @@ interface ConditionRow {
   sumMax: number;          // 합계 최대
   minAC: number;           // conditionType 7: AC값 하한
   minBands: number;        // conditionType 8: 최소 밴드 수 (4 or 5)
-  lowCount: number;        // conditionType 9: 저번호(1~22) 개수
   primeCount: number;      // conditionType 10: 소수 포함 개수
   minUniqueTails: number;  // conditionType 11: 최소 고유 끝수 개수
   roundsAnalyzed: number | null;
@@ -71,36 +70,10 @@ function makeId(): string {
 }
 
 
-const GENERATION_STRATEGIES: Record<string, { tag: string; color: string; desc: string }[]> = {
-  anchor2: [
-    { tag: '2개 고정',      color: 'bg-violet-100 text-violet-700',   desc: '조건 분석에서 2개 이상 조건에 출현한 번호 상위 2개를 전 게임에 고정' },
-    { tag: '슬롯 변형',     color: 'bg-indigo-100 text-indigo-700',   desc: '나머지 4슬롯은 게임마다 다른 번호로 채워 커버리지 최대화 — 중복 조합 없음' },
-    { tag: '광역 커버',     color: 'bg-emerald-100 text-emerald-700', desc: '고정 번호 수가 적어 조합 다양성이 높음 — 넓은 번호 범위를 커버' },
-  ],
-  anchor3: [
-    { tag: '3개 고정',      color: 'bg-violet-100 text-violet-700',   desc: '조건 분석에서 2개 이상 조건에 출현한 번호 상위 3개를 전 게임에 고정' },
-    { tag: '슬롯 변형',     color: 'bg-indigo-100 text-indigo-700',   desc: '나머지 3슬롯은 게임마다 다른 번호로 채워 커버리지 확보 — 중복 조합 없음' },
-    { tag: '5등 실증',      color: 'bg-emerald-100 text-emerald-700', desc: '1230회 기준 이 방식으로 5등 당첨 확인 — 고정 3개 + 변형 3개 구조' },
-  ],
-  anchor: [
-    { tag: '4개 고정',      color: 'bg-violet-100 text-violet-700',   desc: '조건 분석에서 2개 이상 조건에 출현한 번호 상위 4개를 전 게임에 고정 — 최고 신뢰 번호 집중' },
-    { tag: '슬롯 변형',     color: 'bg-indigo-100 text-indigo-700',   desc: '나머지 2슬롯은 게임마다 다른 번호로 채워 커버리지 확보 — 중복 조합 없음' },
-    { tag: '1+4 구조',      color: 'bg-rose-100 text-rose-700',       desc: '전문가 추천 5개 = 앵커 공유 → 한 게임에 당첨번호 다수 집중 가능 (1229회 시뮬레이션 검증)' },
-  ],
-  'no-consec': [
-    { tag: '연속번호 없음', color: 'bg-emerald-100 text-emerald-700', desc: '6개 번호가 모두 연속되지 않는 조합만 생성 (n, n+1 쌍 없음)' },
-    { tag: '역사적 근거',   color: 'bg-blue-100 text-blue-700',       desc: '1~1228회 중 48.3%(593회)가 연속번호 없는 패턴 — 가장 빈번한 유형' },
-    { tag: '추가 필터 없음',color: 'bg-gray-100 text-gray-600',       desc: '연속번호 조건 외 홀짝·등차 등 별도 필터 미적용' },
-  ],
-  'two-consec': [
-    { tag: '연속번호 2개',  color: 'bg-orange-100 text-orange-700',   desc: '정확히 연속된 쌍(n, n+1)이 하나 있는 조합만 생성 — 3개+ 제외' },
-    { tag: '역사적 근거',   color: 'bg-blue-100 text-blue-700',       desc: '1~1228회 중 46.3%(568회)가 연속 2개 패턴 — 연속없음과 거의 동일한 빈도' },
-    { tag: '추가 필터 없음',color: 'bg-gray-100 text-gray-600',       desc: '연속번호 조건 외 홀짝·등차 등 별도 필터 미적용' },
-  ],
-  random: [
-    { tag: '순수 랜덤',     color: 'bg-gray-100 text-gray-600',     desc: '1~45에서 6개 완전 무작위 추출 — 어떠한 필터도 적용하지 않음' },
-  ],
-};
+const GENERATION_STRATEGY: { tag: string; color: string; desc: string }[] = [
+  { tag: '순수 랜덤', color: 'bg-gray-100 text-gray-600', desc: '1~45에서 6개 완전 무작위 추출 — 어떠한 필터도 적용하지 않음' },
+  { tag: 'Claude 추천 5개', color: 'bg-violet-100 text-violet-700', desc: '생성된 조합 중 조건분석 기반 보너스후보·빈도상위 번호를 많이 포함한 상위 5개를 골라 보여줌' },
+];
 
 const MODE_LABELS: Record<string, string> = {
   anchor2: '앵커2', anchor3: '앵커3', anchor: '앵커4', 'no-consec': '연속없음', 'two-consec': '연속2개', random: '랜덤',
@@ -109,17 +82,6 @@ const MODE_LABELS: Record<string, string> = {
 const MODE_ORDER: Record<string, number> = {
   anchor2: 0, anchor3: 1, anchor: 2, 'no-consec': 3, 'two-consec': 4, random: 5,
 };
-
-// 앵커+보너스후보 합집합을 기본으로, 7개 미만이면 빈도상위 번호로 보충 (최대 10개)
-function buildWheelPool(anchors: number[], bonusNums: number[], freqNums: number[]): number[] {
-  const base = [...new Set([...anchors, ...bonusNums])];
-  const padded = [...base];
-  for (const n of freqNums) {
-    if (padded.length >= 8) break;
-    if (!padded.includes(n)) padded.push(n);
-  }
-  return padded.sort((a, b) => a - b).slice(0, 10);
-}
 
 function selectBestPurchases(
   purchases: ConfirmedPurchase[],
@@ -177,8 +139,8 @@ function selectBestPurchases(
   }
 }
 
-function buildConditionText(c: Pick<ConditionRow, 'conditionType' | 'years' | 'months' | 'maxConsec' | 'oddCount' | 'sumMin' | 'sumMax' | 'minAC' | 'minBands' | 'lowCount' | 'primeCount' | 'minUniqueTails'>): string {
-  const { conditionType, years, months, maxConsec, oddCount, sumMin, sumMax, minAC, minBands, lowCount, primeCount, minUniqueTails } = c;
+function buildConditionText(c: Pick<ConditionRow, 'conditionType' | 'years' | 'months' | 'maxConsec' | 'oddCount' | 'sumMin' | 'sumMax' | 'minAC' | 'minBands' | 'primeCount' | 'minUniqueTails'>): string {
+  const { conditionType, years, months, maxConsec, oddCount, sumMin, sumMax, minAC, minBands, primeCount, minUniqueTails } = c;
   if (conditionType === 4) {
     const label = maxConsec === 0 ? '없음' : maxConsec === 2 ? '2개' : '3개+';
     return `연속번호 ${label} 회차에서 가장 많이 나온 숫자 6개 추출`;
@@ -187,7 +149,6 @@ function buildConditionText(c: Pick<ConditionRow, 'conditionType' | 'years' | 'm
   if (conditionType === 6) return `합계 ${sumMin}~${sumMax} 범위 회차에서 가장 많이 나온 숫자 6개 추출`;
   if (conditionType === 7) return `AC값 ${minAC} 이상 회차에서 가장 많이 나온 숫자 6개 추출`;
   if (conditionType === 8) return `${minBands ?? 5}밴드 이상 커버 회차에서 가장 많이 나온 숫자 6개 추출`;
-  if (conditionType === 9) return `저번호(1~22) ${lowCount ?? 3}개 회차에서 가장 많이 나온 숫자 6개 추출`;
   if (conditionType === 10) return `소수 ${primeCount ?? 2}개 포함 회차에서 가장 많이 나온 숫자 6개 추출`;
   if (conditionType === 11) return `끝수 ${minUniqueTails ?? 5}종 이상 회차에서 가장 많이 나온 숫자 6개 추출`;
   if (years === 0 && months === 0) return '전체 당첨번호에서 가장 많이 나온 숫자 6개 추출';
@@ -198,7 +159,7 @@ function buildConditionText(c: Pick<ConditionRow, 'conditionType' | 'years' | 'm
 }
 
 function parseConditionText(text: string): Omit<ConditionRow, 'id' | 'roundsAnalyzed' | 'numbers' | 'frequencies' | 'distribution' | 'bonusNumbers' | 'isLoading'> {
-  const base = { years: 0, months: 0, maxConsec: 0, oddCount: 3, sumMin: 110, sumMax: 166, minAC: 7, minBands: 5, lowCount: 3, primeCount: 2, minUniqueTails: 5 };
+  const base = { years: 0, months: 0, maxConsec: 0, oddCount: 3, sumMin: 110, sumMax: 166, minAC: 7, minBands: 5, primeCount: 2, minUniqueTails: 5 };
   if (text.includes('연속번호')) {
     const m = text.match(/연속번호 (없음|2개|3개\+)/);
     const label = m ? m[1] : '없음';
@@ -220,10 +181,6 @@ function parseConditionText(text: string): Omit<ConditionRow, 'id' | 'roundsAnal
     const m = text.match(/(\d+)밴드/);
     return { ...base, conditionType: 8, minBands: m ? parseInt(m[1]) : 5 };
   }
-  if (text.includes('저번호')) {
-    const m = text.match(/저번호\(1~22\) (\d+)개/);
-    return { ...base, conditionType: 9, lowCount: m ? parseInt(m[1]) : 3 };
-  }
   if (text.includes('소수')) {
     const m = text.match(/소수 (\d+)개/);
     return { ...base, conditionType: 10, primeCount: m ? parseInt(m[1]) : 2 };
@@ -244,43 +201,12 @@ function rowToApiBody(row: ConditionRow) {
     years: row.years, months: row.months,
     maxConsec: row.maxConsec,
     oddCount: row.oddCount, sumMin: row.sumMin, sumMax: row.sumMax, minAC: row.minAC,
-    minBands: row.minBands, lowCount: row.lowCount, primeCount: row.primeCount, minUniqueTails: row.minUniqueTails,
+    minBands: row.minBands, primeCount: row.primeCount, minUniqueTails: row.minUniqueTails,
   };
 }
 
-function computeAnchorData(rows: ConditionRow[]) {
-  const freqMap: Record<number, number> = {};
-  rows.forEach(c => {
-    if (Array.isArray(c.numbers)) {
-      (c.numbers as number[]).forEach(n => { freqMap[n] = (freqMap[n] ?? 0) + 1; });
-    }
-    if (Array.isArray(c.bonusNumbers)) {
-      (c.bonusNumbers as number[]).slice(0, 5).forEach(n => { freqMap[n] = (freqMap[n] ?? 0) + 0.5; });
-    }
-  });
-  const sortedByFreq = Object.entries(freqMap)
-    .filter(([, cnt]) => Number(cnt) >= 2)
-    .sort((a, b) => Number(b[1]) - Number(a[1]));
-  const topAll = Object.entries(freqMap).sort((a, b) => Number(b[1]) - Number(a[1])).map(([n]) => Number(n));
-  const a2 = sortedByFreq.slice(0, 2).map(([n]) => Number(n)).sort((a, b) => a - b);
-  const a3 = sortedByFreq.slice(0, 3).map(([n]) => Number(n)).sort((a, b) => a - b);
-  const a4 = sortedByFreq.slice(0, 4).map(([n]) => Number(n)).sort((a, b) => a - b);
-  const anchorSet4 = new Set(a4);
-  const bonusFreq: Record<number, number> = {};
-  rows.forEach(c => {
-    if (Array.isArray(c.bonusNumbers)) {
-      (c.bonusNumbers as number[]).slice(0, 5).forEach((n, rank) => {
-        if (!anchorSet4.has(n)) bonusFreq[n] = (bonusFreq[n] ?? 0) + (5 - rank);
-      });
-    }
-  });
-  const bc = Object.entries(bonusFreq).sort((a, b) => Number(b[1]) - Number(a[1])).slice(0, 3).map(([n]) => Number(n)).sort((a, b) => a - b);
-  const tf = topAll.filter(n => !anchorSet4.has(n)).slice(0, 10);
-  return { anchor2: a2, anchor3: a3, anchor4: a4, bonus_candidates: bc, top_freq_nums: tf };
-}
-
 const BLANK_ROW = { roundsAnalyzed: null, numbers: null, frequencies: null, distribution: null, bonusNumbers: null, isLoading: false };
-const ROW_DEFAULTS = { maxConsec: 0, oddCount: 3, sumMin: 110, sumMax: 166, minAC: 7, minBands: 5, lowCount: 3, primeCount: 2, minUniqueTails: 5 };
+const ROW_DEFAULTS = { maxConsec: 0, oddCount: 3, sumMin: 110, sumMax: 166, minAC: 7, minBands: 5, primeCount: 2, minUniqueTails: 5 };
 const DEFAULT_CONDITIONS: ConditionRow[] = [
   { id: makeId(), conditionType: 1, years: 0, months: 1,  ...ROW_DEFAULTS, ...BLANK_ROW },
   { id: makeId(), conditionType: 1, years: 0, months: 3,  ...ROW_DEFAULTS, ...BLANK_ROW },
@@ -490,10 +416,10 @@ function getTierTextColor(tier: string): string {
   return 'text-gray-400';
 }
 
-// Claude 추천 5개 표시용 점수 — selectExpertPicks의 선정 기준(앵커·보너스후보·빈도상위 가중치)과
+// Claude 추천 5개 표시용 점수 — selectExpertPicks의 선정 기준(보너스후보·빈도상위 가중치)과
 // 동일한 공식을 재사용해, 화면에 보이는 순위와 점수가 항상 같은 기준으로 정렬되게 한다.
-function expertDisplayScore(combo: number[], anchorNums: number[], bonusNums: number[], freqNums: number[]): number {
-  return scoreCombo(combo, bonusNums, freqNums) + combo.filter(n => anchorNums.includes(n)).length * 5;
+function expertDisplayScore(combo: number[], bonusNums: number[], freqNums: number[]): number {
+  return scoreCombo(combo, bonusNums, freqNums);
 }
 
 // ---------------------------------------------------------------------------
@@ -513,15 +439,10 @@ export default function Home() {
 
   // Section 3 state
   const [gameCount, setGameCount] = useState(100);
-  const [generationMode, setGenerationMode] = useState<'random' | 'no-consec' | 'two-consec' | 'anchor' | 'anchor3' | 'anchor2'>('anchor3');
-  const maxGameCount = (generationMode === 'anchor' || generationMode === 'anchor3' || generationMode === 'anchor2') ? 350 : 100;
+  const maxGameCount = 100;
   const [type3Numbers, setType3Numbers] = useState<number[][]>([]);
   const [selectedComboIndices, setSelectedComboIndices] = useState<Set<number>>(new Set());
   const [expertPicks, setExpertPicks] = useState<number[][]>([]);
-  const [generatedMode, setGeneratedMode] = useState<string | null>(null);
-  // 백테스트 기반 추천 앵커번호 — "생성" 클릭 시 선택된 유형을 백테스트해 얻은 값.
-  // 있으면 조건분석 앵커(activeAnchorNums) 대신 이 값을 실제 생성에 사용한다.
-  const [backtestAnchorNums, setBacktestAnchorNums] = useState<number[]>([]);
   const [isGeneratingAI, setIsGeneratingAI] = useState(false);
   const [aiError, setAiError] = useState('');
   const [confirmMsg, setConfirmMsg] = useState('');
@@ -538,25 +459,17 @@ export default function Home() {
   const [expertPickChecked, setExpertPickChecked] = useState<Set<number>>(new Set());
   // 고급(게임수 조절 · 전체 조합) 아코디언
   const [showAdvanced, setShowAdvanced] = useState(false);
-  // Claude 추천 + 휠링 통합 최종 확정
+  // Claude 추천 5개 최종 확정
   const [isConfirmingFinal, setIsConfirmingFinal] = useState(false);
   const [finalConfirmMsg, setFinalConfirmMsg] = useState('');
 
-  // 앵커 모드 전환 시 게임 수 자동 조정 + 이전 모드의 백테스트 추천 앵커번호 초기화
-  useEffect(() => {
-    if (generationMode === 'anchor' || generationMode === 'anchor3' || generationMode === 'anchor2') setGameCount(350);
-    else setGameCount(prev => Math.min(prev, 100));
-    setBacktestAnchorNums([]);
-  }, [generationMode]);
-
-  // 앵커 번호 공통 빈도 계산 (메인 +1, 보너스 상위5 +0.5 가중치 — 2등 전략 반영)
-  const anchorFreq = useMemo(() => {
+  // 조건분석 결과 번호별 공통 빈도 (메인 +1, 보너스 상위5 +0.5 가중치) — Claude 추천 5개 채점에 사용
+  const numberFreq = useMemo(() => {
     const freq: Record<number, number> = {};
     conditions
       .filter(c => Array.isArray(c.numbers) && c.numbers!.length === 6)
       .forEach(c => {
         (c.numbers as number[]).forEach(n => { freq[n] = (freq[n] ?? 0) + 1; });
-        // 보너스 상위 5개 번호에 0.5 가중치 (2등: 5개+보너스 전략)
         if (Array.isArray(c.bonusNumbers)) {
           (c.bonusNumbers as number[]).slice(0, 5).forEach(n => { freq[n] = (freq[n] ?? 0) + 0.5; });
         }
@@ -564,49 +477,14 @@ export default function Home() {
     return freq;
   }, [conditions]);
 
-  // 앵커2: 2개 이상 조건 공통 출현 번호 상위 2개
-  const anchor2Numbers = useMemo(() =>
-    Object.entries(anchorFreq)
-      .filter(([, cnt]) => Number(cnt) >= 2)
-      .sort((a, b) => Number(b[1]) - Number(a[1]))
-      .slice(0, 2)
-      .map(([num]) => Number(num))
-      .sort((a, b) => a - b),
-  [anchorFreq]);
-
-  // 앵커3: 2개 이상 조건 공통 출현 번호 상위 3개
-  const anchor3Numbers = useMemo(() =>
-    Object.entries(anchorFreq)
-      .filter(([, cnt]) => Number(cnt) >= 2)
-      .sort((a, b) => Number(b[1]) - Number(a[1]))
-      .slice(0, 3)
-      .map(([num]) => Number(num))
-      .sort((a, b) => a - b),
-  [anchorFreq]);
-
-  // 앵커4: 2개 이상 조건 공통 출현 번호 상위 4개
-  const anchorNumbers = useMemo(() =>
-    Object.entries(anchorFreq)
-      .filter(([, cnt]) => Number(cnt) >= 2)
-      .sort((a, b) => Number(b[1]) - Number(a[1]))
-      .slice(0, 4)
-      .map(([num]) => Number(num))
-      .sort((a, b) => a - b),
-  [anchorFreq]);
-
-  // 2등 전략: 보너스 후보 번호 (조건 분석 보너스 빈도 가중 합산, 활성 앵커 제외, 상위 3개)
+  // 2등 전략: 보너스 후보 번호 (조건 분석 보너스 빈도 가중 합산, 상위 3개)
   const bonusCandidateNums = useMemo(() => {
-    const activeAnchors = generationMode === 'anchor2' ? anchor2Numbers
-      : generationMode === 'anchor3' ? anchor3Numbers
-      : generationMode === 'anchor' ? anchorNumbers
-      : [];
-    const anchorSet = new Set(activeAnchors);
     const freq: Record<number, number> = {};
     conditions
       .filter(c => Array.isArray(c.bonusNumbers) && (c.bonusNumbers as number[]).length > 0)
       .forEach(c => {
         (c.bonusNumbers as number[]).slice(0, 5).forEach((n, rank) => {
-          if (!anchorSet.has(n)) freq[n] = (freq[n] ?? 0) + (5 - rank);
+          freq[n] = (freq[n] ?? 0) + (5 - rank);
         });
       });
     return Object.entries(freq)
@@ -614,47 +492,27 @@ export default function Home() {
       .slice(0, 3)
       .map(([num]) => Number(num))
       .sort((a, b) => a - b);
-  }, [conditions, generationMode, anchor2Numbers, anchor3Numbers, anchorNumbers]);
+  }, [conditions]);
 
-  // 3등 전략: 앵커 제외 빈도 상위 번호 (상위 10개, 앵커 제외)
-  const topFreqNums = useMemo(() => {
-    const activeAnchors = generationMode === 'anchor2' ? anchor2Numbers
-      : generationMode === 'anchor3' ? anchor3Numbers
-      : generationMode === 'anchor' ? anchorNumbers
-      : [];
-    const anchorSet = new Set(activeAnchors);
-    return Object.entries(anchorFreq)
+  // 3등 전략: 빈도 상위 번호 (상위 10개)
+  const topFreqNums = useMemo(() =>
+    Object.entries(numberFreq)
       .sort((a, b) => Number(b[1]) - Number(a[1]))
-      .map(([num]) => Number(num))
-      .filter(n => !anchorSet.has(n))
-      .slice(0, 10);
-  }, [anchorFreq, generationMode, anchor2Numbers, anchor3Numbers, anchorNumbers]);
-
-  // 현재 generationMode에 해당하는 앵커 배열 — expert picks useEffect와
-  // generateAIPredictions deps를 단순화하고, 비활성 앵커 변경 시 불필요한
-  // selectExpertPicks 재계산을 방지한다.
-  const activeAnchorNums = useMemo(() => {
-    if (generationMode === 'anchor2') return anchor2Numbers;
-    if (generationMode === 'anchor3') return anchor3Numbers;
-    if (generationMode === 'anchor') return anchorNumbers;
-    return [] as number[];
-  }, [generationMode, anchor2Numbers, anchor3Numbers, anchorNumbers]);
+      .slice(0, 10)
+      .map(([num]) => Number(num)),
+  [numberFreq]);
 
   // 확정 팝업
   const [showInfoPopup, setShowInfoPopup] = useState(false);
 
+  // 조건 유형 설명 팝업
+  const [showConditionHelp, setShowConditionHelp] = useState(false);
+  const [conditionHelpTab, setConditionHelpTab] = useState<'relation' | 'types'>('relation');
+
   // 성과 대시보드
   const [showDashboard, setShowDashboard] = useState(false);
 
-  const effectiveAnchorNums = backtestAnchorNums.length > 0 ? backtestAnchorNums : activeAnchorNums;
-
   const mergedBonusNums = bonusCandidateNums;
-
-  // 휠링 풀: 앵커+보너스후보 합집합을 기본으로 하고, 7개 미만이면 빈도상위 번호로 보충 (최대 10개)
-  const wheelPool = useMemo(
-    () => buildWheelPool(effectiveAnchorNums, mergedBonusNums, topFreqNums),
-    [effectiveAnchorNums, mergedBonusNums, topFreqNums],
-  );
 
   // 분포도 팝업
   const [distPopup, setDistPopup] = useState<{
@@ -665,7 +523,7 @@ export default function Home() {
   const [distLoadingIds, setDistLoadingIds] = useState<Set<string>>(new Set());
 
   // 백테스팅 — 생성 모드의 과거 성과 배지 (개별 조합 단위 지표는 존재하지 않음). "생성" 클릭 시 함께 채워짐
-  const [modeBacktest, setModeBacktest] = useState<{ mode: string; hitRate3Plus: number; hitRate5Plus: number; roi: number } | null>(null);
+  const [modeBacktest, setModeBacktest] = useState<{ hitRate3Plus: number; hitRate5Plus: number; roi: number } | null>(null);
 
   const [tooltipInfo, setTooltipInfo] = useState<{ id: string; x: number; y: number; above: boolean } | null>(null);
   const showTooltip = (e: React.MouseEvent, id: string) => {
@@ -673,41 +531,6 @@ export default function Home() {
     const above = r.top > 140;
     setTooltipInfo({ id, x: r.left + r.width / 2, y: above ? r.top - 8 : r.bottom + 8, above });
   };
-
-  // 휠링 — 조건분석에서 나온 앵커+보너스+빈도상위 번호(wheelPool)로 점수 상위 5게임 자동 생성
-  // (다양성 우선 budget 휠링은 점수가 낮게 나와, 점수만으로 고르는 topScore로 전환)
-  const [isGeneratingWheel, setIsGeneratingWheel] = useState(false);
-  const [wheelResult, setWheelResult] = useState<{
-    combos: number[][];
-    scores: number[];
-    totalCombos: number;
-    fullWheelSize: number;
-    coverage: { rate3plus: number; rate4plus: number; rate5plus: number; rate6: number; totalScenarios: number };
-  } | null>(null);
-  const [wheelChecked, setWheelChecked] = useState<Set<number>>(new Set());
-  const [wheelError, setWheelError] = useState('');
-
-  const runAutoWheel = useCallback(async (pool: number[]) => {
-    if (pool.length < 7) { setWheelResult(null); setWheelError('조건분석 번호가 부족해 휠링 풀을 구성할 수 없습니다'); return; }
-    setIsGeneratingWheel(true);
-    setWheelError('');
-    try {
-      const res = await fetch('/lottery/api/lotto/wheel', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ numbers: pool, type: 'topScore', count: 5, bonusNumbers: bonusCandidateNums, topFreqNums }),
-      });
-      const data = await res.json();
-      if (!data.success) { setWheelError(data.error ?? '오류'); setWheelResult(null); return; }
-      setWheelResult(data.data);
-      // combos/scores는 점수 내림차순으로 이미 정렬돼 있음 — 상위 2개만 기본 체크
-      setWheelChecked(new Set((data.data.combos as number[][]).slice(0, 2).map((_, i) => i)));
-    } catch (e) {
-      setWheelError(e instanceof Error ? e.message : '오류');
-    } finally {
-      setIsGeneratingWheel(false);
-    }
-  }, [bonusCandidateNums, topFreqNums]);
 
   // ---------------------------------------------------------------------------
   // Load saved conditions from DB on mount
@@ -724,7 +547,7 @@ export default function Home() {
           conditionType: number; years: number; months: number;
           maxConsec: number;
           oddCount: number; sumMin: number; sumMax: number; minAC: number;
-          minBands?: number; lowCount?: number; primeCount?: number; minUniqueTails?: number;
+          minBands?: number; primeCount?: number; minUniqueTails?: number;
           numbers: number[] | null; frequencies: number[] | null;
           roundsAnalyzed: number | null; distribution: number[] | null;
           bonusNumbers: number[] | null;
@@ -745,7 +568,7 @@ export default function Home() {
               years: fd.years, months: fd.months,
               maxConsec: fd.maxConsec, oddCount: fd.oddCount,
               sumMin: fd.sumMin, sumMax: fd.sumMax, minAC: fd.minAC,
-              minBands: fd.minBands ?? 5, lowCount: fd.lowCount ?? 3,
+              minBands: fd.minBands ?? 5,
               primeCount: fd.primeCount ?? 2, minUniqueTails: fd.minUniqueTails ?? 5,
               roundsAnalyzed: fd.roundsAnalyzed,
               numbers: fd.numbers,
@@ -1018,10 +841,6 @@ export default function Home() {
     setConditions((prev) => prev.map((c) => c.id === rowId ? { ...c, minBands, ...BLANK_ROW } : c));
   }, []);
 
-  const updateLowCount = useCallback((rowId: string, lowCount: number) => {
-    setConditions((prev) => prev.map((c) => c.id === rowId ? { ...c, lowCount, ...BLANK_ROW } : c));
-  }, []);
-
   const updatePrimeCount = useCallback((rowId: string, primeCount: number) => {
     setConditions((prev) => prev.map((c) => c.id === rowId ? { ...c, primeCount, ...BLANK_ROW } : c));
   }, []);
@@ -1087,12 +906,6 @@ export default function Home() {
       const data = await res.json();
       if (data.success) {
         setSaveConditionsMsg(`${executed.length}개 조건 저장 완료`);
-        // 앵커 스냅샷 저장
-        const anchorData = computeAnchorData(executed);
-        await fetch('/lottery/api/lotto/anchor-config', {
-          method: 'POST', headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ target_round: 0, ...anchorData }),
-        }).catch(() => {/* ignore */});
       } else {
         setSaveConditionsMsg(`저장 실패: ${data.error}`);
       }
@@ -1109,62 +922,41 @@ export default function Home() {
     setAiError('');
     setSelectedComboIndices(new Set());
 
-    const isAnchorMode = generationMode === 'anchor' || generationMode === 'anchor3' || generationMode === 'anchor2';
-    const requiredAnchorCount = generationMode === 'anchor' ? 4 : generationMode === 'anchor3' ? 3 : 2;
-
     try {
-      // 1) 선택한 유형을 최근 100회차로 백테스트 — 시뮬레이션에서 실제로 쓰인 앵커번호 + 과거 성과를 확보
-      const latestRound = results[0]?.round ?? 0;
-      const endRound = latestRound > 0 ? latestRound - 1 : undefined;
-      const startRound = endRound ? endRound - 100 + 1 : undefined;
-      const bt = await fetch('/lottery/api/lotto/backtest', {
-        method: 'POST', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ mode: generationMode, gamesPerRound: 5, startRound, endRound, conditionType: 1, years: 1, months: 0 }),
-      }).then(r => r.json()).catch(() => ({ success: false }));
-
-      // 백테스트가 준 앵커번호를 우선 사용, 부족하면 조건분석(섹션2) 기반 앵커로 폴백
-      let anchorNumsToUse = activeAnchorNums;
-      if (bt.success) {
-        setModeBacktest({ mode: generationMode, hitRate3Plus: bt.data.hitRate3Plus, hitRate5Plus: bt.data.hitRate5Plus, roi: bt.data.roi });
-        if (isAnchorMode && Array.isArray(bt.data.recommendedAnchors) && bt.data.recommendedAnchors.length >= requiredAnchorCount) {
-          anchorNumsToUse = bt.data.recommendedAnchors;
-        }
-      }
-      setBacktestAnchorNums(isAnchorMode ? anchorNumsToUse : []);
-
-      if (isAnchorMode && anchorNumsToUse.length < requiredAnchorCount) {
-        setAiError('앵커 번호 부족 — 백테스트와 조건 분석(섹션 2) 모두에서 충분한 번호를 찾지 못했습니다.');
-        return;
-      }
-
-      // 2) 확보한 앵커번호로 실제 조합 생성
-      const reqBody: Record<string, unknown> = { count: gameCount, mode: generationMode };
-      if (isAnchorMode) reqBody.anchorNumbers = anchorNumsToUse;
-      if (isAnchorMode && mergedBonusNums.length > 0) reqBody.bonusNumbers = mergedBonusNums;
-
+      // 랜덤 100개 생성
       const res = await fetch('/lottery/api/lotto/ai-predict', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(reqBody),
+        body: JSON.stringify({ count: gameCount }),
       });
       const d = await res.json();
       if (d.success && Array.isArray(d.data?.combinations)) {
         skipSaveRef.current = true;
         setType3Numbers(d.data.combinations);
-        setGeneratedMode(generationMode);
         await fetch('/lottery/api/lotto/predicted', {
           method: 'POST', headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ type3: d.data.combinations }),
         });
         setTimeout(() => { skipSaveRef.current = false; }, 0);
-        // 휠링도 방금 확보한 앵커번호 기준으로 즉시 재계산 (memoized wheelPool은 리렌더 이후에야 갱신되므로 직접 계산)
-        runAutoWheel(buildWheelPool(isAnchorMode ? anchorNumsToUse : [], mergedBonusNums, topFreqNums));
       } else {
         setAiError(d.error ?? '조합 생성 오류');
+        return;
+      }
+
+      // 최근 100회차 백테스트로 과거 성과 참고치 확보 (조합 생성과는 무관, 참고용 배지)
+      const latestRound = results[0]?.round ?? 0;
+      const endRound = latestRound > 0 ? latestRound - 1 : undefined;
+      const startRound = endRound ? endRound - 100 + 1 : undefined;
+      const bt = await fetch('/lottery/api/lotto/backtest', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ gamesPerRound: 5, startRound, endRound, conditionType: 1, years: 1, months: 0 }),
+      }).then(r => r.json()).catch(() => ({ success: false }));
+      if (bt.success) {
+        setModeBacktest({ hitRate3Plus: bt.data.hitRate3Plus, hitRate5Plus: bt.data.hitRate5Plus, roi: bt.data.roi });
       }
     } catch { setAiError('서버 연결 오류'); }
     finally { setIsGeneratingAI(false); }
-  }, [gameCount, generationMode, activeAnchorNums, mergedBonusNums, topFreqNums, results, runAutoWheel, setBacktestAnchorNums]);
+  }, [gameCount, results]);
 
   // ---------------------------------------------------------------------------
   // Section 3: Save all predictions to DB
@@ -1188,66 +980,31 @@ export default function Home() {
     if (type3Numbers.length > 0) savePredictions(type3Numbers);
   }, [type3Numbers]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  // 전문가 추천 5개 자동 선정 — 앵커·보너스·빈도 종합 점수 상위 5개
-  // effectiveAnchorNums(백테스트 추천 있으면 그 값, 없으면 조건분석 앵커)로 통일해
-  // 실제 조합 생성에 쓰인 앵커와 항상 같은 기준으로 채점한다.
+  // 전문가 추천 5개 자동 선정 — 조건분석에서 나온 보너스후보·빈도상위 종합 점수 상위 5개
   useEffect(() => {
-    const picks = selectExpertPicks(type3Numbers, effectiveAnchorNums, mergedBonusNums, topFreqNums);
+    const picks = selectExpertPicks(type3Numbers, mergedBonusNums, topFreqNums);
     setExpertPicks(picks);
-    // 기본 체크 3개 = 표시 점수 기준 상위 3개 (화면에 보이는 1~3위와 항상 일치)
-    const top3 = picks
-      .map((combo, i) => ({ i, score: expertDisplayScore(combo, effectiveAnchorNums, mergedBonusNums, topFreqNums) }))
-      .sort((a, b) => b.score - a.score)
-      .slice(0, 3)
-      .map(p => p.i);
-    setExpertPickChecked(new Set(top3));
-  }, [type3Numbers, effectiveAnchorNums, mergedBonusNums, topFreqNums]);
+    // 기본 체크 = 추천 5개 전부
+    setExpertPickChecked(new Set(picks.map((_, i) => i)));
+  }, [type3Numbers, mergedBonusNums, topFreqNums]);
 
   // Claude 추천 5개 — 표시 점수 내림차순으로 정렬 (원래 배열 인덱스 i는 체크 상태 참조용으로 보존)
   const rankedExpertPicks = useMemo(() =>
     expertPicks
-      .map((combo, i) => ({ combo, i, score: expertDisplayScore(combo, effectiveAnchorNums, mergedBonusNums, topFreqNums) }))
+      .map((combo, i) => ({ combo, i, score: expertDisplayScore(combo, mergedBonusNums, topFreqNums) }))
       .sort((a, b) => b.score - a.score),
-  [expertPicks, effectiveAnchorNums, mergedBonusNums, topFreqNums]);
+  [expertPicks, mergedBonusNums, topFreqNums]);
 
-  // 최종확정은 앵커(Claude 추천)+휠링을 합쳐 5게임을 넘을 수 없음 — 해제는 항상 허용, 추가만 캡에서 막음
+  // 최종확정은 Claude 추천 5개를 넘을 수 없음 — 해제는 항상 허용, 추가만 캡에서 막음
   const toggleExpertPick = useCallback((idx: number) => {
     setExpertPickChecked(prev => {
       const next = new Set(prev);
       if (next.has(idx)) { next.delete(idx); return next; }
-      if (next.size + wheelChecked.size >= 5) return prev;
+      if (next.size >= 5) return prev;
       next.add(idx);
       return next;
     });
-  }, [wheelChecked]);
-
-  const toggleWheelPick = useCallback((idx: number) => {
-    setWheelChecked(prev => {
-      const next = new Set(prev);
-      if (next.has(idx)) { next.delete(idx); return next; }
-      if (next.size + expertPickChecked.size >= 5) return prev;
-      next.add(idx);
-      return next;
-    });
-  }, [expertPickChecked]);
-
-  // 번호 풀에서 드래그한 번호를 특정 휠링 조합의 특정 자리에 놓으면 그 번호로 교체하고
-  // 즉시 재채점 — 1위·2위 조합이 너무 비슷할 때 수동으로 갈라낼 수 있게 한다
-  const swapWheelNumber = useCallback((comboIdx: number, posIdx: number, newNum: number) => {
-    setWheelResult(prev => {
-      if (!prev) return prev;
-      const combo = prev.combos[comboIdx];
-      if (!combo || combo.includes(newNum)) return prev; // 이미 그 조합에 있는 번호(자기 자신 포함)면 무시
-      const newCombo = [...combo];
-      newCombo[posIdx] = newNum;
-      newCombo.sort((a, b) => a - b);
-      const newScore = scoreCombo(newCombo, bonusCandidateNums, topFreqNums);
-      const combos = prev.combos.map((c, i) => (i === comboIdx ? newCombo : c));
-      const scores = prev.scores.map((s, i) => (i === comboIdx ? newScore : s));
-      const coverage = computeWheelCoverage(wheelPool, combos);
-      return { ...prev, combos, scores, coverage };
-    });
-  }, [bonusCandidateNums, topFreqNums, wheelPool]);
+  }, []);
 
   const toggleComboSelection = useCallback((idx: number) => {
     setSelectedComboIndices(prev => {
@@ -1313,21 +1070,16 @@ export default function Home() {
 
   // Claude 추천(체크된 것) + 휠링(체크된 것) 통합 확정 — loadConfirmed 이후 정의
   const confirmFinalSelection = useCallback(async () => {
-    const chosenExpert = expertPicks.filter((_, i) => expertPickChecked.has(i));
-    const chosenWheel = wheelResult ? wheelResult.combos.filter((_, i) => wheelChecked.has(i)) : [];
-    const combos = [...chosenExpert, ...chosenWheel];
-    // 앵커(Claude 추천)+휠링을 합쳐 최대 5게임까지만 1세트로 확정 (토글 단계에서도 캡을 걸어두지만 여기서도 방어)
+    const combos = expertPicks.filter((_, i) => expertPickChecked.has(i));
+    // Claude 추천은 최대 5개뿐이라 5게임을 넘을 수 없음 (토글 단계에서도 캡을 걸어두지만 여기서도 방어)
     if (combos.length === 0 || combos.length > 5 || results.length === 0) return;
     setIsConfirmingFinal(true);
     setFinalConfirmMsg('');
     try {
       const target_round = results[0].round + 1;
-      const generation_mode = chosenExpert.length > 0 && chosenWheel.length > 0
-        ? `${generationMode}+wheel`
-        : chosenWheel.length > 0 ? 'wheel-topscore' : generationMode;
       const res = await fetch('/lottery/api/lotto/confirmed', {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ target_round, combos, generation_mode }),
+        body: JSON.stringify({ target_round, combos, generation_mode: 'random' }),
       });
       const data = await res.json();
       if (!data.success) { setFinalConfirmMsg(data.error ?? '확정 실패'); return; }
@@ -1339,7 +1091,7 @@ export default function Home() {
       setIsConfirmingFinal(false);
       setTimeout(() => setFinalConfirmMsg(''), 4000);
     }
-  }, [expertPicks, expertPickChecked, wheelResult, wheelChecked, results, generationMode, loadConfirmed]);
+  }, [expertPicks, expertPickChecked, results, loadConfirmed]);
 
   // 삭제된 항목이 열려 있으면 닫기
   useEffect(() => {
@@ -1359,7 +1111,7 @@ export default function Home() {
       const res = await fetch('/lottery/api/lotto/confirmed', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ target_round, combos: selectedCombos, generation_mode: generationMode }),
+        body: JSON.stringify({ target_round, combos: selectedCombos, generation_mode: 'random' }),
       });
       const d = await res.json();
       if (d.success) {
@@ -1368,7 +1120,7 @@ export default function Home() {
       }
     } catch { /* ignore */ }
     finally { setIsConfirming(false); }
-  }, [type3Numbers, selectedComboIndices, results, loadConfirmed, confirmedPurchases, generationMode]);
+  }, [type3Numbers, selectedComboIndices, results, loadConfirmed]);
 
   const deleteConfirmed = useCallback(async (id: number) => {
     try {
@@ -1480,7 +1232,16 @@ export default function Home() {
           {/* SECTION 2 */}
           <section className="flex flex-col bg-white border-b border-gray-200 shadow-sm md:flex-[3] md:min-h-0 md:border-r md:overflow-hidden">
             <div className="flex-none px-4 py-3 border-b border-gray-100 flex items-center justify-between flex-wrap gap-2">
-              <SectionHeader icon={<IconBarChart />} title="참고) 당첨 빈도 분석" small />
+              <div className="flex items-center gap-1.5">
+                <SectionHeader icon={<IconBarChart />} title="참고) 당첨 빈도 분석" small />
+                <button
+                  onClick={() => setShowConditionHelp(true)}
+                  className="flex-shrink-0 inline-flex items-center justify-center w-4 h-4 rounded-full bg-gray-200 text-gray-500 text-[10px] font-bold hover:bg-gray-300 hover:text-gray-700 transition-colors"
+                  title="조건 유형별 설명"
+                >
+                  ?
+                </button>
+              </div>
               <div className="flex items-center gap-2">
                 {saveConditionsMsg && (
                   <span className={`text-xs font-medium ${saveConditionsMsg.includes('완료') ? 'text-emerald-600' : saveConditionsMsg.includes('중') ? 'text-blue-500' : 'text-red-500'}`}>
@@ -1524,7 +1285,6 @@ export default function Home() {
                             <option value={6}>합계</option>
                             <option value={7}>AC값</option>
                             <option value={8}>밴드커버</option>
-                            <option value={9}>저고비율</option>
                             <option value={10}>소수포함</option>
                             <option value={11}>끝수다양</option>
                           </select>
@@ -1599,16 +1359,6 @@ export default function Home() {
                                 <option value={5}>5밴드</option>
                               </select>
                               <span className="text-gray-400">이상 커버 회차 빈도 상위 6개</span>
-                            </>
-                          )}
-                          {row.conditionType === 9 && (
-                            <>
-                              <span className="text-gray-400">저번호(1~22)</span>
-                              <select value={row.lowCount} onChange={(e) => updateLowCount(row.id, Number(e.target.value))}
-                                className="border border-gray-200 rounded px-1 py-0.5 text-xs bg-white focus:outline-none focus:ring-1 focus:ring-emerald-400">
-                                {[1,2,3,4,5].map(n => <option key={n} value={n}>{n}개</option>)}
-                              </select>
-                              <span className="text-gray-400">회차 빈도 상위 6개</span>
                             </>
                           )}
                           {row.conditionType === 10 && (
@@ -1691,32 +1441,6 @@ export default function Home() {
                   <h2 className="text-xl font-bold text-gray-900 tracking-tight">예상 당첨 번호</h2>
                 </div>
                 <div className="flex items-center gap-2 w-full sm:w-auto">
-                  {/* 라디오 버튼 */}
-                  <div className="flex items-center bg-gray-100 rounded-lg p-1 gap-1 flex-wrap">
-                    {([
-                      { value: 'anchor2',   label: '앵커2' },
-                      { value: 'anchor3',   label: '앵커3' },
-                      { value: 'anchor',    label: '앵커4' },
-                      { value: 'no-consec', label: '연속없음' },
-                      { value: 'two-consec',label: '연속2개' },
-                      { value: 'random',    label: '랜덤' },
-                    ] as const).map(({ value, label }) => (
-                      <label
-                        key={value}
-                        className={`flex items-center gap-1 px-2.5 py-1 rounded-md text-xs font-semibold cursor-pointer transition-all select-none ${
-                          generationMode === value ? 'bg-white text-indigo-700 shadow-sm' : 'text-gray-500 hover:text-gray-700'
-                        }`}
-                      >
-                        <input
-                          type="radio" name="generationMode" value={value}
-                          checked={generationMode === value}
-                          onChange={() => setGenerationMode(value)}
-                          className="sr-only"
-                        />
-                        {label}
-                      </label>
-                    ))}
-                  </div>
                   <button
                     onClick={generateAIPredictions}
                     disabled={isGeneratingAI}
@@ -1743,49 +1467,6 @@ export default function Home() {
                 </div>
               </div>
 
-              {/* 앵커 번호 · 보너스 후보 — 1행 표시 */}
-              {(generationMode === 'anchor2' || generationMode === 'anchor3' || generationMode === 'anchor') && (() => {
-                const usingBacktest = backtestAnchorNums.length > 0;
-                const nums = effectiveAnchorNums;
-                const label = generationMode === 'anchor2' ? '앵커2 번호 (전 게임 고정)' : generationMode === 'anchor3' ? '앵커3 번호 (전 게임 고정)' : '앵커4 번호 (전 게임 고정)';
-                return (
-                  <div className="mt-3 rounded-xl border border-violet-200 bg-violet-50 px-4 py-3">
-                    <div className="flex flex-wrap gap-x-4 gap-y-3">
-                      {/* 앵커 번호 */}
-                      <div className="flex-1 min-w-0">
-                        <div className="flex items-center gap-1.5 mb-1.5">
-                          <span className="text-[10px] font-bold text-violet-800">{label}</span>
-                          <span className="text-[10px] text-violet-400">
-                            {usingBacktest ? '최근 100회차 백테스트 기준' : '조건 분석에서 2개 이상 출현'}
-                          </span>
-                        </div>
-                        {nums.length >= 2 ? (
-                          <div className="flex items-center gap-1.5 flex-wrap">
-                            {nums.map(n => <NumberBall key={n} num={n} size="sm" highlighted />)}
-                            <span className="text-[10px] text-violet-500 font-medium">고정 {nums.length}개 + 변형 {6 - nums.length}개</span>
-                          </div>
-                        ) : (
-                          <p className="text-[10px] text-gray-400">&ldquo;🎲 생성&rdquo;을 누르면 백테스트로 앵커번호를 자동 산출합니다</p>
-                        )}
-                      </div>
-                      {/* 2등 보너스 후보 */}
-                      {bonusCandidateNums.length > 0 && (
-                        <div className="flex-1 min-w-0 pl-4 border-l border-violet-200">
-                          <div className="flex items-center gap-1.5 mb-1.5">
-                            <span className="text-[10px] font-bold text-amber-700">2등 보너스 후보</span>
-                            <span className="text-[10px] text-amber-400">조합의 30%에 포함 · 전문가 추천 우선</span>
-                          </div>
-                          <div className="flex items-center gap-1.5 flex-wrap">
-                            {bonusCandidateNums.map(n => (
-                              <span key={n} className="inline-flex items-center justify-center w-7 h-7 rounded-full bg-amber-100 text-amber-800 text-xs font-bold border border-amber-300">{n}</span>
-                            ))}
-                          </div>
-                        </div>
-                      )}
-                    </div>
-                  </div>
-                );
-              })()}
             </div>
 
             {/* Body */}
@@ -1801,12 +1482,12 @@ export default function Home() {
                     <span className="text-[10px] text-violet-400 font-medium hidden sm:block">밴드분산 · 홀짝균형 · 보너스후보 · 빈도상위 종합 점수 상위 5개</span>
                   </div>
 
-                  {/* 모드 단위 백테스팅 배지 — 5개 전체에 적용되는 과거 성과 참고치 */}
+                  {/* 백테스팅 배지 — 5개 전체에 적용되는 과거 성과 참고치 */}
                   <div className="flex items-center gap-2 mb-2 px-3 py-1.5 bg-white/70 rounded-lg text-[11px] flex-wrap">
-                    <span className="flex-shrink-0 font-bold text-violet-700 bg-violet-100 px-2 py-0.5 rounded-full">{MODE_LABELS[generationMode]} 모드</span>
+                    <span className="flex-shrink-0 font-bold text-violet-700 bg-violet-100 px-2 py-0.5 rounded-full">랜덤 모드</span>
                     {isGeneratingAI ? (
                       <span className="text-gray-400">백테스트로 과거 성과 확인 중...</span>
-                    ) : modeBacktest && modeBacktest.mode === generationMode ? (
+                    ) : modeBacktest ? (
                       <span className="text-gray-500">
                         최근 100회차 3등 이상 <b className={modeBacktest.hitRate3Plus > 0 ? 'text-emerald-600' : 'text-gray-400'}>{modeBacktest.hitRate3Plus}%</b>
                         {' · '}ROI <b className={modeBacktest.roi >= 0 ? 'text-emerald-600' : 'text-red-500'}>{modeBacktest.roi > 0 ? '+' : ''}{modeBacktest.roi}%</b>
@@ -1825,7 +1506,7 @@ export default function Home() {
                         combo.some(n => n >= 20 && n <= 29), combo.some(n => n >= 30 && n <= 39),
                         combo.some(n => n >= 40)].filter(Boolean).length;
                       const checked = expertPickChecked.has(i);
-                      const atCap = !checked && expertPickChecked.size + wheelChecked.size >= 5;
+                      const atCap = !checked && expertPickChecked.size >= 5;
                       return (
                         <div
                           key={i}
@@ -1839,7 +1520,11 @@ export default function Home() {
                           <div className="flex gap-1.5 flex-1">
                             {combo.map((num, j) => <NumberBall key={j} num={num} size="sm" highlighted={checked} />)}
                           </div>
-                          <div className="flex-shrink-0 flex items-center gap-1.5 text-[10px] text-violet-500 font-medium whitespace-nowrap">
+                          <div
+                            className="flex-shrink-0 flex items-center gap-1.5 text-[10px] text-violet-500 font-medium whitespace-nowrap"
+                            onMouseEnter={(e) => showTooltip(e, 'combo-stats')}
+                            onMouseLeave={() => setTooltipInfo(null)}
+                          >
                             <span>합{sum}</span>
                             <span>홀{odds}/짝{6 - odds}</span>
                             <span>{bandCount}밴드</span>
@@ -1849,93 +1534,6 @@ export default function Home() {
                       );
                     })}
                   </div>
-                </div>
-              )}
-
-              {/* 휠링 5게임 */}
-              {(isGeneratingWheel || wheelResult || wheelError) && (
-                <div className="flex-none rounded-2xl border border-rose-200 bg-rose-50/60 px-4 py-3">
-                  <div className="flex items-center gap-2 mb-2.5 min-w-0">
-                    <span className="inline-flex items-center gap-1.5 text-sm font-bold text-rose-900 whitespace-nowrap">
-                      🎡 휠링 5게임
-                    </span>
-                    <span className="text-[10px] text-rose-400 font-medium hidden sm:block">앵커·보너스·빈도상위 번호 풀에서 만들 수 있는 조합 중 점수 상위 5개 (상위 2개 기본 선택)</span>
-                  </div>
-
-                  {isGeneratingWheel ? (
-                    <p className="text-xs text-gray-400">휠링 조합 생성 중...</p>
-                  ) : wheelError ? (
-                    <p className="text-xs text-red-500">{wheelError}</p>
-                  ) : wheelResult ? (
-                    <>
-                      <div className="flex items-center gap-1.5 mb-2 flex-wrap">
-                        <span className="text-[10px] font-bold text-rose-700 flex-shrink-0">번호 풀</span>
-                        {wheelPool.map(n => (
-                          <span
-                            key={n}
-                            draggable
-                            onDragStart={(e) => {
-                              e.dataTransfer.setData('text/plain', String(n));
-                              e.dataTransfer.effectAllowed = 'copy';
-                            }}
-                            className="cursor-grab active:cursor-grabbing"
-                            title="드래그해서 아래 조합의 번호와 교체"
-                          >
-                            <NumberBall num={n} size="sm" highlighted />
-                          </span>
-                        ))}
-                        <span className="text-[9px] text-rose-400 hidden sm:inline">↑ 드래그해서 아래 조합의 번호와 교체</span>
-                      </div>
-                      <div className="grid grid-cols-4 gap-1.5 mb-2.5">
-                        {[
-                          { label: '5등 이상', value: wheelResult.coverage.rate3plus },
-                          { label: '4등 이상', value: wheelResult.coverage.rate4plus },
-                          { label: '2~3등 가능', value: wheelResult.coverage.rate5plus },
-                          { label: '1등 보장', value: wheelResult.coverage.rate6 },
-                        ].map(({ label, value }) => (
-                          <div key={label} className="bg-white rounded-lg border border-rose-100 px-2 py-1.5 text-center">
-                            <div className="text-xs font-bold text-rose-600">{value}%</div>
-                            <div className="text-[9px] text-gray-400">{label}</div>
-                          </div>
-                        ))}
-                      </div>
-                      <div className="flex flex-col divide-y divide-rose-100 rounded-xl border border-rose-200 bg-white overflow-hidden">
-                        {wheelResult.combos.map((combo, i) => {
-                          const checked = wheelChecked.has(i);
-                          const atCap = !checked && expertPickChecked.size + wheelChecked.size >= 5;
-                          return (
-                            <div
-                              key={i}
-                              onClick={() => toggleWheelPick(i)}
-                              className={`flex items-center gap-2 px-3 py-2 transition-all ${atCap ? 'opacity-30 cursor-not-allowed' : `cursor-pointer hover:bg-rose-50/60 ${checked ? '' : 'opacity-50'}`}`}
-                            >
-                              <span className={`flex-shrink-0 w-4 h-4 rounded border-2 flex items-center justify-center ${checked ? 'bg-rose-600 border-rose-600' : 'border-gray-300'}`}>
-                                {checked && <span className="text-white text-[9px] font-bold">✓</span>}
-                              </span>
-                              <div className="flex gap-1.5 flex-1">
-                                {combo.map((num, j) => (
-                                  <span
-                                    key={j}
-                                    onDragOver={(e) => e.preventDefault()}
-                                    onDrop={(e) => {
-                                      e.preventDefault();
-                                      e.stopPropagation();
-                                      const dragged = Number(e.dataTransfer.getData('text/plain'));
-                                      if (dragged >= 1 && dragged <= 45) swapWheelNumber(i, j, dragged);
-                                    }}
-                                    className="rounded-full transition-transform hover:scale-110"
-                                  >
-                                    <NumberBall num={num} size="sm" highlighted={checked} />
-                                  </span>
-                                ))}
-                              </div>
-                              <span className="flex-shrink-0 text-[10px] text-rose-500 font-medium">{wheelResult.scores[i]}점</span>
-                            </div>
-                          );
-                        })}
-                      </div>
-                    </>
-                  ) : null}
                 </div>
               )}
 
@@ -1961,9 +1559,7 @@ export default function Home() {
                             className="w-full h-2 rounded-full appearance-none cursor-pointer accent-indigo-600 bg-indigo-200"
                           />
                           <div className="flex justify-between text-[10px] text-indigo-400 mt-0.5">
-                            {(generationMode === 'anchor' || generationMode === 'anchor3' || generationMode === 'anchor2')
-                              ? <><span>5</span><span>90</span><span>175</span><span>260</span><span>350</span></>
-                              : <><span>5</span><span>25</span><span>50</span><span>75</span><span>100</span></>}
+                            <span>5</span><span>25</span><span>50</span><span>75</span><span>100</span>
                           </div>
                         </div>
                         <div className="flex items-center gap-1">
@@ -1996,7 +1592,7 @@ export default function Home() {
                       <div className="flex-none flex items-center justify-between mb-3">
                         <div className="flex items-center gap-2">
                           <span className="text-base font-bold text-emerald-900">
-                            {MODE_LABELS[generationMode]} &times; {type3Numbers.length > 0 ? type3Numbers.length : gameCount}
+                            랜덤 &times; {type3Numbers.length > 0 ? type3Numbers.length : gameCount}
                           </span>
                           {type3Numbers.length > 0 && (
                             <button
@@ -2089,9 +1685,9 @@ export default function Home() {
                 )}
               </div>
 
-              {/* 최종 확정 트레이 — Claude 추천 체크 + 휠링 체크 통합 */}
-              {(expertPicks.length > 0 || wheelResult) && (() => {
-                const totalSelected = expertPickChecked.size + (wheelResult ? wheelChecked.size : 0);
+              {/* 최종 확정 트레이 — Claude 추천 체크 */}
+              {expertPicks.length > 0 && (() => {
+                const totalSelected = expertPickChecked.size;
                 return (
                   <div className="sticky bottom-0 -mx-4 md:-mx-5 mt-auto px-4 md:px-5 py-3 bg-white/95 backdrop-blur-sm border-t border-gray-200 flex items-center justify-between gap-3">
                     <div>
@@ -2338,12 +1934,10 @@ export default function Home() {
               <div>
                 <div className="flex items-center gap-2 mb-3">
                   <h4 className="text-sm font-bold text-indigo-800">⚙️ 생성 전략</h4>
-                  <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-indigo-100 text-indigo-700">
-                    {MODE_LABELS[generatedMode ?? generationMode] ?? generatedMode ?? generationMode}
-                  </span>
+                  <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-indigo-100 text-indigo-700">랜덤</span>
                 </div>
                 <div className="rounded-xl border border-indigo-100 bg-indigo-50/40 px-4 py-4 flex flex-col gap-2.5">
-                  {(GENERATION_STRATEGIES[generatedMode ?? generationMode] ?? []).map(({ tag, color, desc }) => (
+                  {GENERATION_STRATEGY.map(({ tag, color, desc }) => (
                     <div key={tag} className="flex items-start gap-3">
                       <span className={`flex-shrink-0 mt-0.5 inline-flex items-center justify-center w-[108px] px-2 py-1 rounded-lg text-xs font-bold whitespace-nowrap ${color}`}>{tag}</span>
                       <span className="text-xs text-gray-600 leading-snug pt-0.5">{desc}</span>
@@ -2366,6 +1960,89 @@ export default function Home() {
           onClose={() => setDistPopup(null)}
         />
       )}
+
+      {/* ===== 조건 유형 설명 팝업 ===== */}
+      {showConditionHelp && (() => {
+        const CONDITION_HELP: { label: string; desc: string; required: string }[] = [
+          { label: '기간', desc: '최근 N년 N개월(또는 전체) 당첨번호 중 가장 자주 나온 상위 6개 번호를 추출합니다.', required: '연도, 개월 수 (둘 다 0이면 전체 회차 대상)' },
+          { label: '연속번호', desc: '연속된 번호(n, n+1)가 없는/2개인/3개 이상인 회차만 모아, 그 안에서 가장 자주 나온 6개를 추출합니다.', required: '연속 패턴 — 없음 / 2개 / 3개+' },
+          { label: '홀짝', desc: '홀수 개수가 지정한 값과 일치하는 회차만 모아, 그 안에서 가장 자주 나온 6개를 추출합니다.', required: '홀수 개수 (0~6, 정확히 일치)' },
+          { label: '합계', desc: '6개 번호의 합이 지정한 범위(최소~최대) 안에 드는 회차만 모아, 그 안에서 가장 자주 나온 6개를 추출합니다.', required: '합계 최소값, 최대값 (이상~이하)' },
+          { label: 'AC값', desc: '번호 간 차이값의 다양성 지표(AC)가 지정한 값 이상인 회차만 모아, 그 안에서 가장 자주 나온 6개를 추출합니다.', required: 'AC값 하한 (0~10, 이상)' },
+          { label: '밴드커버', desc: '1~9·10~19·20~29·30~39·40~45 구간 중 지정한 개수 이상을 커버하는 회차만 모아, 그 안에서 가장 자주 나온 6개를 추출합니다.', required: '최소 커버 밴드 수 (4 또는 5, 이상)' },
+          { label: '소수포함', desc: '소수(2,3,5,7,11...) 개수가 지정한 값과 일치하는 회차만 모아, 그 안에서 가장 자주 나온 6개를 추출합니다.', required: '소수 개수 (0~6, 정확히 일치)' },
+          { label: '끝수다양', desc: '끝자리 숫자(0~9)의 종류 수가 지정한 값 이상인 회차만 모아, 그 안에서 가장 자주 나온 6개를 추출합니다.', required: '최소 고유 끝수 종류 수 (이상)' },
+        ];
+        return (
+          <div
+            className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm"
+            onClick={() => setShowConditionHelp(false)}
+          >
+            <div
+              className="bg-white rounded-2xl shadow-2xl px-6 py-5 w-[700px] max-w-[92vw] max-h-[80vh] overflow-y-auto"
+              onClick={(e) => e.stopPropagation()}
+            >
+              <div className="flex items-center justify-between mb-3">
+                <h3 className="text-base font-bold text-gray-800">조건 유형 설명</h3>
+                <button onClick={() => setShowConditionHelp(false)} className="text-gray-400 hover:text-gray-700 text-xl leading-none px-1">✕</button>
+              </div>
+
+              {/* 탭 */}
+              <div className="flex items-center bg-gray-100 rounded-lg p-1 gap-1 mb-4 w-fit">
+                {([
+                  { key: 'relation', label: '당첨번호 생성과 연관 관계' },
+                  { key: 'types', label: '조건 유형별 설명' },
+                ] as const).map(({ key, label }) => (
+                  <button
+                    key={key}
+                    onClick={() => setConditionHelpTab(key)}
+                    className={`px-2.5 py-1 rounded-md text-xs font-semibold transition-all ${
+                      conditionHelpTab === key ? 'bg-white text-emerald-700 shadow-sm' : 'text-gray-500 hover:text-gray-700'
+                    }`}
+                  >
+                    {label}
+                  </button>
+                ))}
+              </div>
+
+              {conditionHelpTab === 'relation' ? (
+                <>
+                  <p className="text-xs text-gray-600 leading-relaxed mb-4">
+                    번호 생성은 항상 <b>완전 무작위(랜덤)</b>이며, 조건분석 결과가 조합 자체를 바꾸지는 않습니다.
+                    대신 각 조건 행의 상위6 번호와 보너스 번호가 모여 <b>보너스 후보(2등 전략)</b>·<b>빈도 상위(3등 전략)</b>
+                    번호를 만들고, 이 번호들이 아래 두 단계에서 쓰입니다.
+                  </p>
+                  <div className="flex flex-col divide-y divide-gray-100">
+                    <div className="py-2.5 flex flex-col gap-1">
+                      <span className="text-xs font-bold text-violet-700">1) 조합 100개 생성</span>
+                      <p className="text-xs text-gray-600 leading-relaxed">1~45 중 6개를 완전 무작위로 뽑아 게임 수만큼 생성합니다. 조건분석 결과는 이 단계에 전혀 관여하지 않습니다.</p>
+                    </div>
+                    <div className="py-2.5 flex flex-col gap-1">
+                      <span className="text-xs font-bold text-violet-700">2) Claude 추천 5개 선정</span>
+                      <p className="text-xs text-gray-600 leading-relaxed">생성된 100개 중, 조건분석에서 나온 보너스 후보·빈도 상위 번호를 많이 포함한 조합일수록 점수가 높아져 상위 5개로 추천됩니다. 조건분석을 실행해두지 않으면 이 가중치 없이 밴드분산·홀짝균형 등 조합 자체의 구조적 점수만으로 5개가 선정됩니다.</p>
+                    </div>
+                  </div>
+                </>
+              ) : (
+                <>
+                  <div className="flex flex-col divide-y divide-gray-100">
+                    {CONDITION_HELP.map(({ label, desc, required }) => (
+                      <div key={label} className="py-2.5 flex flex-col gap-1">
+                        <span className="text-xs font-bold text-emerald-700">{label}</span>
+                        <p className="text-xs text-gray-600 leading-relaxed">{desc}</p>
+                        <p className="text-[11px] text-gray-400">필수 지정: {required}</p>
+                      </div>
+                    ))}
+                  </div>
+                  <p className="text-[10px] text-gray-300 text-center mt-4">
+                    각 조건 행에서 유형을 선택하면 위 방식대로 필터링된 회차 안에서 상위 6개 번호를 계산합니다.
+                  </p>
+                </>
+              )}
+            </div>
+          </div>
+        );
+      })()}
 
       {/* ===== 성과 대시보드 팝업 ===== */}
       {showDashboard && (() => {
@@ -2618,22 +2295,28 @@ export default function Home() {
         generate: {
           title: '🎲 생성',
           titleColor: 'text-indigo-300',
-          desc: '선택한 유형을 최근 100회차로 먼저 백테스트해 실제로 성적이 좋았던 앵커번호를 찾고, 그 번호로 조합을 생성합니다.',
+          desc: '1~45 중 6개를 완전 무작위로 100개 생성하고, 조건분석 기반 점수로 상위 5개를 추천합니다. 최근 100회차 백테스트 성과도 함께 표시됩니다.',
+        },
+        'combo-stats': {
+          title: '📊 조합 통계 · 점수 산정식',
+          titleColor: 'text-violet-300',
+          desc: '합=6개 번호 합계, 홀/짝=홀수·짝수 개수, 밴드=1~9·10~19·20~29·30~39·40~45 중 포함 구간 수.\n\n점수 = 밴드(3밴드+5·4밴드+10·5밴드+15)\n+ 홀짝균형(3:3+20·2:4+15·1:5+6)\n+ 합계범위(108~168+20·93~183+10)\n+ 끝수다양성(종류수×3, 최대15)\n− 연속쌍3개+ 페널티(−10)\n+ 보너스후보 포함개수×5\n+ 빈도상위 포함개수×2',
         },
       };
       const tip = TOOLTIPS[tooltipInfo.id];
       if (!tip) return null;
       return (
         <div
-          className="pointer-events-none fixed z-[300] w-64 rounded-xl bg-gray-900 px-3 py-2.5 text-xs text-white shadow-2xl"
+          className="pointer-events-none fixed z-[300] w-64 max-w-[80vw] rounded-xl bg-gray-900 px-3 py-2.5 text-xs text-white shadow-2xl"
           style={{
             left: tooltipInfo.x,
             top: tooltipInfo.y,
+            width: tip.desc.length > 80 ? '20rem' : undefined,
             transform: `translateX(-50%) ${tooltipInfo.above ? 'translateY(-100%)' : 'translateY(0)'}`,
           }}
         >
           <p className={`font-semibold mb-1 ${tip.titleColor}`}>{tip.title}</p>
-          <p className="text-gray-300 leading-relaxed">{tip.desc}</p>
+          <p className="text-gray-300 leading-relaxed whitespace-pre-line">{tip.desc}</p>
           {tooltipInfo.above
             ? <div className="absolute top-full left-1/2 -translate-x-1/2 border-4 border-transparent border-t-gray-900" />
             : <div className="absolute bottom-full left-1/2 -translate-x-1/2 border-4 border-transparent border-b-gray-900" />

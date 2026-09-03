@@ -9,7 +9,7 @@ export async function POST(req: NextRequest) {
     conditionType?: number; years?: number; months?: number;
     maxConsec?: number;
     oddCount?: number; sumMin?: number; sumMax?: number; minAC?: number;
-    minBands?: number; lowCount?: number; primeCount?: number; minUniqueTails?: number;
+    minBands?: number; primeCount?: number; minUniqueTails?: number;
   };
   try {
     body = await req.json();
@@ -46,7 +46,6 @@ export async function POST(req: NextRequest) {
     sumMax: Number(body.sumMax ?? 166),
     minAC: Number(body.minAC ?? 7),
     minBands: body.minBands != null ? Number(body.minBands) : undefined,
-    lowCount: body.lowCount != null ? Number(body.lowCount) : undefined,
     primeCount: body.primeCount != null ? Number(body.primeCount) : undefined,
     minUniqueTails: body.minUniqueTails != null ? Number(body.minUniqueTails) : undefined,
   };
