@@ -19,14 +19,20 @@ function speechTextOf(item: ExpandItem): string | null {
   return item.translation || null;
 }
 
+// 저장된 content/translation은 한 줄 문단이라, 화면에서만 문장(마침표/물음표/느낌표) 단위로
+// 줄바꿈해 가독성을 높인다 — DB 원문은 그대로 두고 표시할 때만 변환한다.
+function withSentenceBreaks(text: string): string {
+  return text.split(/(?<=[.!?])\s+/).join('\n');
+}
+
 const VOLUME_KEY = 'good-words:tts-volume';
 const RATE_KEY = 'good-words:tts-rate';
 const VOICE_KEY = 'good-words:tts-voice';
 const ADVANCE_INTERVAL_KEY = 'good-words:advance-interval-sec';
 
 const RATE_OPTIONS = [0.5, 0.75, 1.0, 1.25, 1.5, 2.0];
-const ADVANCE_INTERVAL_OPTIONS = [3, 5, 7, 10];
-const DEFAULT_ADVANCE_INTERVAL_SEC = 3;
+const ADVANCE_INTERVAL_OPTIONS = [10, 15, 20, 25, 30];
+const DEFAULT_ADVANCE_INTERVAL_SEC = 15;
 
 export default function ExpandViewModal({
   items, startIndex, categoryLabel, onClose,
@@ -222,7 +228,7 @@ export default function ExpandViewModal({
 
   return (
     <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 px-4">
-      <div className="bg-white rounded-2xl shadow-2xl w-[1000px] h-[800px] max-w-full max-h-[90vh] flex flex-col relative">
+      <div className="bg-white rounded-2xl shadow-2xl w-[1250px] h-[800px] max-w-full max-h-[90vh] flex flex-col relative">
         <div className="shrink-0 px-6 pt-5 text-center">
           <span className="text-xs font-semibold tracking-wide text-gray-400">{categoryLabel}</span>
         </div>
@@ -232,10 +238,23 @@ export default function ExpandViewModal({
           aria-label="닫기"
         >✕</button>
 
-        <div className="flex-1 overflow-y-auto px-8 py-10 flex flex-col items-center justify-center text-center">
-          <p className="leading-loose text-gray-800 whitespace-pre-wrap" style={{ fontSize: '22px' }}>{current.content}</p>
+        <button
+          onClick={goPrev}
+          disabled={index === 0}
+          aria-label="이전 글"
+          className="absolute left-0 top-1/2 -translate-x-1/2 -translate-y-1/2 w-11 h-11 flex items-center justify-center rounded-full bg-neutral-900 text-white text-xl leading-none shadow-md hover:bg-neutral-700 disabled:opacity-30 transition-colors z-10"
+        >‹</button>
+        <button
+          onClick={goNext}
+          disabled={index === items.length - 1}
+          aria-label="다음 글"
+          className="absolute right-0 top-1/2 translate-x-1/2 -translate-y-1/2 w-11 h-11 flex items-center justify-center rounded-full bg-neutral-900 text-white text-xl leading-none shadow-md hover:bg-neutral-700 disabled:opacity-30 transition-colors z-10"
+        >›</button>
+
+        <div className="flex-1 overflow-y-auto px-20 py-10 flex flex-col items-center justify-center text-center">
+          <p className="leading-loose text-gray-800 whitespace-pre-wrap break-keep" style={{ fontSize: '22px' }}>{withSentenceBreaks(current.content)}</p>
           {current.translation && (
-            <p className="leading-loose text-gray-500 whitespace-pre-wrap mt-4" style={{ fontSize: '16px' }}>{current.translation}</p>
+            <p className="leading-loose text-gray-500 whitespace-pre-wrap break-keep mt-4" style={{ fontSize: '16px' }}>{withSentenceBreaks(current.translation)}</p>
           )}
           {current.source && (
             <p className="text-sm text-gray-400 mt-6">{`< ${current.source} >`}</p>
@@ -244,31 +263,6 @@ export default function ExpandViewModal({
 
         <div className="shrink-0 border-t border-gray-100 px-6 py-4 space-y-3">
           <div className="flex items-center justify-center gap-4">
-            <button
-              onClick={goPrev}
-              disabled={index === 0}
-              aria-label="이전 글"
-              className="w-8 h-8 flex items-center justify-center rounded-full border border-gray-200 text-gray-500 hover:border-neutral-500 hover:text-neutral-900 disabled:opacity-30 transition-colors"
-            >‹</button>
-
-            <div className="flex items-center gap-1">
-              {items.map((it, i) => (
-                <button
-                  key={it.id}
-                  onClick={() => setIndex(i)}
-                  className={`rounded-full transition-all ${i === index ? 'w-5 h-1.5 bg-neutral-900' : 'w-1.5 h-1.5 bg-gray-300 hover:bg-gray-400'}`}
-                  aria-label={`${i + 1}번째 글로 이동`}
-                />
-              ))}
-            </div>
-
-            <button
-              onClick={goNext}
-              disabled={index === items.length - 1}
-              aria-label="다음 글"
-              className="w-8 h-8 flex items-center justify-center rounded-full border border-gray-200 text-gray-500 hover:border-neutral-500 hover:text-neutral-900 disabled:opacity-30 transition-colors"
-            >›</button>
-
             <button
               onClick={() => setAutoAdvancing((p) => !p)}
               disabled={items.length <= 1}

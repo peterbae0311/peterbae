@@ -18,6 +18,7 @@ export interface GoodWordsCategory {
   id: string;
   label: string;
   classification: string | null;
+  minLength: number;
   maxLength: number;
   generateCount: number;
   prompt: string;
@@ -28,6 +29,7 @@ interface CategoryRow {
   ID: string;
   LABEL: string;
   CLASSIFICATION: string | null;
+  MIN_LENGTH: number;
   MAX_LENGTH: number;
   GENERATE_COUNT: number;
   PROMPT: string;
@@ -39,6 +41,7 @@ function serialize(row: CategoryRow): GoodWordsCategory {
     id: row.ID,
     label: row.LABEL,
     classification: row.CLASSIFICATION,
+    minLength: row.MIN_LENGTH,
     maxLength: row.MAX_LENGTH,
     generateCount: row.GENERATE_COUNT,
     prompt: row.PROMPT,
@@ -46,7 +49,7 @@ function serialize(row: CategoryRow): GoodWordsCategory {
   };
 }
 
-const SELECT_COLUMNS = 'id, label, classification, max_length, generate_count, prompt, sort_order';
+const SELECT_COLUMNS = 'id, label, classification, min_length, max_length, generate_count, prompt, sort_order';
 
 export async function listCategories(): Promise<GoodWordsCategory[]> {
   return withConnection(async (conn) => {
@@ -83,6 +86,7 @@ export async function categoryLabelExists(label: string, excludeId?: string): Pr
 export interface CategoryInput {
   label: string;
   classification: string | null;
+  minLength: number;
   maxLength: number;
   generateCount: number;
   prompt: string;
@@ -103,22 +107,27 @@ export function parseCategoryInput(body: unknown): { input?: CategoryInput; erro
   const label = typeof b?.label === 'string' ? b.label.trim() : '';
   const classification = typeof b?.classification === 'string' ? b.classification.trim() : '';
   const prompt = typeof b?.prompt === 'string' ? b.prompt.trim() : '';
+  const minLength = Number(b?.minLength);
   const maxLength = Number(b?.maxLength);
   const generateCount = Number(b?.generateCount);
 
   if (!label) return { error: '제목을 입력해주세요.' };
   if (label.length > MAX_LABEL_LENGTH) return { error: `제목은 ${MAX_LABEL_LENGTH}자 이내로 입력해주세요.` };
   if (classification.length > MAX_CLASSIFICATION_LENGTH) return { error: `분류는 ${MAX_CLASSIFICATION_LENGTH}자 이내로 입력해주세요.` };
-  if (!Number.isInteger(maxLength) || maxLength < MIN_MAX_LENGTH || maxLength > MAX_MAX_LENGTH) {
-    return { error: `최대 글자수는 ${MIN_MAX_LENGTH}~${MAX_MAX_LENGTH} 사이의 정수로 입력해주세요.` };
+  if (!Number.isInteger(minLength) || minLength < MIN_MAX_LENGTH || minLength > MAX_MAX_LENGTH) {
+    return { error: `글자수(최소)는 ${MIN_MAX_LENGTH}~${MAX_MAX_LENGTH} 사이의 정수로 입력해주세요.` };
   }
+  if (!Number.isInteger(maxLength) || maxLength < MIN_MAX_LENGTH || maxLength > MAX_MAX_LENGTH) {
+    return { error: `글자수(최대)는 ${MIN_MAX_LENGTH}~${MAX_MAX_LENGTH} 사이의 정수로 입력해주세요.` };
+  }
+  if (minLength > maxLength) return { error: '글자수 최소값은 최대값보다 클 수 없습니다.' };
   if (!Number.isInteger(generateCount) || generateCount < MIN_GENERATE_COUNT || generateCount > MAX_GENERATE_COUNT) {
     return { error: `문장 개수는 ${MIN_GENERATE_COUNT}~${MAX_GENERATE_COUNT} 사이의 정수로 입력해주세요.` };
   }
   if (!prompt) return { error: 'AI 프롬프트를 입력해주세요.' };
   if (prompt.length > MAX_PROMPT_LENGTH) return { error: `AI 프롬프트는 ${MAX_PROMPT_LENGTH}자 이내로 입력해주세요.` };
 
-  return { input: { label, classification: classification || null, maxLength, generateCount, prompt } };
+  return { input: { label, classification: classification || null, minLength, maxLength, generateCount, prompt } };
 }
 
 export async function createCategory(input: CategoryInput): Promise<GoodWordsCategory> {
@@ -129,11 +138,11 @@ export async function createCategory(input: CategoryInput): Promise<GoodWordsCat
     const nextOrder = (maxResult.rows?.[0]?.MAXORDER ?? -1) + 1;
     const id = randomUUID();
     await conn.execute(
-      `INSERT INTO good_words_categories (id, label, classification, max_length, generate_count, prompt, sort_order)
-       VALUES (:id, :label, :classification, :maxLength, :generateCount, :prompt, :sortOrder)`,
-      { id, label: input.label, classification: input.classification, maxLength: input.maxLength, generateCount: input.generateCount, prompt: input.prompt, sortOrder: nextOrder }
+      `INSERT INTO good_words_categories (id, label, classification, min_length, max_length, generate_count, prompt, sort_order)
+       VALUES (:id, :label, :classification, :minLength, :maxLength, :generateCount, :prompt, :sortOrder)`,
+      { id, label: input.label, classification: input.classification, minLength: input.minLength, maxLength: input.maxLength, generateCount: input.generateCount, prompt: input.prompt, sortOrder: nextOrder }
     );
-    return { id, label: input.label, classification: input.classification, maxLength: input.maxLength, generateCount: input.generateCount, prompt: input.prompt, sortOrder: nextOrder };
+    return { id, label: input.label, classification: input.classification, minLength: input.minLength, maxLength: input.maxLength, generateCount: input.generateCount, prompt: input.prompt, sortOrder: nextOrder };
   });
 }
 
@@ -141,9 +150,9 @@ export async function createCategory(input: CategoryInput): Promise<GoodWordsCat
 export async function updateCategory(id: string, input: CategoryInput): Promise<boolean> {
   return withConnection(async (conn) => {
     const result = await conn.execute(
-      `UPDATE good_words_categories SET label = :label, classification = :classification, max_length = :maxLength, generate_count = :generateCount, prompt = :prompt
+      `UPDATE good_words_categories SET label = :label, classification = :classification, min_length = :minLength, max_length = :maxLength, generate_count = :generateCount, prompt = :prompt
        WHERE id = :id AND deleted_at IS NULL`,
-      { label: input.label, classification: input.classification, maxLength: input.maxLength, generateCount: input.generateCount, prompt: input.prompt, id }
+      { label: input.label, classification: input.classification, minLength: input.minLength, maxLength: input.maxLength, generateCount: input.generateCount, prompt: input.prompt, id }
     );
     return (result.rowsAffected ?? 0) > 0;
   });

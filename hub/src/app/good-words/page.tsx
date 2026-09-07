@@ -9,6 +9,7 @@ export interface GoodWordsCategory {
   id: string;
   label: string;
   classification: string | null;
+  minLength: number;
   maxLength: number;
   generateCount: number;
   prompt: string;
@@ -275,25 +276,34 @@ export default function GoodWordsPage() {
                   {c.label}
                 </button>
                 {isSuperAdmin && (
-                  <span className="hidden group-hover:inline-flex items-center gap-1 pr-2">
+                  <span className="inline-flex items-center gap-1.5 mr-2 px-1.5 py-1 rounded-md border border-gray-200 bg-white opacity-0 group-hover:opacity-100 pointer-events-none group-hover:pointer-events-auto transition-opacity">
                     <button
                       onClick={(e) => { e.stopPropagation(); openEditModal(c); }}
-                      className="text-gray-400 hover:text-neutral-900 text-xs"
+                      className="text-neutral-600 hover:text-neutral-900 text-base leading-none"
                       title="수정"
                     >✎</button>
                     <button
                       onClick={(e) => { e.stopPropagation(); moveCategory(c.id, -1); }}
                       disabled={i === 0}
                       aria-label={`${c.label} 카테고리를 왼쪽으로 이동`}
-                      className="text-gray-400 hover:text-neutral-900 text-xs disabled:opacity-30"
+                      className="text-neutral-600 hover:text-neutral-900 text-base leading-none disabled:opacity-30"
                     >◀</button>
                     <button
                       onClick={(e) => { e.stopPropagation(); moveCategory(c.id, 1); }}
                       disabled={i === categories.length - 1}
                       aria-label={`${c.label} 카테고리를 오른쪽으로 이동`}
-                      className="text-gray-400 hover:text-neutral-900 text-xs disabled:opacity-30"
+                      className="text-neutral-600 hover:text-neutral-900 text-base leading-none disabled:opacity-30"
                     >▶</button>
-                    <span className="text-gray-300 text-xs cursor-grab" title="드래그로 순서 이동">⠿</span>
+                    <span className="text-neutral-500 cursor-grab" title="드래그로 순서 이동">
+                      <svg width="10" height="14" viewBox="0 0 10 14" fill="currentColor">
+                        <circle cx="2" cy="2" r="1.4" />
+                        <circle cx="8" cy="2" r="1.4" />
+                        <circle cx="2" cy="7" r="1.4" />
+                        <circle cx="8" cy="7" r="1.4" />
+                        <circle cx="2" cy="12" r="1.4" />
+                        <circle cx="8" cy="12" r="1.4" />
+                      </svg>
+                    </span>
                   </span>
                 )}
               </div>
@@ -446,6 +456,7 @@ function CategoryModal({
   const [category, setCategory] = useState<GoodWordsCategory | null>(state.mode === 'edit' ? state.category : null);
   const [label, setLabel] = useState(category?.label ?? '');
   const [classification, setClassification] = useState(category?.classification ?? '');
+  const [minLength, setMinLength] = useState(category?.minLength ?? 10);
   const [maxLength, setMaxLength] = useState(category?.maxLength ?? 400);
   const [generateCount, setGenerateCount] = useState(category?.generateCount ?? 20);
   const [prompt, setPrompt] = useState(category?.prompt ?? '');
@@ -470,12 +481,12 @@ function CategoryModal({
       const res = await fetch(url, {
         method,
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ label, classification, maxLength, generateCount, prompt }),
+        body: JSON.stringify({ label, classification, minLength, maxLength, generateCount, prompt }),
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error ?? '저장에 실패했습니다.');
       const saved = category
-        ? { ...category, label, classification: classification || null, maxLength, generateCount, prompt }
+        ? { ...category, label, classification: classification || null, minLength, maxLength, generateCount, prompt }
         : (data.category as GoodWordsCategory);
       setCategory(saved);
       setInfo('저장되었습니다.');
@@ -498,7 +509,7 @@ function CategoryModal({
       const genRes = await fetch('/api/good-words/generate', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ prompt, maxLength, generateCount }),
+        body: JSON.stringify({ prompt, minLength, maxLength, generateCount }),
       });
       const genData = await genRes.json();
       if (!genRes.ok) throw new Error(genData.error ?? '생성에 실패했습니다.');
@@ -577,15 +588,28 @@ function CategoryModal({
             />
           </div>
           <div className="flex items-center gap-3">
-            <label className="w-28 shrink-0 text-xs font-semibold text-gray-600">최대 글자수</label>
-            <input
-              type="number"
-              value={maxLength}
-              onChange={(e) => setMaxLength(Number(e.target.value))}
-              min={10}
-              max={4000}
-              className="flex-1 px-3 py-2 border border-gray-200/80 bg-white/60 rounded-md text-sm text-gray-800 focus:outline-none focus:border-neutral-500 focus:ring-1 focus:ring-neutral-500 transition-colors"
-            />
+            <label className="w-28 shrink-0 text-xs font-semibold text-gray-600">글자수</label>
+            <div className="flex-1 flex items-center gap-2">
+              <input
+                type="number"
+                value={minLength}
+                onChange={(e) => setMinLength(Number(e.target.value))}
+                min={10}
+                max={4000}
+                aria-label="글자수 최소"
+                className="flex-1 px-3 py-2 border border-gray-200/80 bg-white/60 rounded-md text-sm text-gray-800 focus:outline-none focus:border-neutral-500 focus:ring-1 focus:ring-neutral-500 transition-colors"
+              />
+              <span className="text-xs text-gray-400 shrink-0">~</span>
+              <input
+                type="number"
+                value={maxLength}
+                onChange={(e) => setMaxLength(Number(e.target.value))}
+                min={10}
+                max={4000}
+                aria-label="글자수 최대"
+                className="flex-1 px-3 py-2 border border-gray-200/80 bg-white/60 rounded-md text-sm text-gray-800 focus:outline-none focus:border-neutral-500 focus:ring-1 focus:ring-neutral-500 transition-colors"
+              />
+            </div>
           </div>
           <div className="flex items-center gap-3">
             <label className="w-28 shrink-0 text-xs font-semibold text-gray-600">문장 개수</label>

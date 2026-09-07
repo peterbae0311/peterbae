@@ -13,4 +13,7 @@ export const goodWordsLlmEnv = {
   openrouterApiKey: process.env.GOOD_WORDS_OPENROUTER_API_KEY,
   groqApiKey: process.env.GOOD_WORDS_GROQ_API_KEY,
   hfToken: process.env.GOOD_WORDS_HF_TOKEN,
+  // "좋은글 생성" 결과의 1/3을 차지하는 창작 파트 전용(generate/route.ts) — 원문 검색이
+  // 아니라 새 글을 짓는 역할이라 무료 모델 대신 Claude Sonnet을 쓴다(2026-09-07).
+  anthropicApiKey: process.env.GOOD_WORDS_ANTHROPIC_API_KEY,
 } as const;

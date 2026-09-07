@@ -58,9 +58,11 @@ CREATE TABLE good_words_categories (
   id              VARCHAR2(36)              NOT NULL,
   label           VARCHAR2(50)              NOT NULL,
   classification  VARCHAR2(50),
-  -- 좋은글 하나당 허용할 최대 글자수(한글 기준 문자 길이) — 카테고리마다 다르다(예: 소설은
+  -- 좋은글 하나당 허용할 글자수 범위(한글 기준 문자 길이) — 카테고리마다 다르다(예: 소설은
   -- 1000, 수필은 400). generate/route.ts가 이 값을 LLM 프롬프트 힌트와 응답 필터 컷 양쪽에
-  -- 그대로 사용한다(2026-08-17 추가, 이전엔 전 카테고리 공용 400자 하드코딩이었음).
+  -- 그대로 사용한다(2026-08-17 추가, 이전엔 전 카테고리 공용 400자 하드코딩이었음. 2026-09-07
+  -- 최대치 단일값에서 최소~최대 범위로 확장 — oracle/good-words-migration-002-min-length.sql).
+  min_length      NUMBER(10)                DEFAULT 10 NOT NULL,
   max_length      NUMBER(10)                DEFAULT 400 NOT NULL,
   -- "좋은글 생성" 클릭 시 한 번에 생성할 문장 개수 — 카테고리마다 다르게 지정 가능
   -- (2026-08-17 추가, 이전엔 전 카테고리 공용 20개 하드코딩이었음).
