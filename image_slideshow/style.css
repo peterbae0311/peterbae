@@ -429,7 +429,7 @@ a { text-decoration: none; color: inherit; }
   background: transparent;
   color: var(--ink); font-weight: 700; font-size: 12px;
   letter-spacing: .04em;
-  border: 1.5px solid var(--ink);
+  border: 2px solid var(--ink);
   box-shadow: none;
   transition: all var(--t-spring);
   position: relative; overflow: hidden;
@@ -701,12 +701,15 @@ a { text-decoration: none; color: inherit; }
   box-shadow: var(--shadow-md);
   overflow: hidden; min-height: 0;
   border-radius: var(--r-stage);
+  /* 안의 슬라이드 레이어가 will-change로 별도 GPU 레이어가 되면서, 이 둥근 모서리 클리핑이
+     흐릿하게 앤티앨리어싱되는 경우가 있어 이 요소 자체도 별도 컴포지팅 레이어로 승격시킴 */
+  transform: translateZ(0);
 }
 .pano-strip-wrap:fullscreen {
   border-radius: 0; border: none; box-shadow: none;
+  transform: none; /* 둥근 모서리 클리핑이 없으니 컴포지팅 승격 트릭도 불필요 */
   background: var(--surface);
 }
-
 .pano-strip-wrap::before,
 .pano-strip-wrap::after { content: none; }
 
@@ -719,12 +722,8 @@ a { text-decoration: none; color: inherit; }
 }
 .pano-slide-img {
   display: block;
-  max-width: 98%; max-height: 98%;
-  width: auto; height: auto;
-  border-radius: var(--r-xl);
   pointer-events: none;
   user-select: none;
-  filter: drop-shadow(0 12px 32px rgba(0,0,0,.14));
 }
 
 /* ── 스테이지 위 호버 전용 컨트롤 (좌/우 이동 + 전체화면) ── */

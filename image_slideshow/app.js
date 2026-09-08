@@ -33,7 +33,7 @@ let slideshowPhotos  = [];
 let currentSlideIdx  = 0;
 let slideshowTimer   = null;
 let slideshowPlaying = true;
-let slideshowSpeed   = 3000;
+let slideshowSpeed   = 10000;
 let slideshowEffect  = 'fade';
 let activeLayer      = 'a'; // 'a' or 'b'
 let slideTransitionMs = 600;
@@ -408,7 +408,7 @@ const EFFECT_LABELS = {
   kenburns: '켄번즈', rotate: '회전', flip: '플립', swing: '스윙', wipe: '와이프',
   blur: '블러', glitch: '글리치',
 };
-const SPEED_OPTIONS = [2000, 3000, 5000, 8000, 10000];
+const SPEED_OPTIONS = [5000, 10000, 15000, 20000];
 
 /** 앨범 카드에 매번 새로 그려지는 전환시간/효과 인라인 셀렉트 — 전체 공통값을 반영 */
 function renderInlineSpeedSelect() {
@@ -473,7 +473,7 @@ function renderAlbumList() {
         next: '<svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor"><rect x="17.5" y="5" width="2.5" height="14"/><polygon points="4 5 15 12 4 19"/></svg>',
         play: '<svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor"><polygon points="6 4 20 12 6 20"/></svg>',
         pause: '<svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor"><rect x="5" y="4" width="4.5" height="16"/><rect x="14.5" y="4" width="4.5" height="16"/></svg>',
-        shuffle: '<svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.3" stroke-linecap="round" stroke-linejoin="round"><polyline points="16 3 21 3 21 8"/><line x1="4" y1="20" x2="21" y2="3"/><polyline points="21 16 21 21 16 21"/><line x1="15" y1="15" x2="21" y2="21"/><line x1="4" y1="4" x2="9" y2="9"/></svg>',
+        shuffle: '<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.3" stroke-linecap="round" stroke-linejoin="round"><polyline points="16 3 21 3 21 8"/><line x1="4" y1="20" x2="21" y2="3"/><polyline points="21 16 21 21 16 21"/><line x1="15" y1="15" x2="21" y2="21"/><line x1="4" y1="4" x2="9" y2="9"/></svg>',
       };
       return `<div class="record-card-row record-card-track-row">
         <div class="record-card-track-controls">
@@ -597,15 +597,13 @@ function _sizeSlideImg(img) {
     requestAnimationFrame(() => _sizeSlideImg(img));
     return;
   }
-  const maxW = wrap.clientWidth  * 0.98;
-  const maxH = wrap.clientHeight * 0.98;
-  const ratio = dims.w / dims.h;
-  let w, h;
-  if (dims.w / maxW >= dims.h / maxH) {
-    w = Math.min(dims.w, maxW); h = w / ratio;
-  } else {
-    h = Math.min(dims.h, maxH); w = h * ratio;
-  }
+  // 카드뷰/전체화면 모두 여백 없이 꽉 채운다 — object-fit:cover와 동일하게 두 축 다 채우고
+  // 넘치는 쪽은 레이어의 overflow:hidden이 잘라낸다(비율 유지, 늘려서 왜곡하지 않음).
+  const maxW = wrap.clientWidth;
+  const maxH = wrap.clientHeight;
+  const scale = Math.max(maxW / dims.w, maxH / dims.h);
+  const w = dims.w * scale;
+  const h = dims.h * scale;
   img.style.width  = Math.round(w) + 'px';
   img.style.height = Math.round(h) + 'px';
 
@@ -625,6 +623,14 @@ function _sizeSlideImg(img) {
       layer.style.clipPath  = clip;
     }
   }
+}
+
+/** 컨테이너 크기가 바뀌었지만 load 이벤트는 안 뜨는 경우(전체화면 토글, 패널 접기/펼치기 등) 재계산 */
+function _resizeVisibleSlideImgs() {
+  ['pano-layer-a', 'pano-layer-b'].forEach(id => {
+    const img = document.getElementById(id)?.querySelector('.pano-slide-img');
+    if (img) requestAnimationFrame(() => _sizeSlideImg(img));
+  });
 }
 
 function setLayerImage(layerEl, url) {
@@ -1522,29 +1528,30 @@ function bindEvents() {
   });
 
   // Slideshow controls
-  document.getElementById('btn-slide-prev').addEventListener('click', () => {
+  document.getElementById('btn-slide-prev').addEventListener('click', (e) => {
     goToSlide(currentSlideIdx - 1, 'prev');
     if (slideshowPlaying) { stopSlideshow(); startSlideshow(); } // reset timer
+    e.currentTarget.blur(); // 클릭 후 포커스가 남으면 :focus-within 때문에 호버 아닐 때도 계속 보임
   });
-  document.getElementById('btn-slide-next').addEventListener('click', () => {
+  document.getElementById('btn-slide-next').addEventListener('click', (e) => {
     goToSlide(currentSlideIdx + 1, 'next');
     if (slideshowPlaying) { stopSlideshow(); startSlideshow(); }
+    e.currentTarget.blur();
   });
   // 전체화면 — #pano-strip-wrap 자체를 fullscreen 요소로 삼아 슬라이드/화살표/드래그 로직을 그대로 재사용
   const stageWrap = document.getElementById('pano-strip-wrap');
-  document.getElementById('btn-pano-fullscreen').addEventListener('click', () => {
+  document.getElementById('btn-pano-fullscreen').addEventListener('click', (e) => {
     if (!document.fullscreenElement) stageWrap.requestFullscreen?.();
     else document.exitFullscreen?.();
+    // 클릭 후에도 버튼에 포커스가 남으면 :focus-within 때문에 호버 아닐 때도 계속 보임 — 포커스 해제
+    e.currentTarget.blur();
   });
   document.addEventListener('fullscreenchange', () => {
     const isFs = document.fullscreenElement === stageWrap;
     const btn = document.getElementById('btn-pano-fullscreen');
     btn.title = isFs ? '전체화면 종료' : '전체화면';
     // 브라우저가 요소 크기를 바꿔도 load 이벤트가 다시 안 뜨므로, 현재 보이는 이미지를 직접 재계산
-    ['pano-layer-a', 'pano-layer-b'].forEach(id => {
-      const img = document.getElementById(id)?.querySelector('.pano-slide-img');
-      if (img) requestAnimationFrame(() => _sizeSlideImg(img));
-    });
+    _resizeVisibleSlideImgs();
   });
 
   // Left panel collapse toggle
@@ -1555,10 +1562,16 @@ function bindEvents() {
     leftPanel.classList.add('collapsed');
     // 트랜지션 끝난 뒤 플로팅 버튼 표시 (width 트랜지션 시간과 맞춤)
     setTimeout(() => floatBtn.classList.add('visible'), 300);
+    // 패널 너비가 바뀌면서 스테이지 크기도 바뀌므로 현재 이미지 cover 크기를 다시 계산
+    setTimeout(_resizeVisibleSlideImgs, 300);
+    // 좌우 이동 버튼과 동일하게, 레이아웃이 바뀌었으니 다음 전환까지 다시 온전한 시간을 준다
+    if (slideshowPlaying) { stopSlideshow(); startSlideshow(); }
   }
   function expandPanel() {
     floatBtn.classList.remove('visible');
     leftPanel.classList.remove('collapsed');
+    setTimeout(_resizeVisibleSlideImgs, 300);
+    if (slideshowPlaying) { stopSlideshow(); startSlideshow(); }
   }
 
   document.getElementById('btn-collapse-panel').addEventListener('click', collapsePanel);
@@ -1598,7 +1611,7 @@ function init() {
 // index.html의 인라인 스크립트에서 페이지 로드 시 바로 호출됨 (hub SSO만으로 접근 통제)
 async function initApp() {
   const saved = loadConfig();
-  slideshowSpeed  = saved.slideSpeed  || 3000;
+  slideshowSpeed  = SPEED_OPTIONS.includes(saved.slideSpeed) ? saved.slideSpeed : 10000;
   slideshowEffect = saved.slideEffect || 'fade';
   musicVolume     = saved.musicVolume ?? 0.7;
   await loadAlbums();
