@@ -1,9 +1,33 @@
 'use client';
 
 import { useCallback, useEffect, useRef, useState } from 'react';
+import localFont from 'next/font/local';
 import { supabase } from '@/lib/supabase';
 import { SUPER_ADMIN_EMAIL } from '@/lib/apps';
 import ExpandViewModal from './ExpandViewModal';
+
+// 보관함 카드 본문용 폰트 — 삼성긴고딕(사용자 제공 로컬 파일). 원본 파일명(한글+공백)이
+// 번들러 경로 해석에서 말썽을 일으킬 수 있어 ./fonts/에 ASCII 파일명으로 복사해 참조한다.
+// Bold도 같이 등록해두는 이유: Medium 하나만 있으면 hover:font-bold 같은 굵기 변화를 줄 때
+// 브라우저가 합성(faux) 볼드로 뭉개 그려서 — 진짜 Bold 글리프를 매칭시키기 위함.
+const samsungGothic = localFont({
+  src: [
+    { path: './fonts/samsung-gothic-medium.ttf', weight: '500', style: 'normal' },
+    { path: './fonts/samsung-gothic-bold.ttf', weight: '700', style: 'normal' },
+  ],
+  display: 'swap',
+});
+
+// 화면 로드/새로고침·카테고리 전환마다 카드 배열 순서를 섞어 매번 다르게 보이게 한다 —
+// 정렬 자체를 바꾸는 게 아니라 화면에 뿌리기 직전에만 섞으므로 DB/정렬 로직은 그대로 둔다.
+function shuffle<T>(arr: T[]): T[] {
+  const result = [...arr];
+  for (let i = result.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [result[i], result[j]] = [result[j], result[i]];
+  }
+  return result;
+}
 
 export interface GoodWordsCategory {
   id: string;
@@ -85,7 +109,7 @@ export default function GoodWordsPage() {
       const res = await fetch(`/api/good-words?category=${encodeURIComponent(activeCategoryId)}`);
       const data = await res.json();
       if (!res.ok) throw new Error(data.error ?? '목록을 불러오지 못했습니다.');
-      setArchiveItems(data.items);
+      setArchiveItems(shuffle(data.items));
     } catch (err) {
       setMessage(err instanceof Error ? err.message : '목록을 불러오지 못했습니다.');
     } finally {
@@ -210,7 +234,7 @@ export default function GoodWordsPage() {
   }
 
   return (
-    <div className="min-h-screen px-6 py-8">
+    <div className={`min-h-screen px-6 py-8 ${samsungGothic.className}`}>
       <div className="w-full space-y-6">
         <div className="flex items-center justify-between">
           <h1 className="text-2xl font-black tracking-tighter text-neutral-900">좋은글</h1>
@@ -348,31 +372,52 @@ export default function GoodWordsPage() {
                 <div
                   key={item.id}
                   onClick={() => setExpandModal({ index: i })}
-                  className="rounded-xl border border-gray-200/80 bg-white/70 p-4 cursor-pointer hover:border-neutral-400 hover:shadow-sm transition-all"
+                  className="group relative overflow-hidden rounded-2xl border border-amber-100 bg-gradient-to-b from-amber-50/70 to-white p-5 pt-6 cursor-pointer hover:border-amber-300 hover:shadow-lg hover:-translate-y-0.5 transition-all"
                 >
+                  {/* 장식용 인용부호 — 텍스트만 있어 삭막해 보이는 카드에 따뜻한 포인트를 주는
+                      배경 장식일 뿐, 스크린리더에는 노출하지 않는다. */}
+                  <span
+                    aria-hidden
+                    className="absolute -top-3 left-3 text-7xl text-amber-200/70 select-none pointer-events-none"
+                  >“</span>
+
                   {isSuperAdmin && (
-                    <div className="flex justify-end gap-2 mb-1">
+                    <div className="relative flex justify-end gap-1 mb-1 opacity-0 group-hover:opacity-100 pointer-events-none group-hover:pointer-events-auto transition-opacity">
                       <button
                         onClick={(e) => { e.stopPropagation(); setEditItem(item); }}
-                        className="text-xs text-gray-500 hover:text-neutral-900"
-                      >
-                        수정
-                      </button>
+                        title="수정"
+                        aria-label="수정"
+                        className="w-7 h-7 flex items-center justify-center rounded-full text-gray-500 hover:text-amber-700 hover:bg-amber-100/60 transition-colors"
+                      >✎</button>
                       <button
                         onClick={(e) => { e.stopPropagation(); handleDelete(item.id); }}
                         disabled={deletingId === item.id}
-                        className="text-xs text-red-500 hover:text-red-700 disabled:opacity-40"
+                        title="삭제"
+                        aria-label="삭제"
+                        className="w-7 h-7 flex items-center justify-center rounded-full text-red-500 hover:text-red-700 hover:bg-red-50 disabled:opacity-40 transition-colors"
                       >
-                        {deletingId === item.id ? '삭제 중...' : '삭제'}
+                        {deletingId === item.id ? (
+                          <span className="w-3 h-3 border-2 border-red-300 border-t-red-600 rounded-full animate-spin" />
+                        ) : (
+                          <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+                            <path d="M2.5 4h11M5.5 4V2.5a1 1 0 0 1 1-1h3a1 1 0 0 1 1 1V4m2 0-.6 9.4a1 1 0 0 1-1 .9H5.1a1 1 0 0 1-1-.9L3.5 4" />
+                          </svg>
+                        )}
                       </button>
                     </div>
                   )}
-                  <p className="text-sm text-gray-700 leading-relaxed line-clamp-6 whitespace-pre-wrap">{item.content}</p>
+                  <p
+                    className="relative text-sm text-stone-700 leading-relaxed line-clamp-6 whitespace-pre-wrap break-keep"
+                  >{item.content}</p>
                   {item.translation && (
-                    <p className="text-xs text-gray-500 leading-relaxed line-clamp-3 whitespace-pre-wrap mt-2 italic">{item.translation}</p>
+                    <p className="relative text-xs text-stone-400 leading-relaxed line-clamp-3 whitespace-pre-wrap mt-2 italic">{item.translation}</p>
                   )}
                   {item.source && (
-                    <p className="text-xs text-gray-400 mt-3">{`< ${item.source} >`}</p>
+                    <div className="relative mt-3">
+                      <span className="inline-flex items-center gap-1.5 text-xs text-amber-700 bg-amber-100/60 border border-amber-200/70 rounded-full px-2.5 py-1">
+                        <span className="text-amber-400">✦</span>{item.source}
+                      </span>
+                    </div>
                   )}
                 </div>
               ))}
