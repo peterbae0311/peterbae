@@ -4,11 +4,27 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Peter-02 관리 도구</title>
-  <link rel="preconnect" href="https://fonts.googleapis.com" />
-  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-  <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@400;500;600;700&display=swap" rel="stylesheet" />
 
   <style>
+    /* ===================================================
+       Fonts — 한글은 삼성긴고딕, 영문/숫자는 Inter Tight.
+       Inter Tight에는 한글 글리프가 없어 font-family 폴백으로
+       삼성긴고딕에 자동 위임된다. 둘 다 단일 굵기 정적 파일이라
+       font-synthesis: none으로 가짜 볼드 합성을 막는다.
+    =================================================== */
+    @font-face {
+      font-family: 'Inter Tight';
+      src: url('삼성긴고딕/Inter Tight.ttf') format('truetype');
+      font-weight: 400;
+      font-display: swap;
+    }
+    @font-face {
+      font-family: '삼성긴고딕';
+      src: url('삼성긴고딕/삼성긴고딕 Medium.ttf') format('truetype');
+      font-weight: 400;
+      font-display: swap;
+    }
+
     /* ===================================================
        CSS Variables & Reset
     =================================================== */
@@ -47,7 +63,8 @@
 
     html, body {
       height: 100%;
-      font-family: 'Noto Sans KR', system-ui, -apple-system, sans-serif;
+      font-family: 'Inter Tight', '삼성긴고딕', system-ui, -apple-system, sans-serif;
+      font-synthesis: none;
       background: linear-gradient(135deg, #f5f5f5, #ffffff 50%, #f5f5f5);
       color: var(--text-main);
       font-size: 14px;
