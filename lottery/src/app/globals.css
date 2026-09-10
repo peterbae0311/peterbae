@@ -8,5 +8,9 @@
 body {
   background: var(--background);
   color: var(--foreground);
-  font-family: var(--font-noto-sans-kr), sans-serif;
+  font-family: var(--font-inter-tight), var(--font-samsung-gin-gothic), sans-serif;
+  /* 두 폰트 모두 단일 굵기(정적) 파일이라, font-bold 등 요청 시 브라우저가 가짜(합성) 볼드를
+     만들어내는데 — 특히 삼성긴고딕은 그 결과가 번져 보인다. 합성 자체를 꺼서 항상 로드된
+     실제 굵기(삼성긴고딕=Medium)로만 렌더링되게 한다. */
+  font-synthesis: none;
 }

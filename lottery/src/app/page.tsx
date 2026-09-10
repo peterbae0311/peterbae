@@ -232,7 +232,7 @@ function getLottoColor(num: number): string {
 function NumberBall({ num, size = 'md', freq, hoverFreq, highlighted }: { num: number | null; size?: 'sm' | 'md' | 'lg'; freq?: number; hoverFreq?: number; highlighted?: boolean }) {
   if (num == null) {
     const dim = size === 'lg' ? 'w-12 h-12 text-base' : size === 'sm' ? 'w-8 h-8 text-sm' : 'w-10 h-10 text-sm';
-    return <span className={`inline-flex items-center justify-center ${dim} rounded-full bg-gray-100 text-gray-400 font-bold`}>-</span>;
+    return <span className={`inline-flex items-center justify-center ${dim} rounded-full bg-gray-100 text-gray-400 `}>-</span>;
   }
 
   const colorClass = highlighted ? getLottoColor(num) : 'bg-white border border-gray-300 text-gray-500';
@@ -240,9 +240,9 @@ function NumberBall({ num, size = 'md', freq, hoverFreq, highlighted }: { num: n
   if (freq != null) {
     const dim = size === 'lg' ? 'w-14 h-14' : size === 'sm' ? 'w-10 h-10' : 'w-12 h-12';
     const numText = size === 'lg' ? 'text-base' : size === 'sm' ? 'text-xs' : 'text-sm';
-    const freqText = size === 'lg' ? 'text-[10px]' : 'text-[9px]';
+    const freqText = size === 'lg' ? 'text-[12px]' : 'text-[9px]';
     return (
-      <span className={`inline-flex flex-col items-center justify-center ${dim} rounded-full ${colorClass} font-bold leading-none gap-0.5`}>
+      <span className={`inline-flex flex-col items-center justify-center ${dim} rounded-full ${colorClass}  leading-none gap-0.5`}>
         <span className={numText}>{String(num).padStart(2, '0')}</span>
         <span className={`${freqText} opacity-80`}>{freq}회</span>
       </span>
@@ -251,7 +251,7 @@ function NumberBall({ num, size = 'md', freq, hoverFreq, highlighted }: { num: n
 
   const dim = size === 'lg' ? 'w-12 h-12 text-base' : size === 'sm' ? 'w-8 h-8 text-sm' : 'w-10 h-10 text-sm';
   const ball = (
-    <span className={`inline-flex items-center justify-center ${dim} rounded-full ${colorClass} font-bold`}>
+    <span className={`inline-flex items-center justify-center ${dim} rounded-full ${colorClass} `}>
       {String(num).padStart(2, '0')}
     </span>
   );
@@ -302,7 +302,7 @@ function DistributionPopup({
       >
         {/* Header */}
         <div className="flex items-center justify-between mb-1">
-          <h3 className="text-base font-bold text-gray-800">📊 번호 분포도</h3>
+          <h3 className="text-base  text-gray-800">📊 번호 분포도</h3>
           <button onClick={onClose} className="text-gray-400 hover:text-gray-700 text-xl leading-none px-1">✕</button>
         </div>
         <p className="text-[11px] text-gray-400 mb-5 leading-relaxed">
@@ -317,7 +317,7 @@ function DistributionPopup({
             const barPct = (count / maxVal) * 100;
             return (
               <div key={i} className="flex items-center gap-3">
-                <span className={`text-[11px] font-semibold w-[60px] flex-shrink-0 ${TEXTCOL[i]}`}>{LABELS[i]}</span>
+                <span className={`text-[11px]  w-[60px] flex-shrink-0 ${TEXTCOL[i]}`}>{LABELS[i]}</span>
                 <div className="flex-1 h-6 bg-gray-100 rounded-full overflow-hidden">
                   <div
                     className={`h-full ${COLORS[i]} rounded-full`}
@@ -325,8 +325,8 @@ function DistributionPopup({
                   />
                 </div>
                 <div className="flex items-baseline gap-1 w-[90px] flex-shrink-0 justify-end">
-                  <span className="text-xs font-semibold text-gray-700">{count.toLocaleString()}회</span>
-                  <span className="text-[10px] text-gray-400">({pct}%)</span>
+                  <span className="text-xs  text-gray-700">{count.toLocaleString()}회</span>
+                  <span className="text-[12px] text-gray-400">({pct}%)</span>
                 </div>
               </div>
             );
@@ -388,7 +388,7 @@ function SectionHeader({ icon, title, small }: { icon: ReactNode; title: string;
   return (
     <div className="flex items-center gap-2">
       <span className={`flex-shrink-0 inline-flex items-center justify-center ${small ? 'w-6 h-6' : 'w-8 h-8'} rounded-full bg-indigo-600 text-white`}>{icon}</span>
-      <h2 className={`${small ? 'text-sm' : 'text-xl'} font-bold text-gray-800 tracking-tight`}>{title}</h2>
+      <h2 className={`${small ? 'text-sm' : 'text-xl'}  text-gray-800 tracking-tight`}>{title}</h2>
     </div>
   );
 }
@@ -1188,7 +1188,7 @@ export default function Home() {
                 <button
                   onClick={registerLatest}
                   disabled={isRegisteringLatest || isSyncing}
-                  className="px-3 py-1.5 text-xs font-semibold bg-indigo-500 text-white rounded-lg hover:bg-indigo-600 active:scale-95 transition-all disabled:opacity-40 whitespace-nowrap"
+                  className="px-3 py-1.5 text-xs  bg-indigo-500 text-white rounded-lg hover:bg-indigo-600 active:scale-95 transition-all disabled:opacity-40 whitespace-nowrap"
                 >
                   {isRegisteringLatest ? '확인 중...' : '최신 당첨번호 등록'}
                 </button>
@@ -1198,12 +1198,12 @@ export default function Home() {
               <table className="w-full border-separate border-spacing-0 text-sm min-w-[560px]">
                 <thead className="sticky top-0 z-10" style={{ boxShadow: '0 2px 0 #a5b4fc' }}>
                   <tr className="bg-indigo-50">
-                    <th className="border-b border-indigo-200 px-3 py-1.5 text-center text-xs font-semibold text-indigo-700 whitespace-nowrap">회차</th>
-                    <th className="border-b border-indigo-200 px-3 py-1.5 text-center text-xs font-semibold text-indigo-700 whitespace-nowrap">추첨일</th>
-                    <th colSpan={6} className="border-b border-indigo-200 px-2 py-1.5 text-center text-xs font-semibold text-indigo-700">당첨번호</th>
-                    <th className="border-b border-l-2 border-indigo-200 border-l-indigo-200 px-2 py-1.5 text-center text-xs font-semibold text-indigo-700">보너스</th>
-                    <th className="border-b border-l-2 border-indigo-200 border-l-indigo-200 px-2 py-1.5 text-center text-xs font-semibold text-indigo-700 whitespace-nowrap">당첨자</th>
-                    <th className="border-b border-indigo-200 px-2 py-1.5 text-center text-xs font-semibold text-indigo-700 whitespace-nowrap">당첨금</th>
+                    <th className="border-b border-indigo-200 px-3 py-1.5 text-center text-xs  text-indigo-700 whitespace-nowrap">회차</th>
+                    <th className="border-b border-indigo-200 px-3 py-1.5 text-center text-xs  text-indigo-700 whitespace-nowrap">추첨일</th>
+                    <th colSpan={6} className="border-b border-indigo-200 px-2 py-1.5 text-center text-xs  text-indigo-700">당첨번호</th>
+                    <th className="border-b border-l-2 border-indigo-200 border-l-indigo-200 px-2 py-1.5 text-center text-xs  text-indigo-700">보너스</th>
+                    <th className="border-b border-l-2 border-indigo-200 border-l-indigo-200 px-2 py-1.5 text-center text-xs  text-indigo-700 whitespace-nowrap">당첨자</th>
+                    <th className="border-b border-indigo-200 px-2 py-1.5 text-center text-xs  text-indigo-700 whitespace-nowrap">당첨금</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -1213,15 +1213,15 @@ export default function Home() {
                   {results.map((row, i) => (
                     <tr key={row.id} className={`${i % 2 === 0 ? 'bg-white' : 'bg-gray-50'} hover:bg-indigo-50 transition-colors`}>
                       <td className="border-b border-r border-gray-200 px-3 py-1 text-center text-sm font-medium text-gray-700 whitespace-nowrap">{String(row.round).padStart(5, '0')}</td>
-                      <td className="border-b border-r border-gray-200 px-3 py-1 text-center text-xs text-gray-500 whitespace-nowrap">{row.draw_date}</td>
+                      <td className="border-b border-r border-gray-200 px-3 py-1 text-center text-[14px] text-gray-500 whitespace-nowrap">{row.draw_date}</td>
                       {[row.num1, row.num2, row.num3, row.num4, row.num5, row.num6].map((num, idx) => (
                         <td key={idx} className="border-b border-r border-gray-200 px-2 py-1 text-center"><NumberBall num={num} size="sm" /></td>
                       ))}
                       <td className="border-b border-r border-l-2 border-gray-200 border-l-indigo-200 px-2 py-1 text-center"><NumberBall num={row.bonus1} size="sm" /></td>
-                      <td className="border-b border-r border-l-2 border-gray-200 border-l-indigo-200 px-2 py-1 text-center text-xs text-gray-600 whitespace-nowrap">
+                      <td className="border-b border-r border-l-2 border-gray-200 border-l-indigo-200 px-2 py-1 text-center text-[14px] text-gray-600 whitespace-nowrap">
                         {row.first_prize_winners != null ? <span className="font-medium">{row.first_prize_winners}명</span> : '-'}
                       </td>
-                      <td className="border-b border-gray-200 px-2 py-1 text-right text-xs text-gray-700 whitespace-nowrap font-medium">{formatAmount(row.first_prize_amount)}</td>
+                      <td className="border-b border-gray-200 px-2 py-1 text-right text-[14px] text-gray-700 whitespace-nowrap font-medium">{formatAmount(row.first_prize_amount)}</td>
                     </tr>
                   ))}
                 </tbody>
@@ -1236,7 +1236,7 @@ export default function Home() {
                 <SectionHeader icon={<IconBarChart />} title="참고) 당첨 빈도 분석" small />
                 <button
                   onClick={() => setShowConditionHelp(true)}
-                  className="flex-shrink-0 inline-flex items-center justify-center w-4 h-4 rounded-full bg-gray-200 text-gray-500 text-[10px] font-bold hover:bg-gray-300 hover:text-gray-700 transition-colors"
+                  className="flex-shrink-0 inline-flex items-center justify-center w-4 h-4 rounded-full bg-gray-200 text-gray-500 text-[12px]  hover:bg-gray-300 hover:text-gray-700 transition-colors"
                   title="조건 유형별 설명"
                 >
                   ?
@@ -1248,28 +1248,28 @@ export default function Home() {
                     {saveConditionsMsg}
                   </span>
                 )}
-                <button onClick={saveConditions} disabled={isSavingConditions} className="px-3 py-1.5 text-xs font-semibold bg-emerald-500 text-white rounded-lg hover:bg-emerald-600 active:scale-95 transition-all disabled:opacity-40">
+                <button onClick={saveConditions} disabled={isSavingConditions} className="px-3 py-1.5 text-xs  bg-emerald-500 text-white rounded-lg hover:bg-emerald-600 active:scale-95 transition-all disabled:opacity-40">
                   {isSavingConditions ? '저장 중...' : '결과 저장'}
                 </button>
-                <button onClick={resetConditionNumbers} className="px-3 py-1.5 text-xs font-semibold bg-gray-100 text-gray-600 rounded-lg hover:bg-gray-200 active:scale-95 transition-all disabled:opacity-40">초기화</button>
+                <button onClick={resetConditionNumbers} className="px-3 py-1.5 text-xs  bg-gray-100 text-gray-600 rounded-lg hover:bg-gray-200 active:scale-95 transition-all disabled:opacity-40">초기화</button>
               </div>
             </div>
             <div className="overflow-x-auto overflow-y-auto max-h-72 md:max-h-none md:flex-1 md:min-h-0">
               <table className="w-full border-separate border-spacing-0 text-xs min-w-[600px]">
                 <thead className="sticky top-0 z-10" style={{ boxShadow: '0 2px 0 #6ee7b7' }}>
                   <tr className="bg-emerald-50">
-                    <th className="border-b border-emerald-100 px-3 py-2 text-left text-xs font-semibold text-emerald-700 bg-emerald-50">
+                    <th className="border-b border-emerald-100 px-3 py-2 text-left text-xs  text-emerald-700 bg-emerald-50">
                       <button onClick={toggleConditionSort} className="flex items-center gap-1 hover:text-emerald-900 transition-colors select-none">
                         조건
-                        <span className="text-[10px] leading-none">
+                        <span className="text-[12px] leading-none">
                           {conditionSort === 'asc' ? '▲' : conditionSort === 'desc' ? '▼' : '⇅'}
                         </span>
                       </button>
                     </th>
-                    <th className="border-b border-emerald-100 px-2 py-2 text-center text-xs font-semibold text-emerald-700 whitespace-nowrap bg-emerald-50">실행</th>
-                    <th className="border-b border-emerald-100 px-2 py-2 text-center text-xs font-semibold text-emerald-700 whitespace-nowrap bg-emerald-50">분석 회차</th>
+                    <th className="border-b border-emerald-100 px-2 py-2 text-center text-xs  text-emerald-700 whitespace-nowrap bg-emerald-50">실행</th>
+                    <th className="border-b border-emerald-100 px-2 py-2 text-center text-xs  text-emerald-700 whitespace-nowrap bg-emerald-50">분석 회차</th>
                     <th colSpan={6} className="border-b border-emerald-100 px-3 py-2 text-center text-xs font-medium text-emerald-600 bg-emerald-50">추출번호</th>
-                    <th className="border-b border-emerald-100 px-2 py-2 text-center text-xs font-semibold text-emerald-700 bg-emerald-50">관리</th>
+                    <th className="border-b border-emerald-100 px-2 py-2 text-center text-xs  text-emerald-700 bg-emerald-50">관리</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -1386,13 +1386,13 @@ export default function Home() {
                       <td className="border-b border-gray-100 px-2 py-1.5 text-center">
                         <div className="flex items-center justify-center gap-1">
                           <button onClick={() => executeCondition(row.id)} disabled={row.isLoading}
-                            className="inline-flex items-center gap-0.5 px-2 py-1 text-xs font-semibold bg-indigo-600 text-white rounded hover:bg-indigo-700 disabled:opacity-40 whitespace-nowrap">
+                            className="inline-flex items-center gap-0.5 px-2 py-1 text-xs  bg-indigo-600 text-white rounded hover:bg-indigo-700 disabled:opacity-40 whitespace-nowrap">
                             {row.isLoading ? <span className="inline-block w-2.5 h-2.5 border-2 border-white border-t-transparent rounded-full animate-spin" /> : '실행'}
                           </button>
                           <button
                             onClick={() => openDistribution(row.id)}
                             disabled={distLoadingIds.has(row.id)}
-                            className="inline-flex items-center gap-0.5 px-2 py-1 text-xs font-semibold bg-amber-500 text-white rounded hover:bg-amber-600 disabled:opacity-50 whitespace-nowrap"
+                            className="inline-flex items-center gap-0.5 px-2 py-1 text-xs  bg-amber-500 text-white rounded hover:bg-amber-600 disabled:opacity-50 whitespace-nowrap"
                             title="번호 분포도 보기"
                           >
                             {distLoadingIds.has(row.id)
@@ -1414,9 +1414,9 @@ export default function Home() {
                         </td>
                       ))}
                       <td className="border-b border-gray-100 px-2 py-1.5 text-center whitespace-nowrap">
-                        <button onClick={addConditionRow} className="inline-flex items-center justify-center w-5 h-5 rounded-full text-emerald-600 hover:bg-emerald-100 font-bold text-sm" title="행 추가">+</button>
+                        <button onClick={addConditionRow} className="inline-flex items-center justify-center w-5 h-5 rounded-full text-emerald-600 hover:bg-emerald-100  text-sm" title="행 추가">+</button>
                         <button onClick={() => removeConditionRow(row.id)} disabled={conditions.length <= 1}
-                          className="inline-flex items-center justify-center w-5 h-5 rounded-full text-red-400 hover:bg-red-50 font-bold text-sm disabled:opacity-25" title="행 삭제">-</button>
+                          className="inline-flex items-center justify-center w-5 h-5 rounded-full text-red-400 hover:bg-red-50  text-sm disabled:opacity-25" title="행 삭제">-</button>
                       </td>
                     </tr>
                   ))}
@@ -1438,7 +1438,7 @@ export default function Home() {
                   <span className="inline-flex items-center justify-center w-9 h-9 rounded-full bg-indigo-600 text-white">
                     <IconDice size="md" />
                   </span>
-                  <h2 className="text-xl font-bold text-gray-900 tracking-tight">예상 당첨 번호</h2>
+                  <h2 className="text-xl  text-gray-900 tracking-tight">예상 당첨 번호</h2>
                 </div>
                 <div className="flex items-center gap-2 w-full sm:w-auto">
                   <button
@@ -1446,7 +1446,7 @@ export default function Home() {
                     disabled={isGeneratingAI}
                     onMouseEnter={(e) => showTooltip(e, 'generate')}
                     onMouseLeave={() => setTooltipInfo(null)}
-                    className="flex-shrink-0 inline-flex items-center gap-1.5 px-4 py-2 text-sm font-semibold bg-indigo-600 text-white rounded-xl hover:bg-indigo-700 disabled:opacity-50 whitespace-nowrap transition-all shadow-sm"
+                    className="flex-shrink-0 inline-flex items-center gap-1.5 px-4 py-2 text-sm  bg-indigo-600 text-white rounded-xl hover:bg-indigo-700 disabled:opacity-50 whitespace-nowrap transition-all shadow-sm"
                   >
                     {isGeneratingAI
                       ? <><span className="inline-block w-3.5 h-3.5 border-2 border-white border-t-transparent rounded-full animate-spin" />백테스트 · 생성 중</>
@@ -1454,13 +1454,13 @@ export default function Home() {
                   </button>
                   <button
                     onClick={() => setShowInfoPopup(true)}
-                    className="flex-shrink-0 inline-flex items-center gap-1.5 px-4 py-2 text-sm font-semibold bg-rose-500 text-white rounded-xl hover:bg-rose-600 whitespace-nowrap transition-all shadow-sm"
+                    className="flex-shrink-0 inline-flex items-center gap-1.5 px-4 py-2 text-sm  bg-rose-500 text-white rounded-xl hover:bg-rose-600 whitespace-nowrap transition-all shadow-sm"
                   >
                     🎯 확정
                   </button>
                   <button
                     onClick={() => setShowDashboard(true)}
-                    className="flex-shrink-0 inline-flex items-center gap-1.5 px-4 py-2 text-sm font-semibold bg-amber-500 text-white rounded-xl hover:bg-amber-600 whitespace-nowrap transition-all shadow-sm"
+                    className="flex-shrink-0 inline-flex items-center gap-1.5 px-4 py-2 text-sm  bg-amber-500 text-white rounded-xl hover:bg-amber-600 whitespace-nowrap transition-all shadow-sm"
                   >
                     📊 성과
                   </button>
@@ -1476,15 +1476,15 @@ export default function Home() {
               {expertPicks.length > 0 && (
                 <div className="flex-none rounded-2xl border border-violet-200 bg-violet-50/60 px-4 py-3">
                   <div className="flex items-center gap-2 mb-2 min-w-0">
-                    <span className="inline-flex items-center gap-1.5 text-sm font-bold text-violet-900 whitespace-nowrap">
+                    <span className="inline-flex items-center gap-1.5 text-sm  text-violet-900 whitespace-nowrap">
                       🤖 Claude 추천 5개
                     </span>
-                    <span className="text-[10px] text-violet-400 font-medium hidden sm:block">밴드분산 · 홀짝균형 · 보너스후보 · 빈도상위 종합 점수 상위 5개</span>
+                    <span className="text-[12px] text-violet-400 font-medium hidden sm:block">밴드분산 · 홀짝균형 · 보너스후보 · 빈도상위 종합 점수 상위 5개</span>
                   </div>
 
                   {/* 백테스팅 배지 — 5개 전체에 적용되는 과거 성과 참고치 */}
                   <div className="flex items-center gap-2 mb-2 px-3 py-1.5 bg-white/70 rounded-lg text-[11px] flex-wrap">
-                    <span className="flex-shrink-0 font-bold text-violet-700 bg-violet-100 px-2 py-0.5 rounded-full">랜덤 모드</span>
+                    <span className="flex-shrink-0  text-violet-700 bg-violet-100 px-2 py-0.5 rounded-full">랜덤 모드</span>
                     {isGeneratingAI ? (
                       <span className="text-gray-400">백테스트로 과거 성과 확인 중...</span>
                     ) : modeBacktest ? (
@@ -1514,21 +1514,21 @@ export default function Home() {
                           className={`flex items-center gap-2 px-3 py-2 transition-all ${atCap ? 'opacity-30 cursor-not-allowed' : `cursor-pointer hover:bg-violet-50/60 ${checked ? '' : 'opacity-50'}`}`}
                         >
                           <span className={`flex-shrink-0 w-4 h-4 rounded border-2 flex items-center justify-center ${checked ? 'bg-violet-600 border-violet-600' : 'border-gray-300'}`}>
-                            {checked && <span className="text-white text-[9px] font-bold">✓</span>}
+                            {checked && <span className="text-white text-[9px] ">✓</span>}
                           </span>
-                          <span className="flex-shrink-0 w-5 h-5 rounded-full bg-violet-600 text-white text-[10px] font-bold flex items-center justify-center">{rank + 1}</span>
-                          <div className="flex gap-1.5 flex-1">
+                          <span className="flex-shrink-0 w-5 h-5 rounded-full bg-violet-600 text-white text-[12px]  flex items-center justify-center">{rank + 1}</span>
+                          <div className="flex gap-3 flex-1">
                             {combo.map((num, j) => <NumberBall key={j} num={num} size="sm" highlighted={checked} />)}
                           </div>
                           <div
-                            className="flex-shrink-0 flex items-center gap-1.5 text-[10px] text-violet-500 font-medium whitespace-nowrap"
+                            className="flex-shrink-0 flex items-center gap-1.5 text-[14px] text-violet-500 font-medium whitespace-nowrap"
                             onMouseEnter={(e) => showTooltip(e, 'combo-stats')}
                             onMouseLeave={() => setTooltipInfo(null)}
                           >
                             <span>합{sum}</span>
                             <span>홀{odds}/짝{6 - odds}</span>
                             <span>{bandCount}밴드</span>
-                            <span className="text-violet-700 font-bold">{score}점</span>
+                            <span className="text-violet-700 ">{score}점</span>
                           </div>
                         </div>
                       );
@@ -1541,7 +1541,7 @@ export default function Home() {
               <div className="flex-none rounded-2xl border border-gray-200 bg-gray-50/60 overflow-hidden">
                 <button
                   onClick={() => setShowAdvanced(v => !v)}
-                  className="w-full flex items-center gap-2 px-4 py-2.5 text-xs font-semibold text-gray-500 hover:text-gray-700 transition-colors"
+                  className="w-full flex items-center gap-2 px-4 py-2.5 text-xs  text-gray-500 hover:text-gray-700 transition-colors"
                 >
                   <span className={`inline-block transition-transform ${showAdvanced ? 'rotate-90' : ''}`}>▸</span>
                   고급 — 게임 수 조절 · 전체 조합 보기{type3Numbers.length > 0 ? ` (${type3Numbers.length}개)` : ''}
@@ -1551,14 +1551,14 @@ export default function Home() {
                     {/* 게임 수 조절 패널 */}
                     <div className="bg-indigo-50/70 rounded-xl border border-indigo-100 px-4 py-3">
                       <div className="flex items-center gap-3 flex-wrap">
-                        <span className="text-sm font-semibold text-indigo-800 whitespace-nowrap">게임 수</span>
+                        <span className="text-sm  text-indigo-800 whitespace-nowrap">게임 수</span>
                         <div className="flex-1 min-w-[120px]">
                           <input
                             type="range" min={5} max={maxGameCount} step={5} value={gameCount}
                             onChange={(e) => setGameCount(Number(e.target.value))}
                             className="w-full h-2 rounded-full appearance-none cursor-pointer accent-indigo-600 bg-indigo-200"
                           />
-                          <div className="flex justify-between text-[10px] text-indigo-400 mt-0.5">
+                          <div className="flex justify-between text-[12px] text-indigo-400 mt-0.5">
                             <span>5</span><span>25</span><span>50</span><span>75</span><span>100</span>
                           </div>
                         </div>
@@ -1566,23 +1566,23 @@ export default function Home() {
                           <input
                             type="number" min={5} max={100} step={5} value={gameCount}
                             onChange={(e) => setGameCount(Math.min(maxGameCount, Math.max(5, Number(e.target.value))))}
-                            className="w-14 border border-indigo-300 rounded-lg px-2 py-1 text-sm text-center font-bold text-indigo-700 bg-white focus:outline-none focus:ring-2 focus:ring-indigo-400"
+                            className="w-14 border border-indigo-300 rounded-lg px-2 py-1 text-sm text-center  text-indigo-700 bg-white focus:outline-none focus:ring-2 focus:ring-indigo-400"
                           />
                           <span className="text-sm text-indigo-600 font-medium">게임</span>
                         </div>
                       </div>
                       <div className="mt-2.5 grid grid-cols-3 gap-2">
                         <div className="bg-white rounded-xl border border-indigo-100 px-2 py-2 text-center">
-                          <div className="text-[10px] text-gray-400 mb-0.5">구매 비용</div>
-                          <div className="text-sm font-bold text-gray-800">{(gameCount * 1000).toLocaleString()}원</div>
+                          <div className="text-[12px] text-gray-400 mb-0.5">구매 비용</div>
+                          <div className="text-sm  text-gray-800">{(gameCount * 1000).toLocaleString()}원</div>
                         </div>
                         <div className="bg-white rounded-xl border border-indigo-100 px-2 py-2 text-center">
-                          <div className="text-[10px] text-gray-400 mb-0.5">1등 확률</div>
-                          <div className="text-sm font-bold text-indigo-600">1 / {Math.round(8145060 / gameCount).toLocaleString()}</div>
+                          <div className="text-[12px] text-gray-400 mb-0.5">1등 확률</div>
+                          <div className="text-sm  text-indigo-600">1 / {Math.round(8145060 / gameCount).toLocaleString()}</div>
                         </div>
                         <div className="bg-white rounded-xl border border-amber-100 px-2 py-2 text-center">
-                          <div className="text-[10px] text-amber-500 mb-0.5">기본 대비</div>
-                          <div className="text-sm font-bold text-amber-600">× {(gameCount / 5).toFixed(1)} 배</div>
+                          <div className="text-[12px] text-amber-500 mb-0.5">기본 대비</div>
+                          <div className="text-sm  text-amber-600">× {(gameCount / 5).toFixed(1)} 배</div>
                         </div>
                       </div>
                     </div>
@@ -1591,7 +1591,7 @@ export default function Home() {
                     <div className="flex-none flex flex-col rounded-2xl border border-emerald-200 bg-emerald-50/60 px-4 py-4 md:px-5">
                       <div className="flex-none flex items-center justify-between mb-3">
                         <div className="flex items-center gap-2">
-                          <span className="text-base font-bold text-emerald-900">
+                          <span className="text-base  text-emerald-900">
                             랜덤 &times; {type3Numbers.length > 0 ? type3Numbers.length : gameCount}
                           </span>
                           {type3Numbers.length > 0 && (
@@ -1610,7 +1610,7 @@ export default function Home() {
                             <button
                               onClick={confirmPurchase}
                               disabled={isConfirming || results.length === 0 || selectedComboIndices.size === 0}
-                              className="inline-flex items-center gap-1 px-3 py-1 text-xs font-semibold bg-rose-500 text-white rounded-lg hover:bg-rose-600 disabled:opacity-40 transition-all"
+                              className="inline-flex items-center gap-1 px-3 py-1 text-xs  bg-rose-500 text-white rounded-lg hover:bg-rose-600 disabled:opacity-40 transition-all"
                             >
                               {isConfirming
                                 ? <><span className="inline-block w-2.5 h-2.5 border-2 border-white border-t-transparent rounded-full animate-spin" />확정 중</>
@@ -1637,7 +1637,7 @@ export default function Home() {
                                         className={`flex items-center gap-1.5 py-2 px-2 cursor-pointer transition-all ${selected ? 'bg-indigo-50 ring-1 ring-inset ring-indigo-300' : 'hover:bg-gray-50'}`}
                                       >
                                         <span className={`w-4 h-4 flex-shrink-0 rounded-full border-2 flex items-center justify-center ${selected ? 'bg-indigo-500 border-indigo-500' : 'border-gray-300'}`}>
-                                          {selected && <span className="text-white text-[9px] font-bold">✓</span>}
+                                          {selected && <span className="text-white text-[9px] ">✓</span>}
                                         </span>
                                         <div className="flex justify-center gap-1 flex-1">
                                           {combo.map((num, j) => <NumberBall key={j} num={num} size="sm" highlighted={selected} />)}
@@ -1665,7 +1665,7 @@ export default function Home() {
                                       className={`flex items-center gap-3 px-3 py-2.5 cursor-pointer transition-all ${selected ? 'bg-indigo-50 ring-1 ring-inset ring-indigo-300' : 'hover:bg-gray-50'}`}
                                     >
                                       <span className={`w-5 h-5 flex-shrink-0 rounded-full border-2 flex items-center justify-center ${selected ? 'bg-indigo-500 border-indigo-500' : 'border-gray-300'}`}>
-                                        {selected && <span className="text-white text-xs font-bold">✓</span>}
+                                        {selected && <span className="text-white text-xs ">✓</span>}
                                       </span>
                                       <div className="flex justify-center gap-2.5 flex-1">
                                         {combo.map((num, j) => <NumberBall key={j} num={num} size="md" highlighted={selected} />)}
@@ -1691,7 +1691,7 @@ export default function Home() {
                 return (
                   <div className="sticky bottom-0 -mx-4 md:-mx-5 mt-auto px-4 md:px-5 py-3 bg-white/95 backdrop-blur-sm border-t border-gray-200 flex items-center justify-between gap-3">
                     <div>
-                      <div className="text-sm font-bold text-gray-800">선택 {totalSelected}게임 <span className="text-[11px] font-normal text-gray-400">/ 최대 5게임 · 1세트로 확정</span></div>
+                      <div className="text-sm  text-gray-800">선택 {totalSelected}게임 <span className="text-[11px] font-normal text-gray-400">/ 최대 5게임 · 1세트로 확정</span></div>
                       <div className="text-[11px] text-gray-400">
                         {(totalSelected * 1000).toLocaleString()}원
                         {totalSelected > 0 ? ` · 1등 확률 1 / ${Math.round(8145060 / totalSelected).toLocaleString()}` : ''}
@@ -1702,7 +1702,7 @@ export default function Home() {
                       <button
                         onClick={confirmFinalSelection}
                         disabled={isConfirmingFinal || totalSelected === 0 || results.length === 0}
-                        className="inline-flex items-center gap-1.5 px-5 py-2 text-sm font-bold bg-indigo-600 text-white rounded-xl hover:bg-indigo-700 disabled:opacity-40 transition-all"
+                        className="inline-flex items-center gap-1.5 px-5 py-2 text-sm  bg-indigo-600 text-white rounded-xl hover:bg-indigo-700 disabled:opacity-40 transition-all"
                       >
                         {isConfirmingFinal
                           ? <><span className="inline-block w-3 h-3 border-2 border-white border-t-transparent rounded-full animate-spin" />확정 중</>
@@ -1731,7 +1731,7 @@ export default function Home() {
           >
             {/* 팝업 헤더 */}
             <div className="flex-none flex items-center justify-between px-6 py-4 border-b border-gray-100">
-              <h3 className="text-base font-bold text-gray-800">🎯 확정 현황</h3>
+              <h3 className="text-base  text-gray-800">🎯 확정 현황</h3>
               <button onClick={() => setShowInfoPopup(false)} className="text-gray-400 hover:text-gray-700 text-xl leading-none px-1">✕</button>
             </div>
 
@@ -1740,9 +1740,9 @@ export default function Home() {
               {/* 구매 이력 — 회차별 그룹 + 아코디언 */}
               <div>
                 <div className="flex items-center justify-between mb-3">
-                  <h4 className="text-sm font-bold text-rose-800">📋 구매 이력</h4>
+                  <h4 className="text-sm  text-rose-800">📋 구매 이력</h4>
                   {confirmedPurchases.length > 0 && (
-                    <span className="text-[10px] text-gray-400">{new Set(confirmedPurchases.map(p => p.target_round)).size}회차 · {confirmedPurchases.length}종</span>
+                    <span className="text-[12px] text-gray-400">{new Set(confirmedPurchases.map(p => p.target_round)).size}회차 · {confirmedPurchases.length}종</span>
                   )}
                 </div>
                 {confirmedPurchases.length === 0 ? (
@@ -1783,16 +1783,16 @@ export default function Home() {
                           <div key={round} className="rounded-xl border border-rose-100 overflow-hidden">
                             {/* 회차 헤더 */}
                             <div className="flex items-center gap-2 px-4 py-2.5 bg-rose-50 border-b border-rose-100">
-                              <span className="text-sm font-bold text-rose-800">{round}회</span>
+                              <span className="text-sm  text-rose-800">{round}회</span>
                               {actual ? (
-                                <span className="text-[10px] text-gray-400">{actual.draw_date}</span>
+                                <span className="text-[12px] text-gray-400">{actual.draw_date}</span>
                               ) : (
-                                <span className="text-[10px] text-amber-500 font-semibold">추첨 대기</span>
+                                <span className="text-[12px] text-amber-500 ">추첨 대기</span>
                               )}
-                              <span className="text-[10px] text-gray-400">{purchases.length}종 확정</span>
+                              <span className="text-[12px] text-gray-400">{purchases.length}종 확정</span>
                               <div className="ml-auto flex items-center gap-2">
                                 {actual && roundBestTier !== '낙첨' && (
-                                  <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full border ${getTierStyle(roundBestTier)}`}>
+                                  <span className={`text-[12px]  px-2 py-0.5 rounded-full border ${getTierStyle(roundBestTier)}`}>
                                     최고 {roundBestTier}
                                   </span>
                                 )}
@@ -1800,7 +1800,7 @@ export default function Home() {
                                   <button
                                     onClick={() => sendTelegram(round)}
                                     disabled={sendingTelegramRound === round}
-                                    className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-[10px] font-semibold bg-sky-500 text-white hover:bg-sky-600 disabled:opacity-50 transition-all"
+                                    className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-[12px]  bg-sky-500 text-white hover:bg-sky-600 disabled:opacity-50 transition-all"
                                   >
                                     {sendingTelegramRound === round
                                       ? <><span className="inline-block w-2 h-2 border border-white border-t-transparent rounded-full animate-spin" />전송 중</>
@@ -1808,7 +1808,7 @@ export default function Home() {
                                   </button>
                                 )}
                                 {telegramMsg?.round === round && (
-                                  <span className={`text-[10px] font-medium ${telegramMsg.ok ? 'text-sky-600' : 'text-red-500'}`}>
+                                  <span className={`text-[12px] font-medium ${telegramMsg.ok ? 'text-sky-600' : 'text-red-500'}`}>
                                     {telegramMsg.text}
                                   </span>
                                 )}
@@ -1818,11 +1818,11 @@ export default function Home() {
                             {/* 당첨 번호 (추첨 완료 시) */}
                             {actual && (
                               <div className="flex items-center gap-2 px-4 py-2 border-b border-rose-100 bg-white/60">
-                                <span className="text-[10px] text-gray-400 flex-shrink-0 w-12">당첨번호</span>
+                                <span className="text-[12px] text-gray-400 flex-shrink-0 w-12">당첨번호</span>
                                 <div className="flex gap-1 flex-wrap">
                                   {winNums.map((num, j) => <NumberBall key={j} num={num} size="sm" highlighted />)}
                                   {actual.bonus1 != null && (
-                                    <><span className="text-[10px] text-gray-300 self-center">+</span>
+                                    <><span className="text-[12px] text-gray-300 self-center">+</span>
                                     <NumberBall num={actual.bonus1} size="sm" highlighted /></>
                                   )}
                                 </div>
@@ -1859,33 +1859,33 @@ export default function Home() {
                                         className="flex items-center gap-2 px-4 py-2.5 cursor-pointer hover:bg-rose-50/60 transition-colors select-none"
                                         onClick={() => setOpenConfirmedIds(prev => { const next = new Set(prev); isOpen ? next.delete(purchase.id) : next.add(purchase.id); return next; })}
                                       >
-                                        <span className="text-xs font-bold text-rose-500 w-4">{slotLabels[slotIdx]}</span>
+                                        <span className="text-xs  text-rose-500 w-4">{slotLabels[slotIdx]}</span>
                                         {purchase.generation_mode && (
-                                          <span className="text-[10px] font-semibold px-1.5 py-0.5 rounded bg-violet-100 text-violet-700">
+                                          <span className="text-[12px]  px-1.5 py-0.5 rounded bg-violet-100 text-violet-700">
                                             {MODE_LABELS[purchase.generation_mode] ?? purchase.generation_mode}
                                           </span>
                                         )}
                                         {isSelected && (
                                           <span className="flex items-center gap-1">
-                                            <span className="text-[10px] font-bold px-1.5 py-0.5 rounded bg-emerald-100 text-emerald-700 border border-emerald-200">
+                                            <span className="text-[12px]  px-1.5 py-0.5 rounded bg-emerald-100 text-emerald-700 border border-emerald-200">
                                               선정
                                             </span>
-                                            <span className="text-[10px] text-emerald-600">{selectionReason}</span>
+                                            <span className="text-[12px] text-emerald-600">{selectionReason}</span>
                                           </span>
                                         )}
                                         {actual && bestTier ? (
-                                          <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded-full border ${getTierStyle(bestTier)}`}>
+                                          <span className={`text-[12px]  px-1.5 py-0.5 rounded-full border ${getTierStyle(bestTier)}`}>
                                             최고 {bestTier}
                                           </span>
                                         ) : !actual ? (
-                                          <span className="text-[10px] text-gray-400">대기 중</span>
+                                          <span className="text-[12px] text-gray-400">대기 중</span>
                                         ) : null}
                                         <button
                                           onClick={(e) => { e.stopPropagation(); deleteConfirmed(purchase.id); }}
                                           className="ml-auto text-gray-300 hover:text-red-400 text-base leading-none transition-colors px-1"
                                           title="삭제"
                                         >×</button>
-                                        <span className="text-[10px] text-gray-300">{isOpen ? '▲' : '▼'}</span>
+                                        <span className="text-[12px] text-gray-300">{isOpen ? '▲' : '▼'}</span>
                                       </div>
 
                                       {/* 조합 상세 (펼쳐짐) */}
@@ -1900,7 +1900,7 @@ export default function Home() {
                                                   ))}
                                                 </div>
                                                 {analyses && (
-                                                  <span className={`flex-shrink-0 text-[10px] font-bold px-1.5 py-0.5 rounded-full border ${getTierStyle(analyses[i].tier)}`}>
+                                                  <span className={`flex-shrink-0 text-[12px]  px-1.5 py-0.5 rounded-full border ${getTierStyle(analyses[i].tier)}`}>
                                                     {analyses[i].tier}
                                                   </span>
                                                 )}
@@ -1933,13 +1933,13 @@ export default function Home() {
               {/* 생성 전략 */}
               <div>
                 <div className="flex items-center gap-2 mb-3">
-                  <h4 className="text-sm font-bold text-indigo-800">⚙️ 생성 전략</h4>
-                  <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-indigo-100 text-indigo-700">랜덤</span>
+                  <h4 className="text-sm  text-indigo-800">⚙️ 생성 전략</h4>
+                  <span className="px-2 py-0.5 rounded-full text-[12px]  bg-indigo-100 text-indigo-700">랜덤</span>
                 </div>
                 <div className="rounded-xl border border-indigo-100 bg-indigo-50/40 px-4 py-4 flex flex-col gap-2.5">
                   {GENERATION_STRATEGY.map(({ tag, color, desc }) => (
                     <div key={tag} className="flex items-start gap-3">
-                      <span className={`flex-shrink-0 mt-0.5 inline-flex items-center justify-center w-[108px] px-2 py-1 rounded-lg text-xs font-bold whitespace-nowrap ${color}`}>{tag}</span>
+                      <span className={`flex-shrink-0 mt-0.5 inline-flex items-center justify-center w-[108px] px-2 py-1 rounded-lg text-xs  whitespace-nowrap ${color}`}>{tag}</span>
                       <span className="text-xs text-gray-600 leading-snug pt-0.5">{desc}</span>
                     </div>
                   ))}
@@ -1983,7 +1983,7 @@ export default function Home() {
               onClick={(e) => e.stopPropagation()}
             >
               <div className="flex items-center justify-between mb-3">
-                <h3 className="text-base font-bold text-gray-800">조건 유형 설명</h3>
+                <h3 className="text-base  text-gray-800">조건 유형 설명</h3>
                 <button onClick={() => setShowConditionHelp(false)} className="text-gray-400 hover:text-gray-700 text-xl leading-none px-1">✕</button>
               </div>
 
@@ -1996,7 +1996,7 @@ export default function Home() {
                   <button
                     key={key}
                     onClick={() => setConditionHelpTab(key)}
-                    className={`px-2.5 py-1 rounded-md text-xs font-semibold transition-all ${
+                    className={`px-2.5 py-1 rounded-md text-xs  transition-all ${
                       conditionHelpTab === key ? 'bg-white text-emerald-700 shadow-sm' : 'text-gray-500 hover:text-gray-700'
                     }`}
                   >
@@ -2014,11 +2014,11 @@ export default function Home() {
                   </p>
                   <div className="flex flex-col divide-y divide-gray-100">
                     <div className="py-2.5 flex flex-col gap-1">
-                      <span className="text-xs font-bold text-violet-700">1) 조합 100개 생성</span>
+                      <span className="text-xs  text-violet-700">1) 조합 100개 생성</span>
                       <p className="text-xs text-gray-600 leading-relaxed">1~45 중 6개를 완전 무작위로 뽑아 게임 수만큼 생성합니다. 조건분석 결과는 이 단계에 전혀 관여하지 않습니다.</p>
                     </div>
                     <div className="py-2.5 flex flex-col gap-1">
-                      <span className="text-xs font-bold text-violet-700">2) Claude 추천 5개 선정</span>
+                      <span className="text-xs  text-violet-700">2) Claude 추천 5개 선정</span>
                       <p className="text-xs text-gray-600 leading-relaxed">생성된 100개 중, 조건분석에서 나온 보너스 후보·빈도 상위 번호를 많이 포함한 조합일수록 점수가 높아져 상위 5개로 추천됩니다. 조건분석을 실행해두지 않으면 이 가중치 없이 밴드분산·홀짝균형 등 조합 자체의 구조적 점수만으로 5개가 선정됩니다.</p>
                     </div>
                   </div>
@@ -2028,13 +2028,13 @@ export default function Home() {
                   <div className="flex flex-col divide-y divide-gray-100">
                     {CONDITION_HELP.map(({ label, desc, required }) => (
                       <div key={label} className="py-2.5 flex flex-col gap-1">
-                        <span className="text-xs font-bold text-emerald-700">{label}</span>
+                        <span className="text-xs  text-emerald-700">{label}</span>
                         <p className="text-xs text-gray-600 leading-relaxed">{desc}</p>
                         <p className="text-[11px] text-gray-400">필수 지정: {required}</p>
                       </div>
                     ))}
                   </div>
-                  <p className="text-[10px] text-gray-300 text-center mt-4">
+                  <p className="text-[12px] text-gray-300 text-center mt-4">
                     각 조건 행에서 유형을 선택하면 위 방식대로 필터링된 회차 안에서 상위 6개 번호를 계산합니다.
                   </p>
                 </>
@@ -2132,7 +2132,7 @@ export default function Home() {
             >
               {/* 헤더 */}
               <div className="flex-none flex items-center justify-between px-6 py-4 border-b border-gray-100">
-                <h3 className="text-base font-bold text-gray-800">📊 성과 대시보드</h3>
+                <h3 className="text-base  text-gray-800">📊 성과 대시보드</h3>
                 <div className="flex items-center gap-3">
                   {pendingRounds > 0 && (
                     <span className="text-[11px] text-amber-600 bg-amber-50 border border-amber-200 rounded-full px-2 py-0.5">
@@ -2162,16 +2162,16 @@ export default function Home() {
                         { label: '확정 당첨금', value: `${fixedPrize.toLocaleString()}원`, sub: `5등×${cnt5} + 4등×${cnt4}`, color: fixedPrize > 0 ? 'border-amber-200 bg-amber-50' : 'border-gray-100 bg-gray-50', valueColor: fixedPrize > 0 ? 'text-amber-700' : 'text-gray-400' },
                       ].map(card => (
                         <div key={card.label} className={`rounded-xl border ${card.color} px-3 py-3 text-center`}>
-                          <div className="text-[10px] text-gray-500 mb-1">{card.label}</div>
-                          <div className={`text-base font-bold ${card.valueColor}`}>{card.value}</div>
-                          <div className="text-[10px] text-gray-400 mt-0.5">{card.sub}</div>
+                          <div className="text-[12px] text-gray-500 mb-1">{card.label}</div>
+                          <div className={`text-base  ${card.valueColor}`}>{card.value}</div>
+                          <div className="text-[12px] text-gray-400 mt-0.5">{card.sub}</div>
                         </div>
                       ))}
                     </div>
 
                     {/* 등수 분포 */}
                     <div className="rounded-xl border border-gray-100 bg-gray-50 px-4 py-3">
-                      <p className="text-xs font-semibold text-gray-600 mb-3">
+                      <p className="text-xs  text-gray-600 mb-3">
                         회차별 최고 등수 분포
                         <span className="ml-2 text-gray-400 font-normal">({totalAnalyzedRounds}회차 기준)</span>
                       </p>
@@ -2181,11 +2181,11 @@ export default function Home() {
                           const pct = totalAnalyzedRounds > 0 ? cnt / totalAnalyzedRounds * 100 : 0;
                           return (
                             <div key={tier} className="flex items-center gap-2">
-                              <span className={`w-10 text-right text-[10px] font-bold px-1 py-0.5 rounded border ${TIER_BADGE2[tier]}`}>{tier}</span>
+                              <span className={`w-10 text-right text-[12px]  px-1 py-0.5 rounded border ${TIER_BADGE2[tier]}`}>{tier}</span>
                               <div className="flex-1 h-4 bg-white rounded border border-gray-100 overflow-hidden">
                                 <div className={`h-full rounded transition-all duration-500 ${TIER_COLOR[tier]}`} style={{ width: `${pct}%` }} />
                               </div>
-                              <span className="w-20 text-[10px] text-gray-500 text-right">
+                              <span className="w-20 text-[12px] text-gray-500 text-right">
                                 {cnt}회 <span className="text-gray-400">({pct.toFixed(1)}%)</span>
                               </span>
                             </div>
@@ -2197,7 +2197,7 @@ export default function Home() {
                     {/* 전략별 성과 */}
                     {Object.keys(modeStats).length > 0 && (
                       <div className="rounded-xl border border-gray-100 bg-gray-50 px-4 py-3">
-                        <p className="text-xs font-semibold text-gray-600 mb-3">전략별 적중률</p>
+                        <p className="text-xs  text-gray-600 mb-3">전략별 적중률</p>
                         <div className="grid grid-cols-2 gap-2">
                           {Object.entries(modeStats)
                             .sort((a, b) => (b[1].hits / Math.max(b[1].rounds, 1)) - (a[1].hits / Math.max(a[1].rounds, 1)))
@@ -2205,10 +2205,10 @@ export default function Home() {
                               const rate = stat.rounds > 0 ? stat.hits / stat.rounds * 100 : 0;
                               return (
                                 <div key={mode} className="bg-white rounded-lg border border-gray-100 px-3 py-2 flex items-center justify-between gap-2">
-                                  <span className="text-[11px] font-semibold text-gray-700 px-1.5 py-0.5 rounded bg-violet-100 text-violet-700">{MODE_LABEL[mode] ?? mode}</span>
+                                  <span className="text-[11px]  text-gray-700 px-1.5 py-0.5 rounded bg-violet-100 text-violet-700">{MODE_LABEL[mode] ?? mode}</span>
                                   <div className="text-right">
-                                    <div className="text-xs font-bold text-gray-800">{rate.toFixed(1)}%</div>
-                                    <div className="text-[10px] text-gray-400">{stat.hits}/{stat.rounds}회</div>
+                                    <div className="text-xs  text-gray-800">{rate.toFixed(1)}%</div>
+                                    <div className="text-[12px] text-gray-400">{stat.hits}/{stat.rounds}회</div>
                                   </div>
                                 </div>
                               );
@@ -2219,7 +2219,7 @@ export default function Home() {
 
                     {/* 회차별 이력 */}
                     <div>
-                      <p className="text-xs font-semibold text-gray-600 mb-2">회차별 이력 <span className="text-gray-400 font-normal">({roundStats.length}회차)</span></p>
+                      <p className="text-xs  text-gray-600 mb-2">회차별 이력 <span className="text-gray-400 font-normal">({roundStats.length}회차)</span></p>
                       <div className="rounded-xl border border-gray-100 overflow-hidden">
                         <table className="w-full text-xs">
                           <thead>
@@ -2243,7 +2243,7 @@ export default function Home() {
                                   <td className="px-3 py-2">
                                     <div className="flex gap-1 flex-wrap">
                                       {r.modes.map(m => (
-                                        <span key={m} className="text-[10px] px-1.5 py-0.5 rounded bg-violet-100 text-violet-700 font-medium">
+                                        <span key={m} className="text-[12px] px-1.5 py-0.5 rounded bg-violet-100 text-violet-700 font-medium">
                                           {MODE_LABEL[m] ?? m}
                                         </span>
                                       ))}
@@ -2251,7 +2251,7 @@ export default function Home() {
                                   </td>
                                   <td className="px-3 py-2 text-center text-gray-500">{r.games}</td>
                                   <td className="px-3 py-2 text-center">
-                                    <span className={`inline-block px-1.5 py-0.5 rounded border text-[10px] font-bold ${TIER_BADGE2[r.bestTier] ?? ''}`}>
+                                    <span className={`inline-block px-1.5 py-0.5 rounded border text-[12px]  ${TIER_BADGE2[r.bestTier] ?? ''}`}>
                                       {r.bestTier}
                                     </span>
                                   </td>
@@ -2260,8 +2260,7 @@ export default function Home() {
                                       {allMatchCounts.map((mc, i) => (
                                         <span
                                           key={i}
-                                          className={`inline-flex items-center justify-center w-5 h-5 rounded-full text-[9px] font-bold
-                                            ${mc >= 5 ? 'bg-rose-100 text-rose-600' : mc === 4 ? 'bg-blue-100 text-blue-600' : mc === 3 ? 'bg-emerald-100 text-emerald-700' : 'bg-gray-100 text-gray-400'}`}
+                                          className={`inline-flex items-center justify-center w-5 h-5 rounded-full text-[9px]                                             ${mc >= 5 ? 'bg-rose-100 text-rose-600' : mc === 4 ? 'bg-blue-100 text-blue-600' : mc === 3 ? 'bg-emerald-100 text-emerald-700' : 'bg-gray-100 text-gray-400'}`}
                                         >
                                           {mc}
                                         </span>
@@ -2277,7 +2276,7 @@ export default function Home() {
                     </div>
 
                     {/* 안내 */}
-                    <p className="text-[10px] text-gray-300 text-center">
+                    <p className="text-[12px] text-gray-300 text-center">
                       5등(3일치)=5,000원·4등(4일치)=50,000원 고정 기준. 3등 이상은 실제 당첨금 별도 확인 필요.
                     </p>
                   </>
@@ -2315,7 +2314,7 @@ export default function Home() {
             transform: `translateX(-50%) ${tooltipInfo.above ? 'translateY(-100%)' : 'translateY(0)'}`,
           }}
         >
-          <p className={`font-semibold mb-1 ${tip.titleColor}`}>{tip.title}</p>
+          <p className={` mb-1 ${tip.titleColor}`}>{tip.title}</p>
           <p className="text-gray-300 leading-relaxed whitespace-pre-line">{tip.desc}</p>
           {tooltipInfo.above
             ? <div className="absolute top-full left-1/2 -translate-x-1/2 border-4 border-transparent border-t-gray-900" />
