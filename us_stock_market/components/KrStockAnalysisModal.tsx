@@ -116,7 +116,7 @@ function InvestorTrendSection({ data }: { data: FundamentalsData }) {
 
   return (
     <div className="bg-gray-800 rounded-lg p-3 mb-3">
-      <p className="text-[11px] font-semibold text-gray-400 mb-2">
+      <p className="text-[12px] font-semibold text-gray-400 mb-2">
         👥 투자자 동향
         <span className="ml-1 font-normal text-gray-500">({dateLabel} 순매수량)</span>
       </p>
@@ -160,7 +160,7 @@ function EarningsSection({ data }: { data: FundamentalsData }) {
   return (
     <div className="bg-gray-800 rounded-lg p-3 mb-3">
       <div className="flex items-center justify-between mb-2">
-        <p className="text-[11px] font-semibold text-gray-400">
+        <p className="text-[12px] font-semibold text-gray-400">
           📊 최근 실적
           {latest && <span className="ml-1 font-normal text-gray-500">({latest.period})</span>}
         </p>
@@ -314,7 +314,7 @@ export default function KrStockAnalysisModal({
         <div className="p-4">
           {/* ── 실시간 데이터 섹션 ── */}
           {fundLoading ? (
-            <div className="bg-gray-800 rounded-lg p-3 mb-3 flex items-center gap-2 text-[11px] text-gray-500">
+            <div className="bg-gray-800 rounded-lg p-3 mb-3 flex items-center gap-2 text-[12px] text-gray-500">
               <span className="animate-spin inline-block w-3 h-3 border-2 border-gray-600 border-t-gray-300 rounded-full" />
               투자자 동향 · 실적 불러오는 중...
             </div>
@@ -328,7 +328,7 @@ export default function KrStockAnalysisModal({
           {/* 🔴 리스크 — 최근 실적 바로 아래 */}
           {analysis && !analysisLoading && analysis.analysis.risks.length > 0 && (
             <div className="bg-gray-800 rounded-lg p-3 mb-3">
-              <p className="text-[11px] font-semibold text-gray-400 mb-1.5">🔴 리스크</p>
+              <p className="text-[12px] font-semibold text-gray-400 mb-1.5">🔴 리스크</p>
               <ul className="space-y-2">
                 {analysis.analysis.risks.map((item, i) => (
                   <li key={i} className="text-xs text-gray-200 flex gap-1.5">
@@ -357,7 +357,7 @@ export default function KrStockAnalysisModal({
               {/* 회사 개요 — 펀더멘털 API에서 가져온 실데이터 */}
               {fundamentals?.companySummary && (
                 <div className="bg-gray-800 rounded-lg p-3 mb-3">
-                  <p className="text-[11px] font-semibold text-gray-400 mb-1.5">🏢 회사 개요</p>
+                  <p className="text-[12px] font-semibold text-gray-400 mb-1.5">🏢 회사 개요</p>
                   <ul className="space-y-1">
                     {fundamentals.companySummary.map((line, i) => (
                       <li key={i} className="text-xs text-gray-300 leading-relaxed flex gap-1.5">
@@ -370,23 +370,23 @@ export default function KrStockAnalysisModal({
               )}
 
               <div className="bg-gray-800 rounded-lg p-3 mb-3">
-                <p className="text-[11px] font-semibold text-gray-400 mb-1">💬 회사 가이던스</p>
+                <p className="text-[12px] font-semibold text-gray-400 mb-1">💬 회사 가이던스</p>
                 <p className="text-xs text-gray-200 leading-relaxed">{analysis.analysis.companyGuidance}</p>
               </div>
 
               <div className="bg-gray-800 rounded-lg p-3 mb-3">
-                <p className="text-[11px] font-semibold text-gray-400 mb-1">📈 단기 전망 (3개월)</p>
+                <p className="text-[12px] font-semibold text-gray-400 mb-1">📈 단기 전망 (3개월)</p>
                 <p className="text-xs text-gray-200 leading-relaxed">{analysis.analysis.shortTerm}</p>
               </div>
 
               <div className="bg-gray-800 rounded-lg p-3 mb-3">
-                <p className="text-[11px] font-semibold text-gray-400 mb-1">🔭 장기 전망 (6개월)</p>
+                <p className="text-[12px] font-semibold text-gray-400 mb-1">🔭 장기 전망 (6개월)</p>
                 <p className="text-xs text-gray-200 leading-relaxed">{analysis.analysis.longTerm}</p>
               </div>
 
               {analysis.analysis.targetPriceRange && (
                 <div className="bg-gray-800 rounded-lg p-3 mb-3">
-                  <p className="text-[11px] font-semibold text-gray-400 mb-1">🎯 목표 주가</p>
+                  <p className="text-[12px] font-semibold text-gray-400 mb-1">🎯 목표 주가</p>
                   <KrPriceRangeBar
                     low={analysis.analysis.targetPriceRange.low}
                     consensus={analysis.analysis.targetPriceRange.consensus}
@@ -399,7 +399,7 @@ export default function KrStockAnalysisModal({
               {/* 🟢 기회요인 — 단독 섹션, 전체 너비 */}
               {analysis.analysis.opportunities.length > 0 && (
                 <div className="bg-gray-800 rounded-lg p-3 mb-3">
-                  <p className="text-[11px] font-semibold text-gray-400 mb-1.5">🟢 기회요인</p>
+                  <p className="text-[12px] font-semibold text-gray-400 mb-1.5">🟢 기회요인</p>
                   <ul className="space-y-2">
                     {analysis.analysis.opportunities.map((item, i) => (
                       <li key={i} className="text-xs text-gray-200 flex gap-1.5">
@@ -412,7 +412,7 @@ export default function KrStockAnalysisModal({
               )}
 
               <div className="bg-gray-800 rounded-lg p-3">
-                <p className="text-[11px] font-semibold text-gray-400 mb-1">📚 참고 출처</p>
+                <p className="text-[12px] font-semibold text-gray-400 mb-1">📚 참고 출처</p>
                 <p className="text-[10px] text-gray-500 leading-relaxed">
                   {analysis.analysis.sources.join(', ')}
                 </p>

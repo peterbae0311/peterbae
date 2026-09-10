@@ -113,13 +113,17 @@
 body {
   background-color: var(--bg-root);
   color: var(--text-primary);
-  font-family: var(--font-noto-sans-kr), 'Noto Sans KR', Arial, Helvetica, sans-serif;
+  font-family: var(--font-inter-tight), var(--font-samsung-gin-gothic), sans-serif;
+  /* 두 폰트 모두 단일 굵기(정적) 파일이라, font-bold 등 요청 시 브라우저가 가짜(합성) 볼드를
+     만들어내는데 — 특히 삼성긴고딕은 그 결과가 번져 보인다. 합성 자체를 꺼서 항상 로드된
+     실제 굵기(삼성긴고딕=Medium)로만 렌더링되게 한다. */
+  font-synthesis: none;
   /* 폰트 렌더링 최적화:
      macOS에서 기본값(auto)은 서브픽셀 안티앨리어싱을 사용해 소형 폰트가 번져 보임.
      antialiased는 그레이스케일 안티앨리어싱을 사용해 특히 다크 배경에서 선명도 향상. */
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
-  /* 소형 폰트(10-11px)의 kern/ligature 렌더링 최적화 */
+  /* 소형 폰트(10-12px)의 kern/ligature 렌더링 최적화 */
   text-rendering: optimizeLegibility;
   font-feature-settings: "kern" 1;
 }
@@ -127,11 +131,11 @@ body {
 /* 숫자 데이터 영역: 고정폭 폰트로 열 정렬 보장.
    'ui-monospace'는 macOS/iOS 시스템 모노폰트(SF Mono),
    'Cascadia Code' / 'Consolas'는 Windows 시스템 폰트,
-   Noto Sans KR는 최종 한글 폴백으로만 유지. */
+   Inter Tight / 삼성긴고딕는 최종 폴백으로만 유지. */
 .font-mono {
   font-family: ui-monospace, 'Cascadia Code', 'Consolas', 'Menlo', 'Monaco',
                'Liberation Mono', monospace,
-               var(--font-noto-sans-kr), 'Noto Sans KR', sans-serif;
+               var(--font-inter-tight), var(--font-samsung-gin-gothic), sans-serif;
   font-variant-numeric: tabular-nums;
   letter-spacing: 0.01em;
 }

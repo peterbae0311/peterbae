@@ -182,7 +182,7 @@ export default function DashboardPage() {
                   }}
                   aria-current={active ? 'page' : undefined}
                 >
-                  <div className="text-[11px] font-semibold leading-tight" style={{ color: active ? '#ffffff' : 'var(--text-primary)' }}>
+                  <div className="text-[12px] font-semibold leading-tight" style={{ color: active ? '#ffffff' : 'var(--text-primary)' }}>
                     {d.date} <span style={{ color: active ? '#93c5fd' : 'var(--text-muted)' }}>({d.dayOfWeek})</span>
                   </div>
                 </button>

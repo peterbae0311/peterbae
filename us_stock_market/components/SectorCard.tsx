@@ -46,10 +46,10 @@ export default function SectorCard({ sector, rank, exchangeRate, onSectorClick, 
         <span className="w-4 shrink-0 text-[10px] font-medium text-gray-400 text-center">No</span>
         <span className="w-9 shrink-0 text-[10px] font-medium text-gray-400 ml-1">코드</span>
         <span className="flex-1 text-[10px] font-medium text-gray-400 ml-1">회사명</span>
-        <span className="w-14 shrink-0 text-[10px] font-medium text-gray-400 text-right">종가($)</span>
-        <span className="w-16 shrink-0 text-[10px] font-medium text-gray-400 text-right ml-1">종가(₩)</span>
-        <span className="w-12 shrink-0 text-[10px] font-medium text-gray-400 text-right ml-1">등락율</span>
-        <span className="w-12 shrink-0 text-[10px] font-medium text-gray-400 text-right ml-1">등락액($)</span>
+        <span className="w-14 shrink-0 text-[10px] font-medium text-gray-400 text-right ml-1">종가($)</span>
+        <span className="w-16 shrink-0 text-[10px] font-medium text-gray-400 text-right ml-3.5">종가(₩)</span>
+        <span className="w-12 shrink-0 text-[10px] font-medium text-gray-400 text-right ml-3.5">등락율</span>
+        <span className="w-12 shrink-0 text-[10px] font-medium text-gray-400 text-right ml-3.5">등락액($)</span>
       </div>
 
       {/* 종목 행 — 등락율 상위 5개 */}

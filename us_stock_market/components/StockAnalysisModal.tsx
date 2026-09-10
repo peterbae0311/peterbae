@@ -205,7 +205,7 @@ export default function StockAnalysisModal({
                 data.marketData.forwardEps !== null ||
                 data.marketData.recommendation !== null) && (
                 <div className="bg-gray-800 rounded-lg p-3 mb-3">
-                  <p className="text-[11px] font-semibold text-gray-400 mb-2">📊 시장 데이터</p>
+                  <p className="text-[12px] font-semibold text-gray-400 mb-2">📊 시장 데이터</p>
                   <div className="flex flex-wrap gap-x-4 gap-y-1.5">
                     {data.marketData.targetPrice !== null && (
                       <div className="flex items-center gap-1.5">
@@ -243,29 +243,29 @@ export default function StockAnalysisModal({
 
               {data.analysis.companyOverview && (
                 <div className="bg-gray-800 rounded-lg p-3 mb-3">
-                  <p className="text-[11px] font-semibold text-gray-400 mb-1">🏢 회사 개요</p>
+                  <p className="text-[12px] font-semibold text-gray-400 mb-1">🏢 회사 개요</p>
                   <p className="text-xs text-gray-200 leading-relaxed">{data.analysis.companyOverview}</p>
                 </div>
               )}
 
               <div className="bg-gray-800 rounded-lg p-3 mb-3">
-                <p className="text-[11px] font-semibold text-gray-400 mb-1">💬 회사 가이던스</p>
+                <p className="text-[12px] font-semibold text-gray-400 mb-1">💬 회사 가이던스</p>
                 <p className="text-xs text-gray-200 leading-relaxed">{data.analysis.companyGuidance}</p>
               </div>
 
               <div className="bg-gray-800 rounded-lg p-3 mb-3">
-                <p className="text-[11px] font-semibold text-gray-400 mb-1">📈 단기 전망 (3개월)</p>
+                <p className="text-[12px] font-semibold text-gray-400 mb-1">📈 단기 전망 (3개월)</p>
                 <p className="text-xs text-gray-200 leading-relaxed">{data.analysis.shortTerm}</p>
               </div>
 
               <div className="bg-gray-800 rounded-lg p-3 mb-3">
-                <p className="text-[11px] font-semibold text-gray-400 mb-1">🔭 장기 전망 (6개월)</p>
+                <p className="text-[12px] font-semibold text-gray-400 mb-1">🔭 장기 전망 (6개월)</p>
                 <p className="text-xs text-gray-200 leading-relaxed">{data.analysis.longTerm}</p>
               </div>
 
               {data.analysis.targetPriceRange && (
                 <div className="bg-gray-800 rounded-lg p-3 mb-3">
-                  <p className="text-[11px] font-semibold text-gray-400 mb-1">🎯 목표 주가</p>
+                  <p className="text-[12px] font-semibold text-gray-400 mb-1">🎯 목표 주가</p>
                   <PriceRangeBar
                     low={data.analysis.targetPriceRange.low}
                     consensus={data.analysis.targetPriceRange.consensus}
@@ -278,7 +278,7 @@ export default function StockAnalysisModal({
               {/* 🔴 리스크 — 목표 주가 바로 아래, 전체 너비 */}
               {data.analysis.risks.length > 0 && (
                 <div className="bg-gray-800 rounded-lg p-3 mb-3">
-                  <p className="text-[11px] font-semibold text-gray-400 mb-1.5">🔴 리스크</p>
+                  <p className="text-[12px] font-semibold text-gray-400 mb-1.5">🔴 리스크</p>
                   <ul className="space-y-2">
                     {data.analysis.risks.map((item, i) => (
                       <li key={i} className="text-xs text-gray-200 flex gap-1.5">
@@ -293,7 +293,7 @@ export default function StockAnalysisModal({
               {/* 🟢 기회요인 — 리스크 바로 아래, 전체 너비 */}
               {data.analysis.opportunities.length > 0 && (
                 <div className="bg-gray-800 rounded-lg p-3 mb-3">
-                  <p className="text-[11px] font-semibold text-gray-400 mb-1.5">🟢 기회요인</p>
+                  <p className="text-[12px] font-semibold text-gray-400 mb-1.5">🟢 기회요인</p>
                   <ul className="space-y-2">
                     {data.analysis.opportunities.map((item, i) => (
                       <li key={i} className="text-xs text-gray-200 flex gap-1.5">
@@ -306,7 +306,7 @@ export default function StockAnalysisModal({
               )}
 
               <div className="bg-gray-800 rounded-lg p-3">
-                <p className="text-[11px] font-semibold text-gray-400 mb-1">📚 참고 출처</p>
+                <p className="text-[12px] font-semibold text-gray-400 mb-1">📚 참고 출처</p>
                 <p className="text-[10px] text-gray-500 leading-relaxed">{data.analysis.sources.join(', ')}</p>
                 <p className="text-[10px] text-gray-600 mt-1.5">
                   🤖 AI 모델: <span className="font-mono">{data.model ?? 'openai/gpt-4o-mini'}{data.modelCutoff ? ` · 학습종료 ${data.modelCutoff}` : ''}</span>

@@ -112,24 +112,24 @@ export default function KrSectorAnalysisModal({
           {data && !loading && (
             <>
               <div className="bg-gray-800 rounded-lg p-3 mb-3">
-                <p className="text-[11px] font-semibold text-gray-400 mb-1">📅 당일 요약</p>
+                <p className="text-[12px] font-semibold text-gray-400 mb-1">📅 당일 요약</p>
                 <p className="text-xs text-gray-200 leading-relaxed">{data.analysis.today}</p>
               </div>
 
               <div className="bg-gray-800 rounded-lg p-3 mb-3">
-                <p className="text-[11px] font-semibold text-gray-400 mb-1">📈 단기 전망 (3개월)</p>
+                <p className="text-[12px] font-semibold text-gray-400 mb-1">📈 단기 전망 (3개월)</p>
                 <p className="text-xs text-gray-200 leading-relaxed">{data.analysis.shortTerm}</p>
               </div>
 
               <div className="bg-gray-800 rounded-lg p-3 mb-3">
-                <p className="text-[11px] font-semibold text-gray-400 mb-1">🔭 장기 전망 (6개월)</p>
+                <p className="text-[12px] font-semibold text-gray-400 mb-1">🔭 장기 전망 (6개월)</p>
                 <p className="text-xs text-gray-200 leading-relaxed">{data.analysis.longTerm}</p>
               </div>
 
               <div className="bg-gray-800 rounded-lg p-3 mb-3">
                 <div className="grid grid-cols-2 gap-3">
                   <div>
-                    <p className="text-[11px] font-semibold text-gray-400 mb-1.5">🟢 기회요인</p>
+                    <p className="text-[12px] font-semibold text-gray-400 mb-1.5">🟢 기회요인</p>
                     <ul className="space-y-1">
                       {data.analysis.opportunities.map((item, i) => (
                         <li key={i} className="text-xs text-gray-200 flex gap-1.5">
@@ -140,7 +140,7 @@ export default function KrSectorAnalysisModal({
                     </ul>
                   </div>
                   <div>
-                    <p className="text-[11px] font-semibold text-gray-400 mb-1.5">🔴 리스크</p>
+                    <p className="text-[12px] font-semibold text-gray-400 mb-1.5">🔴 리스크</p>
                     <ul className="space-y-1">
                       {data.analysis.risks.map((item, i) => (
                         <li key={i} className="text-xs text-gray-200 flex gap-1.5">
@@ -154,7 +154,7 @@ export default function KrSectorAnalysisModal({
               </div>
 
               <div className="bg-gray-800 rounded-lg p-3">
-                <p className="text-[11px] font-semibold text-gray-400 mb-1">📚 참고 출처</p>
+                <p className="text-[12px] font-semibold text-gray-400 mb-1">📚 참고 출처</p>
                 <p className="text-[10px] text-gray-500 leading-relaxed">
                   {data.analysis.sources.join(', ')}
                 </p>

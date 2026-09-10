@@ -1,13 +1,22 @@
 import type { Metadata } from "next";
-import { Noto_Sans_KR } from "next/font/google";
+import localFont from "next/font/local";
 import "./globals.css";
 
-const notoSansKr = Noto_Sans_KR({
-  variable: "--font-noto-sans-kr",
-  subsets: ["latin"],
-  /* 600(semibold) 추가: 종목 코드 font-semibold 렌더링에 필요.
-     400(body) / 500(medium) / 600(semibold) / 700(bold) 4단계 weight 확보. */
-  weight: ["400", "500", "600", "700"],
+const samsungGinGothic = localFont({
+  src: [
+    { path: "../삼성긴고딕/삼성긴고딕 Medium.ttf", weight: "500", style: "normal" },
+    // 실제 Bold 파일 사용 — font-synthesis: none 환경에서 font-bold가 가짜 볼드 없이 진짜 굵기로 렌더링되도록.
+    { path: "../삼성긴고딕/삼성긴고딕 Bold.ttf", weight: "700", style: "normal" },
+  ],
+  display: "swap",
+  variable: "--font-samsung-gin-gothic",
+});
+
+// 영문·숫자 전용 (한글 글리프 없음 — 한글은 아래 font-family 폴백에서 삼성긴고딕으로 자동 대체됨)
+const interTight = localFont({
+  src: "../삼성긴고딕/Inter Tight.ttf",
+  display: "swap",
+  variable: "--font-inter-tight",
 });
 
 export const metadata: Metadata = {
@@ -23,7 +32,7 @@ export default function RootLayout({
   return (
     <html
       lang="ko"
-      className={`${notoSansKr.variable} h-full antialiased`}
+      className={`${samsungGinGothic.variable} ${interTight.variable} h-full antialiased`}
     >
       <body className="min-h-full h-full flex flex-col bg-gray-950 text-gray-100">
         {children}

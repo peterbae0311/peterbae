@@ -210,7 +210,7 @@ function buildSectorRow(sector: SectorRow, idx: number): VNode {
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'center',
-            fontSize: '11px',
+            fontSize: '12px',
             color: TEXT_SECONDARY,
             fontWeight: 700,
           },
@@ -292,7 +292,7 @@ function buildSessionCard(session: SessionSummary): VNode {
       ),
       el(
         'div',
-        { style: { fontSize: '11px', color: TEXT_SECONDARY, marginLeft: '8px' } },
+        { style: { fontSize: '12px', color: TEXT_SECONDARY, marginLeft: '8px' } },
         '섹터 TOP 5',
       ),
     ),
@@ -336,7 +336,7 @@ function buildRootNode(data: DashboardData): VNode {
       },
       el(
         'div',
-        { style: { fontSize: '11px', color: TEXT_SECONDARY, marginBottom: '4px', letterSpacing: '1px' } },
+        { style: { fontSize: '12px', color: TEXT_SECONDARY, marginBottom: '4px', letterSpacing: '1px' } },
         'DAILY MARKET REPORT',
       ),
       el(
@@ -390,7 +390,7 @@ function buildRootNode(data: DashboardData): VNode {
       },
       el(
         'div',
-        { style: { fontSize: '11px', color: TEXT_SECONDARY } },
+        { style: { fontSize: '12px', color: TEXT_SECONDARY } },
         'Peter-04 | US Market Dashboard',
       ),
     ),

@@ -9,7 +9,7 @@ interface KrStockRowProps {
   onStockClick: (stock: KrStock) => void;
 }
 
-const COLS = 'grid-cols-[5fr_10fr_30fr_20fr_15fr_20fr]';
+const COLS = 'grid-cols-[5fr_10fr_30fr_20fr_15fr_15fr]';
 
 export default function KrStockRow({ stock, rank, onStockClick }: KrStockRowProps) {
   const isPositive = stock.changeRate >= 0;
@@ -26,15 +26,15 @@ export default function KrStockRow({ stock, rank, onStockClick }: KrStockRowProp
       aria-label={`${stock.name} 분석 보기`}
     >
       <span className="text-[10px] text-gray-500 font-mono text-center">{rank}</span>
-      <span className="text-[11px] font-mono font-semibold text-gray-300 truncate">{stock.code}</span>
-      <span className="text-[11px] font-semibold text-gray-300 truncate">{stock.name}</span>
-      <span className="text-[11px] font-mono font-medium text-gray-200 text-right tabular-nums">
+      <span className="text-[12px] font-mono text-gray-300 truncate">{stock.code}</span>
+      <span className="text-[12px] font-semibold text-gray-300 truncate">{stock.name}</span>
+      <span className="text-[12px] font-mono font-medium text-gray-200 text-right tabular-nums">
         {stock.price.toLocaleString('ko-KR')}
       </span>
-      <span style={colorStyle} className="text-[11px] font-mono font-bold text-right tabular-nums">
+      <span style={colorStyle} className="text-[12px] font-mono font-bold text-right tabular-nums">
         {sign}{stock.changeRate.toFixed(2)}%
       </span>
-      <span style={colorStyle} className="text-[11px] font-mono font-medium text-right tabular-nums">
+      <span style={colorStyle} className="text-[12px] font-mono font-medium text-right tabular-nums">
         {sign}{Math.abs(stock.changeAmount).toLocaleString('ko-KR')}
       </span>
     </div>

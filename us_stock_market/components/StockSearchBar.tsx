@@ -121,7 +121,7 @@ export default function StockSearchBar({
                 {r.code}
               </span>
               <span
-                className="text-[11px] truncate"
+                className="text-[12px] truncate"
                 style={{ color: 'var(--text-secondary)' }}
               >
                 {r.name}

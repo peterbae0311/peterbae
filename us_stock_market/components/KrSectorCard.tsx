@@ -61,7 +61,7 @@ export default function KrSectorCard({
       </div>
 
       {/* 컬럼 헤더: text-[10px]/font-medium — 중간 계층 (레이블) */}
-      <div className="grid grid-cols-[5fr_10fr_30fr_20fr_15fr_20fr] items-center gap-x-1 px-2 py-0.5 bg-gray-900/80 border-b border-gray-700">
+      <div className="grid grid-cols-[5fr_10fr_30fr_20fr_15fr_15fr] items-center gap-x-1 px-2 py-0.5 bg-gray-900/80 border-b border-gray-700">
         <span className="text-[10px] font-medium text-gray-400 text-center">No</span>
         <span className="text-[10px] font-medium text-gray-400">코드</span>
         <span className="text-[10px] font-medium text-gray-400">회사명</span>
