@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import { createServerSupabaseClient } from '@/lib/supabaseServer';
+import { getTokenKeyValue } from '@/lib/tokenStore';
 
 /**
  * 대시보드 카드의 "최종 배포일시"를 GitHub 커밋 히스토리에서 직접 조회한다.
@@ -41,20 +42,30 @@ const APP_PATHS: Record<string, string> = {
 const CACHE_TTL_MS = 15 * 60_000;
 let cache: { data: Record<string, string>; fetchedAt: number } | null = null;
 
-async function fetchLatestCommitDate(path: string): Promise<string | null> {
+async function fetchLatestCommitDate(path: string, token: string | null): Promise<string | null> {
   try {
     const res = await fetch(
       `https://api.github.com/repos/${REPO}/commits?path=${encodeURIComponent(path)}&per_page=1`,
       {
-        headers: { Accept: 'application/vnd.github+json' },
+        headers: {
+          Accept: 'application/vnd.github+json',
+          'User-Agent': 'peterbae-hub-dashboard',
+          ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        },
         signal: AbortSignal.timeout(10_000),
       }
     );
-    if (!res.ok) return null;
+    if (!res.ok) {
+      // 클라우드 서버 IP는 GitHub의 미인증 anti-abuse 제한/차단에 더 자주 걸린다 —
+      // 서버 로그(pm2 logs hub)에서 원인을 바로 볼 수 있게 남겨둔다.
+      console.error(`[deploy-times] GitHub API ${res.status} for path="${path}": ${(await res.text()).slice(0, 200)}`);
+      return null;
+    }
     const commits = await res.json();
     const date = commits?.[0]?.commit?.committer?.date;
     return typeof date === 'string' ? date : null;
-  } catch {
+  } catch (err) {
+    console.error(`[deploy-times] fetch failed for path="${path}":`, err instanceof Error ? err.message : err);
     return null;
   }
 }
@@ -68,8 +79,13 @@ export async function GET() {
     return NextResponse.json({ deployTimes: cache.data });
   }
 
+  // GITHUB_TOKEN(manage_token/Key 관리에 등록, 별도 scope 없어도 됨 — public repo라 read만
+  // 필요)이 있으면 인증 요청으로 올려서 미인증 요청보다 훨씬 관대한 rate limit/anti-abuse
+  // 처리를 받는다. 없으면 미인증으로 폴백(느슨한 제한 안에서는 여전히 동작).
+  const token = await getTokenKeyValue('GITHUB_TOKEN');
+
   const entries = await Promise.all(
-    Object.entries(APP_PATHS).map(async ([appKey, path]) => [appKey, await fetchLatestCommitDate(path)] as const)
+    Object.entries(APP_PATHS).map(async ([appKey, path]) => [appKey, await fetchLatestCommitDate(path, token)] as const)
   );
 
   const deployTimes: Record<string, string> = {};
