@@ -19,7 +19,7 @@ export interface LottoRow {
 }
 
 export interface FilterParams {
-  conditionType: 1 | 4 | 5 | 6 | 7 | 8 | 10 | 11;
+  conditionType: 1 | 4 | 5 | 6 | 7 | 8 | 10 | 11 | 12;
   years?: number;
   months?: number;
   maxConsec?: number;      // 0=없음, 2=2개, 3+=3이상
@@ -132,6 +132,57 @@ export function selectExpertPicks(
   return selected;
 }
 
+// 구조적 점수만의 최댓값(밴드15+홀짝20+합계20+끝수15) — 보너스후보/빈도상위 매치가
+// 하나도 없으면 이 이상 못 올라간다. 임계값이 이보다 높으면 절대 도달 불가능하다.
+const MAX_STRUCTURAL_SCORE = 70;
+
+// minScore 이상인 조합만 count개를 찾을 때까지 무작위 조합을 계속 생성한다.
+// (기존 selectExpertPicks처럼 "생성된 N개 중 상위 5개"가 아니라, 목표 점수를
+// 만족하는 조합이 나올 때까지 직접 탐색 — Claude 추천 5개가 항상 임계값을 넘도록 보장한다)
+export function generateHighScoreCombos(
+  bonusCandidates: number[] = [],
+  topFreqNums: number[] = [],
+  options: { minScore?: number; count?: number; maxAttempts?: number; exclude?: Set<string>; excludeNumbers?: number[] } = {},
+): { combos: number[][]; scores: number[]; reachable: boolean } {
+  const { minScore = 80, count = 5, maxAttempts = 100000, exclude, excludeNumbers = [] } = options;
+  const bonusSet = new Set(bonusCandidates);
+  const freqSet = new Set(topFreqNums);
+  // excludeNumbers에 담긴 번호는 후보 풀에서 완전히 제외 — 다른 그룹과 번호가 겹치지 않도록 한다.
+  const excludeNumSet = new Set(excludeNumbers);
+  const fullPool = Array.from({ length: 45 }, (_, i) => i + 1).filter(n => !excludeNumSet.has(n));
+
+  // 보너스후보/빈도상위가 비어있으면(조건분석 미실행) 구조점수만으로는 임계값에
+  // 절대 못 미치므로 — 무의미한 탐색을 반복하지 않고 즉시 포기한다.
+  const reachable = MAX_STRUCTURAL_SCORE + bonusCandidates.length * 5 + Math.min(6, topFreqNums.length) * 2 >= minScore;
+
+  // exclude로 넘어온 조합(다른 그룹에서 이미 채택된 조합)은 재선정하지 않는다.
+  const seen = new Set<string>(exclude);
+  const qualifying: { combo: number[]; score: number }[] = [];
+  const best: { combo: number[]; score: number }[] = [];
+
+  if (reachable) {
+    for (let attempt = 0; attempt < maxAttempts && qualifying.length < count; attempt++) {
+      const combo = uniformSample(fullPool).sort((a, b) => a - b);
+      const key = combo.join(',');
+      if (seen.has(key)) continue;
+      seen.add(key);
+      const score = _scoreCombo(combo, bonusSet, freqSet);
+      if (score >= minScore) qualifying.push({ combo, score });
+      else best.push({ combo, score });
+    }
+  }
+
+  if (qualifying.length >= count) {
+    qualifying.sort((a, b) => b.score - a.score);
+    const top = qualifying.slice(0, count);
+    return { combos: top.map(q => q.combo), scores: top.map(q => q.score), reachable: true };
+  }
+
+  // 극히 드문 경우(또는 애초에 도달 불가능한 경우) — 지금까지 찾은 것 중 점수 높은 순으로 채움
+  const fallback = [...qualifying, ...best].sort((a, b) => b.score - a.score).slice(0, count);
+  return { combos: fallback.map(q => q.combo), scores: fallback.map(q => q.score), reachable: qualifying.length >= count };
+}
+
 // ---------------------------------------------------------------------------
 // Prize
 // ---------------------------------------------------------------------------
@@ -191,6 +242,22 @@ export function getTopKNumbers(results: LottoRow[], k: number): { numbers: numbe
     .sort((a, b) => b.count - a.count || a.num - b.num)
     .slice(0, k);
   return { numbers: topK.map(x => x.num), frequencies: topK.map(x => x.count) };
+}
+
+// 미출현 번호: results(최신순 정렬)에서 마지막으로 등장한 이후 경과한 회차 수(streak)가
+// 가장 큰(=가장 오래 안 나온) 번호 k개를 뽑는다. 한 번도 안 나온 번호는 results.length로 취급.
+export function getAbsentNumbers(results: LottoRow[], k: number): { numbers: number[]; streaks: number[] } {
+  const lastSeenIndex = new Map<number, number>();
+  results.forEach((row, i) => {
+    for (const num of [row.num1, row.num2, row.num3, row.num4, row.num5, row.num6]) {
+      if (num != null && !lastSeenIndex.has(num)) lastSeenIndex.set(num, i);
+    }
+  });
+  const ranked = Array.from({ length: 45 }, (_, idx) => {
+    const num = idx + 1;
+    return { num, streak: lastSeenIndex.get(num) ?? results.length };
+  }).sort((a, b) => b.streak - a.streak || a.num - b.num).slice(0, k);
+  return { numbers: ranked.map(r => r.num), streaks: ranked.map(r => r.streak) };
 }
 
 export function getTopBonusNumbers(results: LottoRow[]): { numbers: number[]; frequencies: number[] } {

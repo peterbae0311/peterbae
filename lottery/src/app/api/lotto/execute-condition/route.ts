@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createServerClient } from '@/lib/supabase';
-import { type LottoRow, getTopKNumbers, getTopBonusNumbers, getDistribution, filterByCondition, type FilterParams } from '@/lib/lotto-engine';
+import { type LottoRow, getTopKNumbers, getAbsentNumbers, getTopBonusNumbers, getDistribution, filterByCondition, type FilterParams } from '@/lib/lotto-engine';
 
 export async function POST(req: NextRequest) {
   const supabase = createServerClient();
@@ -59,7 +59,11 @@ export async function POST(req: NextRequest) {
     }, { status: 422 });
   }
 
-  const { numbers, frequencies } = getTopKNumbers(filteredResults, 6);
+  // 미출현(conditionType 12)은 필터링된 회차 안에서 "가장 오래 안 나온" 번호 6개를 뽑는다 —
+  // 등장 빈도가 아니라 마지막 등장 이후 경과 회차 수(streak) 기준.
+  const { numbers, frequencies } = conditionType === 12
+    ? (() => { const r = getAbsentNumbers(filteredResults, 6); return { numbers: r.numbers, frequencies: r.streaks }; })()
+    : getTopKNumbers(filteredResults, 6);
   if (numbers.length < 6) {
     return NextResponse.json({ success: false, error: '충분한 데이터가 없습니다.' }, { status: 422 });
   }

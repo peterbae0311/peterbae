@@ -1,7 +1,7 @@
 'use client';
 
-import { useEffect, useState, useCallback, useRef, useMemo, type ReactNode } from 'react';
-import { scoreCombo, selectExpertPicks, getPrizeTier } from '@/lib/lotto-engine';
+import { useEffect, useLayoutEffect, useState, useCallback, useRef, useMemo, type ReactNode } from 'react';
+import { scoreCombo, generateHighScoreCombos, getPrizeTier } from '@/lib/lotto-engine';
 
 // ---------------------------------------------------------------------------
 // Types
@@ -23,7 +23,7 @@ interface LottoResult {
   first_prize_amount: number | null;
 }
 
-type ConditionType = 1 | 4 | 5 | 6 | 7 | 8 | 10 | 11;
+type ConditionType = 1 | 4 | 5 | 6 | 7 | 8 | 10 | 11 | 12;
 
 interface ConditionRow {
   id: string;
@@ -72,7 +72,7 @@ function makeId(): string {
 
 const GENERATION_STRATEGY: { tag: string; color: string; desc: string }[] = [
   { tag: '순수 랜덤', color: 'bg-gray-100 text-gray-600', desc: '1~45에서 6개 완전 무작위 추출 — 어떠한 필터도 적용하지 않음' },
-  { tag: 'Claude 추천 5개', color: 'bg-violet-100 text-violet-700', desc: '생성된 조합 중 조건분석 기반 보너스후보·빈도상위 번호를 많이 포함한 상위 5개를 골라 보여줌' },
+  { tag: 'Claude 추천 5개', color: 'bg-violet-100 text-violet-700', desc: '조건분석 기반 보너스후보·빈도상위 번호를 반영한 조합 3개(서로 번호 중복 없음, 80점 이상·3번째는 미달 가능) + 조건분석 없이 구조점수만으로 50점 이상인 완전 무작위 조합 2개(서로 번호 중복 없음)' },
 ];
 
 const MODE_LABELS: Record<string, string> = {
@@ -151,6 +151,13 @@ function buildConditionText(c: Pick<ConditionRow, 'conditionType' | 'years' | 'm
   if (conditionType === 8) return `${minBands ?? 5}밴드 이상 커버 회차에서 가장 많이 나온 숫자 6개 추출`;
   if (conditionType === 10) return `소수 ${primeCount ?? 2}개 포함 회차에서 가장 많이 나온 숫자 6개 추출`;
   if (conditionType === 11) return `끝수 ${minUniqueTails ?? 5}종 이상 회차에서 가장 많이 나온 숫자 6개 추출`;
+  if (conditionType === 12) {
+    if (years === 0 && months === 0) return '전체 회차에서 가장 오래 미출현된 숫자 6개 추출';
+    const parts: string[] = [];
+    if (years > 0) parts.push(`${years}년`);
+    if (months > 0) parts.push(`${months}개월`);
+    return `최근 ${parts.join(' ')} 동안 미출현된 숫자 6개 추출`;
+  }
   if (years === 0 && months === 0) return '전체 당첨번호에서 가장 많이 나온 숫자 6개 추출';
   const parts: string[] = [];
   if (years > 0) parts.push(`${years}년`);
@@ -188,6 +195,11 @@ function parseConditionText(text: string): Omit<ConditionRow, 'id' | 'roundsAnal
   if (text.includes('끝수')) {
     const m = text.match(/끝수 (\d+)종/);
     return { ...base, conditionType: 11, minUniqueTails: m ? parseInt(m[1]) : 5 };
+  }
+  if (text.includes('미출현')) {
+    const yearMatch = text.match(/(\d+)년/);
+    const monthMatch = text.match(/(\d+)개월/);
+    return { ...base, conditionType: 12, years: yearMatch ? parseInt(yearMatch[1]) : 0, months: monthMatch ? parseInt(monthMatch[1]) : 0 };
   }
   const yearMatch = text.match(/(\d+)년/);
   const monthMatch = text.match(/(\d+)개월/);
@@ -229,7 +241,7 @@ function getLottoColor(num: number): string {
   return 'bg-green-500 text-white';
 }
 
-function NumberBall({ num, size = 'md', freq, hoverFreq, highlighted }: { num: number | null; size?: 'sm' | 'md' | 'lg'; freq?: number; hoverFreq?: number; highlighted?: boolean }) {
+function NumberBall({ num, size = 'md', freq, hoverFreq, highlighted, fontPx, sizePx }: { num: number | null; size?: 'sm' | 'md' | 'lg'; freq?: number; hoverFreq?: number; highlighted?: boolean; fontPx?: number; sizePx?: number }) {
   if (num == null) {
     const dim = size === 'lg' ? 'w-12 h-12 text-base' : size === 'sm' ? 'w-8 h-8 text-sm' : 'w-10 h-10 text-sm';
     return <span className={`inline-flex items-center justify-center ${dim} rounded-full bg-gray-100 text-gray-400 `}>-</span>;
@@ -239,8 +251,8 @@ function NumberBall({ num, size = 'md', freq, hoverFreq, highlighted }: { num: n
 
   if (freq != null) {
     const dim = size === 'lg' ? 'w-14 h-14' : size === 'sm' ? 'w-10 h-10' : 'w-12 h-12';
-    const numText = size === 'lg' ? 'text-base' : size === 'sm' ? 'text-xs' : 'text-sm';
-    const freqText = size === 'lg' ? 'text-[12px]' : 'text-[9px]';
+    const numText = size === 'lg' ? 'text-base' : size === 'sm' ? 'text-sm' : 'text-sm';
+    const freqText = size === 'lg' ? 'text-[14px]' : 'text-[14px]';
     return (
       <span className={`inline-flex flex-col items-center justify-center ${dim} rounded-full ${colorClass}  leading-none gap-0.5`}>
         <span className={numText}>{String(num).padStart(2, '0')}</span>
@@ -251,7 +263,13 @@ function NumberBall({ num, size = 'md', freq, hoverFreq, highlighted }: { num: n
 
   const dim = size === 'lg' ? 'w-12 h-12 text-base' : size === 'sm' ? 'w-8 h-8 text-sm' : 'w-10 h-10 text-sm';
   const ball = (
-    <span className={`inline-flex items-center justify-center ${dim} rounded-full ${colorClass} `}>
+    <span
+      className={`inline-flex flex-shrink-0 items-center justify-center ${dim} rounded-full ${colorClass} `}
+      style={{
+        ...(fontPx != null ? { fontSize: `${fontPx}px` } : {}),
+        ...(sizePx != null ? { width: `${sizePx}px`, height: `${sizePx}px` } : {}),
+      }}
+    >
       {String(num).padStart(2, '0')}
     </span>
   );
@@ -262,7 +280,7 @@ function NumberBall({ num, size = 'md', freq, hoverFreq, highlighted }: { num: n
       <span className="relative group inline-flex flex-col items-center">
         {ball}
         <span className="absolute -top-5 left-1/2 -translate-x-1/2 whitespace-nowrap
-          bg-gray-800 text-white text-[9px] font-medium px-1.5 py-0.5 rounded
+          bg-gray-800 text-white text-[14px] font-medium px-1.5 py-0.5 rounded
           opacity-0 group-hover:opacity-100 pointer-events-none transition-opacity duration-150 z-10">
           {hoverFreq}회
         </span>
@@ -305,7 +323,7 @@ function DistributionPopup({
           <h3 className="text-base  text-gray-800">📊 번호 분포도</h3>
           <button onClick={onClose} className="text-gray-400 hover:text-gray-700 text-xl leading-none px-1">✕</button>
         </div>
-        <p className="text-[11px] text-gray-400 mb-5 leading-relaxed">
+        <p className="text-[14px] text-gray-400 mb-5 leading-relaxed">
           {conditionText}
           {roundsAnalyzed != null ? <span className="ml-1 text-indigo-400 font-medium">· 분석 {roundsAnalyzed.toLocaleString()}회차</span> : ''}
         </p>
@@ -317,7 +335,7 @@ function DistributionPopup({
             const barPct = (count / maxVal) * 100;
             return (
               <div key={i} className="flex items-center gap-3">
-                <span className={`text-[11px]  w-[60px] flex-shrink-0 ${TEXTCOL[i]}`}>{LABELS[i]}</span>
+                <span className={`text-[14px]  w-[60px] flex-shrink-0 ${TEXTCOL[i]}`}>{LABELS[i]}</span>
                 <div className="flex-1 h-6 bg-gray-100 rounded-full overflow-hidden">
                   <div
                     className={`h-full ${COLORS[i]} rounded-full`}
@@ -325,8 +343,8 @@ function DistributionPopup({
                   />
                 </div>
                 <div className="flex items-baseline gap-1 w-[90px] flex-shrink-0 justify-end">
-                  <span className="text-xs  text-gray-700">{count.toLocaleString()}회</span>
-                  <span className="text-[12px] text-gray-400">({pct}%)</span>
+                  <span className="text-sm  text-gray-700">{count.toLocaleString()}회</span>
+                  <span className="text-[14px] text-gray-400">({pct}%)</span>
                 </div>
               </div>
             );
@@ -335,12 +353,12 @@ function DistributionPopup({
 
         {/* Footer */}
         <div className="mt-5 pt-3 border-t border-gray-100 flex items-center justify-between">
-          <span className="text-[11px] text-gray-400">전체 <b>{total.toLocaleString()}</b>개 번호 분석</span>
+          <span className="text-[14px] text-gray-400">전체 <b>{total.toLocaleString()}</b>개 번호 분석</span>
           <div className="flex gap-2.5">
             {LABELS.map((label, i) => (
               <div key={i} className="flex items-center gap-1">
                 <span className={`inline-block w-2 h-2 rounded-full ${COLORS[i]}`} />
-                <span className="text-[9px] text-gray-400">{label}</span>
+                <span className="text-[14px] text-gray-400">{label}</span>
               </div>
             ))}
           </div>
@@ -388,7 +406,7 @@ function SectionHeader({ icon, title, small }: { icon: ReactNode; title: string;
   return (
     <div className="flex items-center gap-2">
       <span className={`flex-shrink-0 inline-flex items-center justify-center ${small ? 'w-6 h-6' : 'w-8 h-8'} rounded-full bg-indigo-600 text-white`}>{icon}</span>
-      <h2 className={`${small ? 'text-sm' : 'text-xl'}  text-gray-800 tracking-tight`}>{title}</h2>
+      <h2 className={`${small ? 'text-[20px]' : 'text-xl'}  text-gray-800 tracking-tight`}>{title}</h2>
     </div>
   );
 }
@@ -438,27 +456,17 @@ export default function Home() {
   const [conditionSort, setConditionSort] = useState<'asc' | 'desc' | null>(null);
 
   // Section 3 state
-  const [gameCount, setGameCount] = useState(100);
-  const maxGameCount = 100;
   const [type3Numbers, setType3Numbers] = useState<number[][]>([]);
-  const [selectedComboIndices, setSelectedComboIndices] = useState<Set<number>>(new Set());
   const [expertPicks, setExpertPicks] = useState<number[][]>([]);
   const [isGeneratingAI, setIsGeneratingAI] = useState(false);
   const [aiError, setAiError] = useState('');
-  const [confirmMsg, setConfirmMsg] = useState('');
-  const [isSavingPredicted, setIsSavingPredicted] = useState(false);
   const [confirmedPurchases, setConfirmedPurchases] = useState<ConfirmedPurchase[]>([]);
   const [openConfirmedIds, setOpenConfirmedIds] = useState<Set<number>>(new Set());
-  const [isConfirming, setIsConfirming] = useState(false);
   const [sendingTelegramRound, setSendingTelegramRound] = useState<number | null>(null);
   const [telegramMsg, setTelegramMsg] = useState<{ round: number; ok: boolean; text: string } | null>(null);
   // DB에서 불러온 직후 auto-save 방지용 플래그
   const skipSaveRef = useRef(false);
 
-  // Claude 추천 5개 중 확정에 포함할 항목 체크 (기본 상위 3개)
-  const [expertPickChecked, setExpertPickChecked] = useState<Set<number>>(new Set());
-  // 고급(게임수 조절 · 전체 조합) 아코디언
-  const [showAdvanced, setShowAdvanced] = useState(false);
   // Claude 추천 5개 최종 확정
   const [isConfirmingFinal, setIsConfirmingFinal] = useState(false);
   const [finalConfirmMsg, setFinalConfirmMsg] = useState('');
@@ -526,11 +534,40 @@ export default function Home() {
   const [modeBacktest, setModeBacktest] = useState<{ hitRate3Plus: number; hitRate5Plus: number; roi: number } | null>(null);
 
   const [tooltipInfo, setTooltipInfo] = useState<{ id: string; x: number; y: number; above: boolean } | null>(null);
+  const [tooltipDy, setTooltipDy] = useState(0);
+  const tooltipRef = useRef<HTMLDivElement | null>(null);
   const showTooltip = (e: React.MouseEvent, id: string) => {
     const r = e.currentTarget.getBoundingClientRect();
     const above = r.top > 140;
-    setTooltipInfo({ id, x: r.left + r.width / 2, y: above ? r.top - 8 : r.bottom + 8, above });
+    // 툴팁 박스(최대 20rem=320px)가 뷰포트 좌우 밖으로 밀려 잘리지 않도록 중심 x를 클램프
+    const halfWidth = 160;
+    const margin = 8;
+    const rawX = r.left + r.width / 2;
+    const x = Math.min(Math.max(rawX, halfWidth + margin), window.innerWidth - halfWidth - margin);
+    setTooltipDy(0);
+    setTooltipInfo({ id, x, y: above ? r.top - 8 : r.bottom + 8, above });
   };
+
+  // 렌더된 실제 박스 높이를 기준으로 위/아래 뷰포트 경계를 넘어가면 세로로 밀어 넣는다
+  // (긴 설명(생성/조합 통계 툴팁)이 화면 상단·하단에서 잘리는 문제 보정).
+  useLayoutEffect(() => {
+    if (!tooltipInfo || !tooltipRef.current) return;
+    const rect = tooltipRef.current.getBoundingClientRect();
+    const margin = 8;
+    let dy = 0;
+    if (rect.top < margin) dy = margin - rect.top;
+    else if (rect.bottom > window.innerHeight - margin) dy = (window.innerHeight - margin) - rect.bottom;
+    if (dy !== 0) setTooltipDy(dy);
+  }, [tooltipInfo]);
+
+  // 클릭으로 연 툴팁("생성" ? 버튼)은 바깥을 클릭하면 닫힌다.
+  // ? 버튼의 onClick은 stopPropagation으로 이 리스너를 건너뛰므로 같은 클릭에서 즉시 닫히지 않는다.
+  useEffect(() => {
+    if (!tooltipInfo) return;
+    const close = () => setTooltipInfo(null);
+    document.addEventListener('click', close);
+    return () => document.removeEventListener('click', close);
+  }, [tooltipInfo]);
 
   // ---------------------------------------------------------------------------
   // Load saved conditions from DB on mount
@@ -920,14 +957,13 @@ export default function Home() {
   const generateAIPredictions = useCallback(async () => {
     setIsGeneratingAI(true);
     setAiError('');
-    setSelectedComboIndices(new Set());
 
     try {
       // 랜덤 100개 생성
       const res = await fetch('/lottery/api/lotto/ai-predict', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ count: gameCount }),
+        body: JSON.stringify({ count: 100 }),
       });
       const d = await res.json();
       if (d.success && Array.isArray(d.data?.combinations)) {
@@ -956,7 +992,7 @@ export default function Home() {
       }
     } catch { setAiError('서버 연결 오류'); }
     finally { setIsGeneratingAI(false); }
-  }, [gameCount, results]);
+  }, [results]);
 
   // ---------------------------------------------------------------------------
   // Section 3: Save all predictions to DB
@@ -964,14 +1000,12 @@ export default function Home() {
 
   const savePredictions = useCallback(async (t3: number[][]) => {
     if (t3.length === 0) return;
-    setIsSavingPredicted(true);
     try {
       await fetch('/lottery/api/lotto/predicted', {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ type3: t3 }),
       });
     } catch { /* ignore */ }
-    finally { setIsSavingPredicted(false); }
   }, []);
 
   // Auto-save type3 when it changes
@@ -980,47 +1014,57 @@ export default function Home() {
     if (type3Numbers.length > 0) savePredictions(type3Numbers);
   }, [type3Numbers]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  // 전문가 추천 5개 자동 선정 — 조건분석에서 나온 보너스후보·빈도상위 종합 점수 상위 5개
+  // 전문가 추천 5개 자동 선정 — 3개는 조건분석(보너스후보·빈도상위) 가중치를 반영해
+  // 80점 이상이 나올 때까지 탐색하고, 나머지 2개는 조건분석 가중치를 전혀 쓰지 않고
+  // 구조적 점수(밴드·홀짝·합계·끝수다양성, 최대 70점)만으로 50점 이상인 완전 무작위 조합을 탐색한다.
+  // type3Numbers는 값 자체는 안 쓰지만 "생성" 클릭마다 재탐색을 트리거하는 용도로 deps에 유지.
   useEffect(() => {
-    const picks = selectExpertPicks(type3Numbers, mergedBonusNums, topFreqNums);
-    setExpertPicks(picks);
-    // 기본 체크 = 추천 5개 전부
-    setExpertPickChecked(new Set(picks.map((_, i) => i)));
+    // 조건분석 3개는 서로 겹치는 번호가 없는 것을 최우선으로 한다. 1·2번째는 80점 이상을
+    // 유지해야 하지만, 3번째는 앞선 12개 번호가 이미 보너스후보·빈도상위 재료를 많이 써버려
+    // 80점을 못 채울 수 있으므로 — 무겹침을 지키는 대신 80점 미만도 허용한다(가능한 한 높은
+    // 점수를 계속 탐색하되, minScore를 못 넘겨도 그중 최고점 조합을 그대로 채택).
+    const usedNumbers = new Set<number>();
+    const avoidKeys = new Set<string>();
+    const cond1 = generateHighScoreCombos(mergedBonusNums, topFreqNums, {
+      minScore: 80, count: 1, exclude: avoidKeys,
+    });
+    if (cond1.combos[0]) { cond1.combos[0].forEach(n => usedNumbers.add(n)); avoidKeys.add(cond1.combos[0].join(',')); }
+    const cond2 = generateHighScoreCombos(mergedBonusNums, topFreqNums, {
+      minScore: 80, count: 1, excludeNumbers: Array.from(usedNumbers), exclude: avoidKeys,
+    });
+    if (cond2.combos[0]) { cond2.combos[0].forEach(n => usedNumbers.add(n)); avoidKeys.add(cond2.combos[0].join(',')); }
+    const cond3 = generateHighScoreCombos(mergedBonusNums, topFreqNums, {
+      minScore: 80, count: 1, excludeNumbers: Array.from(usedNumbers), exclude: avoidKeys,
+    });
+    const conditionCombos = [...cond1.combos, ...cond2.combos, ...cond3.combos];
+    // 3번째는 80점 미달이 허용된 항목이라 전체 판정에서 제외 — 1·2번째만 80점 보장 여부를 본다.
+    const conditionReachable = cond1.reachable && cond2.reachable;
+    const excludeKeys = new Set(conditionCombos.map(c => c.join(',')));
+    // 무작위 2개는 서로 겹치는 번호가 없도록 — 첫 번째를 뽑은 뒤 그 6개 번호를 후보 풀에서
+    // 제외하고 두 번째를 뽑는다.
+    const random1 = generateHighScoreCombos([], [], { minScore: 50, count: 1, exclude: excludeKeys });
+    const random2 = generateHighScoreCombos([], [], {
+      minScore: 50, count: 1,
+      exclude: excludeKeys,
+      excludeNumbers: random1.combos[0] ?? [],
+    });
+    const combos = [...conditionCombos, ...random1.combos, ...random2.combos];
+    setExpertPicks(combos);
+    if (type3Numbers.length > 0 && !conditionReachable) {
+      setAiError('조건분석 결과가 부족해 80점 이상 조합을 찾지 못했습니다 — 섹션2에서 조건을 더 실행해보세요.');
+    }
   }, [type3Numbers, mergedBonusNums, topFreqNums]);
 
-  // Claude 추천 5개 — 표시 점수 내림차순으로 정렬 (원래 배열 인덱스 i는 체크 상태 참조용으로 보존)
-  const rankedExpertPicks = useMemo(() =>
-    expertPicks
-      .map((combo, i) => ({ combo, i, score: expertDisplayScore(combo, mergedBonusNums, topFreqNums) }))
-      .sort((a, b) => b.score - a.score),
+  // Claude 추천 5개 — 앞 3개(조건분석 기반)와 뒤 2개(완전 무작위)를 각 그룹 내에서만
+  // 표시 점수 내림차순으로 정렬 (그룹 순서 자체는 뒤섞지 않음). 원래 배열 인덱스 i는
+  // 체크 상태 참조용으로 보존.
+  const rankedExpertPicks = useMemo(() => {
+    const scored = expertPicks.map((combo, i) => ({ combo, i, score: expertDisplayScore(combo, mergedBonusNums, topFreqNums) }));
+    const conditionPart = scored.slice(0, 3).sort((a, b) => b.score - a.score);
+    const randomPart = scored.slice(3).sort((a, b) => b.score - a.score);
+    return [...conditionPart, ...randomPart];
+  },
   [expertPicks, mergedBonusNums, topFreqNums]);
-
-  // 최종확정은 Claude 추천 5개를 넘을 수 없음 — 해제는 항상 허용, 추가만 캡에서 막음
-  const toggleExpertPick = useCallback((idx: number) => {
-    setExpertPickChecked(prev => {
-      const next = new Set(prev);
-      if (next.has(idx)) { next.delete(idx); return next; }
-      if (next.size >= 5) return prev;
-      next.add(idx);
-      return next;
-    });
-  }, []);
-
-  const toggleComboSelection = useCallback((idx: number) => {
-    setSelectedComboIndices(prev => {
-      const next = new Set(prev);
-      if (next.has(idx)) next.delete(idx); else next.add(idx);
-      return next;
-    });
-  }, []);
-
-  const toggleAllCombos = useCallback(() => {
-    setSelectedComboIndices(prev =>
-      prev.size === type3Numbers.length
-        ? new Set()
-        : new Set(type3Numbers.map((_, i) => i))
-    );
-  }, [type3Numbers]);
 
   // ---------------------------------------------------------------------------
   // Section 3: Confirmed purchases
@@ -1068,10 +1112,9 @@ export default function Home() {
     })();
   }, [results, confirmedPurchases, loadConfirmed]);
 
-  // Claude 추천(체크된 것) + 휠링(체크된 것) 통합 확정 — loadConfirmed 이후 정의
+  // Claude 추천 5개를 그대로 최종 확정 — loadConfirmed 이후 정의
   const confirmFinalSelection = useCallback(async () => {
-    const combos = expertPicks.filter((_, i) => expertPickChecked.has(i));
-    // Claude 추천은 최대 5개뿐이라 5게임을 넘을 수 없음 (토글 단계에서도 캡을 걸어두지만 여기서도 방어)
+    const combos = expertPicks;
     if (combos.length === 0 || combos.length > 5 || results.length === 0) return;
     setIsConfirmingFinal(true);
     setFinalConfirmMsg('');
@@ -1091,7 +1134,7 @@ export default function Home() {
       setIsConfirmingFinal(false);
       setTimeout(() => setFinalConfirmMsg(''), 4000);
     }
-  }, [expertPicks, expertPickChecked, results, loadConfirmed]);
+  }, [expertPicks, results, loadConfirmed]);
 
   // 삭제된 항목이 열려 있으면 닫기
   useEffect(() => {
@@ -1101,26 +1144,6 @@ export default function Home() {
       return next.size === prev.size ? prev : next;
     });
   }, [confirmedPurchases]);
-
-  const confirmPurchase = useCallback(async () => {
-    if (selectedComboIndices.size === 0 || results.length === 0) return;
-    const target_round = results[0].round + 1;
-    setIsConfirming(true);
-    try {
-      const selectedCombos = type3Numbers.filter((_, i) => selectedComboIndices.has(i));
-      const res = await fetch('/lottery/api/lotto/confirmed', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ target_round, combos: selectedCombos, generation_mode: 'random' }),
-      });
-      const d = await res.json();
-      if (d.success) {
-        setSelectedComboIndices(new Set());
-        await loadConfirmed();
-      }
-    } catch { /* ignore */ }
-    finally { setIsConfirming(false); }
-  }, [type3Numbers, selectedComboIndices, results, loadConfirmed]);
 
   const deleteConfirmed = useCallback(async (id: number) => {
     try {
@@ -1175,20 +1198,20 @@ export default function Home() {
           {/* SECTION 1 */}
           <section className="flex flex-col bg-white border-b border-gray-200 shadow-sm md:flex-[2] md:min-h-0 md:border-r">
             <div className="flex-none px-4 py-3 border-b border-gray-100 flex items-center justify-between">
-              <SectionHeader icon={<IconList />} title="참고) 로또 당첨 번호" small />
+              <SectionHeader icon={<IconList />} title="로또 당첨 번호" small />
               <div className="flex items-center gap-2">
                 {registerLatestMsg && (
-                  <span className={`text-xs font-medium ${registerLatestMsg.includes('완료') ? 'text-emerald-600' : registerLatestMsg.includes('최신') ? 'text-gray-400' : 'text-red-500'}`}>
+                  <span className={`text-sm font-medium ${registerLatestMsg.includes('완료') ? 'text-emerald-600' : registerLatestMsg.includes('최신') ? 'text-gray-400' : 'text-red-500'}`}>
                     {registerLatestMsg}
                   </span>
                 )}
                 {!registerLatestMsg && isSyncing
-                  ? <span className="inline-flex items-center gap-1.5 text-xs text-indigo-500 font-medium"><span className="inline-block w-1.5 h-1.5 rounded-full bg-indigo-400 animate-pulse" />동기화 중...</span>
-                  : !registerLatestMsg && syncMessage ? <span className="text-xs text-gray-400">{syncMessage}</span> : null}
+                  ? <span className="inline-flex items-center gap-1.5 text-sm text-indigo-500 font-medium"><span className="inline-block w-1.5 h-1.5 rounded-full bg-indigo-400 animate-pulse" />동기화 중...</span>
+                  : !registerLatestMsg && syncMessage ? <span className="text-sm text-gray-400">{syncMessage}</span> : null}
                 <button
                   onClick={registerLatest}
                   disabled={isRegisteringLatest || isSyncing}
-                  className="px-3 py-1.5 text-xs  bg-indigo-500 text-white rounded-lg hover:bg-indigo-600 active:scale-95 transition-all disabled:opacity-40 whitespace-nowrap"
+                  className="px-3 py-1.5 text-sm  bg-indigo-500 text-white rounded-lg hover:bg-indigo-600 active:scale-95 transition-all disabled:opacity-40 whitespace-nowrap"
                 >
                   {isRegisteringLatest ? '확인 중...' : '최신 당첨번호 등록'}
                 </button>
@@ -1198,12 +1221,12 @@ export default function Home() {
               <table className="w-full border-separate border-spacing-0 text-sm min-w-[560px]">
                 <thead className="sticky top-0 z-10" style={{ boxShadow: '0 2px 0 #a5b4fc' }}>
                   <tr className="bg-indigo-50">
-                    <th className="border-b border-indigo-200 px-3 py-1.5 text-center text-xs  text-indigo-700 whitespace-nowrap">회차</th>
-                    <th className="border-b border-indigo-200 px-3 py-1.5 text-center text-xs  text-indigo-700 whitespace-nowrap">추첨일</th>
-                    <th colSpan={6} className="border-b border-indigo-200 px-2 py-1.5 text-center text-xs  text-indigo-700">당첨번호</th>
-                    <th className="border-b border-l-2 border-indigo-200 border-l-indigo-200 px-2 py-1.5 text-center text-xs  text-indigo-700">보너스</th>
-                    <th className="border-b border-l-2 border-indigo-200 border-l-indigo-200 px-2 py-1.5 text-center text-xs  text-indigo-700 whitespace-nowrap">당첨자</th>
-                    <th className="border-b border-indigo-200 px-2 py-1.5 text-center text-xs  text-indigo-700 whitespace-nowrap">당첨금</th>
+                    <th className="border-b border-indigo-200 px-3 py-1.5 text-center text-sm  text-indigo-700 whitespace-nowrap">회차</th>
+                    <th className="border-b border-indigo-200 px-3 py-1.5 text-center text-sm  text-indigo-700 whitespace-nowrap">추첨일</th>
+                    <th colSpan={6} className="border-b border-indigo-200 px-2 py-1.5 text-center text-sm  text-indigo-700">당첨번호</th>
+                    <th className="border-b border-l-2 border-indigo-200 border-l-indigo-200 px-2 py-1.5 text-center text-sm  text-indigo-700">보너스</th>
+                    <th className="border-b border-l-2 border-indigo-200 border-l-indigo-200 px-2 py-1.5 text-right text-sm  text-indigo-700 whitespace-nowrap">당첨자</th>
+                    <th className="border-b border-indigo-200 px-2 py-1.5 text-center text-sm  text-indigo-700 whitespace-nowrap">당첨금</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -1215,10 +1238,10 @@ export default function Home() {
                       <td className="border-b border-r border-gray-200 px-3 py-1 text-center text-sm font-medium text-gray-700 whitespace-nowrap">{String(row.round).padStart(5, '0')}</td>
                       <td className="border-b border-r border-gray-200 px-3 py-1 text-center text-[14px] text-gray-500 whitespace-nowrap">{row.draw_date}</td>
                       {[row.num1, row.num2, row.num3, row.num4, row.num5, row.num6].map((num, idx) => (
-                        <td key={idx} className="border-b border-r border-gray-200 px-2 py-1 text-center"><NumberBall num={num} size="sm" /></td>
+                        <td key={idx} className="border-b border-r border-gray-200 px-2 py-1 text-center"><NumberBall num={num} size="sm" sizePx={40} /></td>
                       ))}
-                      <td className="border-b border-r border-l-2 border-gray-200 border-l-indigo-200 px-2 py-1 text-center"><NumberBall num={row.bonus1} size="sm" /></td>
-                      <td className="border-b border-r border-l-2 border-gray-200 border-l-indigo-200 px-2 py-1 text-center text-[14px] text-gray-600 whitespace-nowrap">
+                      <td className="border-b border-r border-l-2 border-gray-200 border-l-indigo-200 px-2 py-1 text-center"><NumberBall num={row.bonus1} size="sm" sizePx={40} /></td>
+                      <td className="border-b border-r border-l-2 border-gray-200 border-l-indigo-200 px-2 py-1 text-right text-[14px] text-gray-600 whitespace-nowrap">
                         {row.first_prize_winners != null ? <span className="font-medium">{row.first_prize_winners}명</span> : '-'}
                       </td>
                       <td className="border-b border-gray-200 px-2 py-1 text-right text-[14px] text-gray-700 whitespace-nowrap font-medium">{formatAmount(row.first_prize_amount)}</td>
@@ -1233,10 +1256,10 @@ export default function Home() {
           <section className="flex flex-col bg-white border-b border-gray-200 shadow-sm md:flex-[3] md:min-h-0 md:border-r md:overflow-hidden">
             <div className="flex-none px-4 py-3 border-b border-gray-100 flex items-center justify-between flex-wrap gap-2">
               <div className="flex items-center gap-1.5">
-                <SectionHeader icon={<IconBarChart />} title="참고) 당첨 빈도 분석" small />
+                <SectionHeader icon={<IconBarChart />} title="당첨 빈도 분석" small />
                 <button
                   onClick={() => setShowConditionHelp(true)}
-                  className="flex-shrink-0 inline-flex items-center justify-center w-4 h-4 rounded-full bg-gray-200 text-gray-500 text-[12px]  hover:bg-gray-300 hover:text-gray-700 transition-colors"
+                  className="flex-shrink-0 inline-flex items-center justify-center w-4 h-4 rounded-full bg-gray-200 text-gray-500 text-[14px]  hover:bg-gray-300 hover:text-gray-700 transition-colors"
                   title="조건 유형별 설명"
                 >
                   ?
@@ -1244,41 +1267,41 @@ export default function Home() {
               </div>
               <div className="flex items-center gap-2">
                 {saveConditionsMsg && (
-                  <span className={`text-xs font-medium ${saveConditionsMsg.includes('완료') ? 'text-emerald-600' : saveConditionsMsg.includes('중') ? 'text-blue-500' : 'text-red-500'}`}>
+                  <span className={`text-sm font-medium ${saveConditionsMsg.includes('완료') ? 'text-emerald-600' : saveConditionsMsg.includes('중') ? 'text-blue-500' : 'text-red-500'}`}>
                     {saveConditionsMsg}
                   </span>
                 )}
-                <button onClick={saveConditions} disabled={isSavingConditions} className="px-3 py-1.5 text-xs  bg-emerald-500 text-white rounded-lg hover:bg-emerald-600 active:scale-95 transition-all disabled:opacity-40">
+                <button onClick={saveConditions} disabled={isSavingConditions} className="px-3 py-1.5 text-sm  bg-emerald-500 text-white rounded-lg hover:bg-emerald-600 active:scale-95 transition-all disabled:opacity-40">
                   {isSavingConditions ? '저장 중...' : '결과 저장'}
                 </button>
-                <button onClick={resetConditionNumbers} className="px-3 py-1.5 text-xs  bg-gray-100 text-gray-600 rounded-lg hover:bg-gray-200 active:scale-95 transition-all disabled:opacity-40">초기화</button>
+                <button onClick={resetConditionNumbers} className="px-3 py-1.5 text-sm  bg-gray-100 text-gray-600 rounded-lg hover:bg-gray-200 active:scale-95 transition-all disabled:opacity-40">초기화</button>
               </div>
             </div>
             <div className="overflow-x-auto overflow-y-auto max-h-72 md:max-h-none md:flex-1 md:min-h-0">
-              <table className="w-full border-separate border-spacing-0 text-xs min-w-[600px]">
+              <table className="w-full border-separate border-spacing-0 text-sm min-w-[600px]">
                 <thead className="sticky top-0 z-10" style={{ boxShadow: '0 2px 0 #6ee7b7' }}>
                   <tr className="bg-emerald-50">
-                    <th className="border-b border-emerald-100 px-3 py-2 text-left text-xs  text-emerald-700 bg-emerald-50">
+                    <th className="border-b border-emerald-100 px-3 py-2 text-left text-sm  text-emerald-700 bg-emerald-50">
                       <button onClick={toggleConditionSort} className="flex items-center gap-1 hover:text-emerald-900 transition-colors select-none">
                         조건
-                        <span className="text-[12px] leading-none">
+                        <span className="text-[14px] leading-none">
                           {conditionSort === 'asc' ? '▲' : conditionSort === 'desc' ? '▼' : '⇅'}
                         </span>
                       </button>
                     </th>
-                    <th className="border-b border-emerald-100 px-2 py-2 text-center text-xs  text-emerald-700 whitespace-nowrap bg-emerald-50">실행</th>
-                    <th className="border-b border-emerald-100 px-2 py-2 text-center text-xs  text-emerald-700 whitespace-nowrap bg-emerald-50">분석 회차</th>
-                    <th colSpan={6} className="border-b border-emerald-100 px-3 py-2 text-center text-xs font-medium text-emerald-600 bg-emerald-50">추출번호</th>
-                    <th className="border-b border-emerald-100 px-2 py-2 text-center text-xs  text-emerald-700 bg-emerald-50">관리</th>
+                    <th className="border-b border-emerald-100 px-2 py-2 text-center text-sm  text-emerald-700 whitespace-nowrap bg-emerald-50">실행</th>
+                    <th className="border-b border-emerald-100 px-2 py-2 text-right text-sm  text-emerald-700 whitespace-nowrap bg-emerald-50">분석 회차</th>
+                    <th colSpan={6} className="border-b border-emerald-100 px-3 py-2 text-center text-sm font-medium text-emerald-600 bg-emerald-50">추출번호</th>
+                    <th className="border-b border-emerald-100 px-2 py-2 text-center text-sm  text-emerald-700 bg-emerald-50">관리</th>
                   </tr>
                 </thead>
                 <tbody>
                   {sortedConditions.map((row, i) => (
                     <tr key={row.id} className={`${i % 2 === 0 ? 'bg-white' : 'bg-gray-50'} hover:bg-emerald-50 transition-colors`}>
                       <td className="border-b border-gray-100 px-3 py-1.5">
-                        <div className="flex items-center gap-1.5 text-xs text-gray-600 whitespace-nowrap">
+                        <div className="flex items-center gap-1.5 text-sm text-gray-600 whitespace-nowrap">
                           <select value={row.conditionType} onChange={(e) => updateConditionType(row.id, Number(e.target.value) as ConditionType)}
-                            className="border border-gray-200 rounded px-1 py-0.5 text-xs bg-white focus:outline-none focus:ring-1 focus:ring-emerald-400">
+                            className="border border-gray-200 rounded px-1 py-0.5 text-sm h-[30px] bg-white focus:outline-none focus:ring-1 focus:ring-emerald-400">
                             <option value={1}>기간</option>
                             <option value={4}>연속번호</option>
                             <option value={5}>홀짝</option>
@@ -1287,45 +1310,41 @@ export default function Home() {
                             <option value={8}>밴드커버</option>
                             <option value={10}>소수포함</option>
                             <option value={11}>끝수다양</option>
+                            <option value={12}>미출현</option>
                           </select>
-                          {row.conditionType === 1 && (
+                          {(row.conditionType === 1 || row.conditionType === 12) && (
                             <>
                               <select value={row.years} onChange={(e) => updateYears(row.id, Number(e.target.value))}
-                                className="border border-gray-200 rounded px-1 py-0.5 text-xs bg-white focus:outline-none focus:ring-1 focus:ring-emerald-400">
+                                className="border border-gray-200 rounded px-1 py-0.5 text-sm h-[30px] bg-white focus:outline-none focus:ring-1 focus:ring-emerald-400">
                                 <option value={0}>-</option>
                                 {Array.from({ length: 20 }, (_, i) => i + 1).map((y) => <option key={y} value={y}>{y}</option>)}
                               </select>
                               <span>년</span>
                               <select value={row.months} onChange={(e) => updateMonths(row.id, Number(e.target.value))}
-                                className="border border-gray-200 rounded px-1 py-0.5 text-xs bg-white focus:outline-none focus:ring-1 focus:ring-emerald-400">
+                                className="border border-gray-200 rounded px-1 py-0.5 text-sm h-[30px] bg-white focus:outline-none focus:ring-1 focus:ring-emerald-400">
                                 <option value={0}>-</option>
                                 {Array.from({ length: 12 }, (_, i) => i + 1).map((m) => <option key={m} value={m}>{m}</option>)}
                               </select>
                               <span>개월</span>
-                              <span className="text-gray-400">
-                                {row.years === 0 && row.months === 0 ? '전체' : '당첨번호 빈도 상위 6개'}
-                              </span>
                             </>
                           )}
                           {row.conditionType === 4 && (
                             <>
                               <select value={row.maxConsec} onChange={(e) => updateMaxConsec(row.id, Number(e.target.value))}
-                                className="border border-gray-200 rounded px-1 py-0.5 text-xs bg-white focus:outline-none focus:ring-1 focus:ring-emerald-400">
+                                className="border border-gray-200 rounded px-1 py-0.5 text-sm h-[30px] bg-white focus:outline-none focus:ring-1 focus:ring-emerald-400">
                                 <option value={0}>없음</option>
                                 <option value={2}>2개</option>
                                 <option value={3}>3개+</option>
                               </select>
-                              <span className="text-gray-400">연속번호 회차 빈도 상위 6개</span>
                             </>
                           )}
                           {row.conditionType === 5 && (
                             <>
                               <span className="text-gray-400">홀수</span>
                               <select value={row.oddCount} onChange={(e) => updateOddCount(row.id, Number(e.target.value))}
-                                className="border border-gray-200 rounded px-1 py-0.5 text-xs bg-white focus:outline-none focus:ring-1 focus:ring-emerald-400">
+                                className="border border-gray-200 rounded px-1 py-0.5 text-sm h-[30px] bg-white focus:outline-none focus:ring-1 focus:ring-emerald-400">
                                 {[0,1,2,3,4,5,6].map(n => <option key={n} value={n}>{n}개</option>)}
                               </select>
-                              <span className="text-gray-400">회차 빈도 상위 6개</span>
                             </>
                           )}
                           {row.conditionType === 6 && (
@@ -1333,52 +1352,47 @@ export default function Home() {
                               <span className="text-gray-400">합계</span>
                               <input type="number" min={21} max={255} value={row.sumMin}
                                 onChange={(e) => updateSumMin(row.id, Number(e.target.value))}
-                                className="border border-gray-200 rounded px-1 py-0.5 text-xs bg-white w-14 focus:outline-none focus:ring-1 focus:ring-emerald-400" />
+                                className="border border-gray-200 rounded px-1 py-0.5 text-sm h-[30px] bg-white w-14 focus:outline-none focus:ring-1 focus:ring-emerald-400" />
                               <span className="text-gray-400">~</span>
                               <input type="number" min={21} max={255} value={row.sumMax}
                                 onChange={(e) => updateSumMax(row.id, Number(e.target.value))}
-                                className="border border-gray-200 rounded px-1 py-0.5 text-xs bg-white w-14 focus:outline-none focus:ring-1 focus:ring-emerald-400" />
-                              <span className="text-gray-400">범위 빈도 상위 6개</span>
+                                className="border border-gray-200 rounded px-1 py-0.5 text-sm h-[30px] bg-white w-14 focus:outline-none focus:ring-1 focus:ring-emerald-400" />
                             </>
                           )}
                           {row.conditionType === 7 && (
                             <>
                               <span className="text-gray-400">AC값</span>
                               <select value={row.minAC} onChange={(e) => updateMinAC(row.id, Number(e.target.value))}
-                                className="border border-gray-200 rounded px-1 py-0.5 text-xs bg-white focus:outline-none focus:ring-1 focus:ring-emerald-400">
+                                className="border border-gray-200 rounded px-1 py-0.5 text-sm h-[30px] bg-white focus:outline-none focus:ring-1 focus:ring-emerald-400">
                                 {[3,4,5,6,7,8,9,10].map(n => <option key={n} value={n}>{n} 이상</option>)}
                               </select>
-                              <span className="text-gray-400">회차 빈도 상위 6개</span>
                             </>
                           )}
                           {row.conditionType === 8 && (
                             <>
                               <select value={row.minBands} onChange={(e) => updateMinBands(row.id, Number(e.target.value))}
-                                className="border border-gray-200 rounded px-1 py-0.5 text-xs bg-white focus:outline-none focus:ring-1 focus:ring-emerald-400">
+                                className="border border-gray-200 rounded px-1 py-0.5 text-sm h-[30px] bg-white focus:outline-none focus:ring-1 focus:ring-emerald-400">
                                 <option value={4}>4밴드</option>
                                 <option value={5}>5밴드</option>
                               </select>
-                              <span className="text-gray-400">이상 커버 회차 빈도 상위 6개</span>
                             </>
                           )}
                           {row.conditionType === 10 && (
                             <>
                               <span className="text-gray-400">소수</span>
                               <select value={row.primeCount} onChange={(e) => updatePrimeCount(row.id, Number(e.target.value))}
-                                className="border border-gray-200 rounded px-1 py-0.5 text-xs bg-white focus:outline-none focus:ring-1 focus:ring-emerald-400">
+                                className="border border-gray-200 rounded px-1 py-0.5 text-sm h-[30px] bg-white focus:outline-none focus:ring-1 focus:ring-emerald-400">
                                 {[1,2,3,4].map(n => <option key={n} value={n}>{n}개</option>)}
                               </select>
-                              <span className="text-gray-400">포함 회차 빈도 상위 6개</span>
                             </>
                           )}
                           {row.conditionType === 11 && (
                             <>
                               <span className="text-gray-400">끝수</span>
                               <select value={row.minUniqueTails} onChange={(e) => updateMinUniqueTails(row.id, Number(e.target.value))}
-                                className="border border-gray-200 rounded px-1 py-0.5 text-xs bg-white focus:outline-none focus:ring-1 focus:ring-emerald-400">
+                                className="border border-gray-200 rounded px-1 py-0.5 text-sm h-[30px] bg-white focus:outline-none focus:ring-1 focus:ring-emerald-400">
                                 {[4,5,6].map(n => <option key={n} value={n}>{n}종 이상</option>)}
                               </select>
-                              <span className="text-gray-400">회차 빈도 상위 6개</span>
                             </>
                           )}
                         </div>
@@ -1386,13 +1400,13 @@ export default function Home() {
                       <td className="border-b border-gray-100 px-2 py-1.5 text-center">
                         <div className="flex items-center justify-center gap-1">
                           <button onClick={() => executeCondition(row.id)} disabled={row.isLoading}
-                            className="inline-flex items-center gap-0.5 px-2 py-1 text-xs  bg-indigo-600 text-white rounded hover:bg-indigo-700 disabled:opacity-40 whitespace-nowrap">
+                            className="inline-flex items-center gap-0.5 px-2 py-1 text-sm  bg-indigo-600 text-white rounded hover:bg-indigo-700 disabled:opacity-40 whitespace-nowrap">
                             {row.isLoading ? <span className="inline-block w-2.5 h-2.5 border-2 border-white border-t-transparent rounded-full animate-spin" /> : '실행'}
                           </button>
                           <button
                             onClick={() => openDistribution(row.id)}
                             disabled={distLoadingIds.has(row.id)}
-                            className="inline-flex items-center gap-0.5 px-2 py-1 text-xs  bg-amber-500 text-white rounded hover:bg-amber-600 disabled:opacity-50 whitespace-nowrap"
+                            className="inline-flex items-center gap-0.5 px-2 py-1 text-sm  bg-amber-500 text-white rounded hover:bg-amber-600 disabled:opacity-50 whitespace-nowrap"
                             title="번호 분포도 보기"
                           >
                             {distLoadingIds.has(row.id)
@@ -1401,16 +1415,16 @@ export default function Home() {
                           </button>
                         </div>
                       </td>
-                      <td className="border-b border-gray-100 px-2 py-1.5 text-center whitespace-nowrap">
+                      <td className="border-b border-gray-100 px-2 py-1.5 text-right whitespace-nowrap">
                         {row.roundsAnalyzed != null
-                          ? <span className="text-xs font-medium text-gray-600">{row.roundsAnalyzed.toLocaleString()}회</span>
-                          : <span className="text-gray-300 text-xs">-</span>}
+                          ? <span className="text-sm font-medium text-gray-600">{row.roundsAnalyzed.toLocaleString()}회</span>
+                          : <span className="text-gray-300 text-sm">-</span>}
                       </td>
                       {[0,1,2,3,4,5].map((idx) => (
                         <td key={idx} className="border-b border-gray-100 px-3 py-1.5 text-center">
                           {row.numbers != null
-                            ? <NumberBall num={row.numbers[idx]} size="sm" hoverFreq={row.frequencies != null ? row.frequencies[idx] : undefined} />
-                            : <span className="text-gray-300 text-xs">-</span>}
+                            ? <NumberBall num={row.numbers[idx]} size="sm" sizePx={40} hoverFreq={row.frequencies != null ? row.frequencies[idx] : undefined} />
+                            : <span className="text-gray-300 text-sm">-</span>}
                         </td>
                       ))}
                       <td className="border-b border-gray-100 px-2 py-1.5 text-center whitespace-nowrap">
@@ -1441,17 +1455,28 @@ export default function Home() {
                   <h2 className="text-xl  text-gray-900 tracking-tight">예상 당첨 번호</h2>
                 </div>
                 <div className="flex items-center gap-2 w-full sm:w-auto">
-                  <button
-                    onClick={generateAIPredictions}
-                    disabled={isGeneratingAI}
-                    onMouseEnter={(e) => showTooltip(e, 'generate')}
-                    onMouseLeave={() => setTooltipInfo(null)}
-                    className="flex-shrink-0 inline-flex items-center gap-1.5 px-4 py-2 text-sm  bg-indigo-600 text-white rounded-xl hover:bg-indigo-700 disabled:opacity-50 whitespace-nowrap transition-all shadow-sm"
-                  >
-                    {isGeneratingAI
-                      ? <><span className="inline-block w-3.5 h-3.5 border-2 border-white border-t-transparent rounded-full animate-spin" />백테스트 · 생성 중</>
-                      : '🎲 생성'}
-                  </button>
+                  <div className="flex-shrink-0 inline-flex items-center bg-indigo-600 text-white rounded-xl overflow-hidden shadow-sm">
+                    <button
+                      onClick={generateAIPredictions}
+                      disabled={isGeneratingAI}
+                      className="inline-flex items-center gap-1.5 pl-4 pr-3 py-2 text-sm  hover:bg-indigo-700 disabled:opacity-50 whitespace-nowrap transition-all"
+                    >
+                      {isGeneratingAI
+                        ? <><span className="inline-block w-3.5 h-3.5 border-2 border-white border-t-transparent rounded-full animate-spin" />백테스트 · 생성 중</>
+                        : '🎲 생성'}
+                    </button>
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        if (tooltipInfo?.id === 'generate') { setTooltipInfo(null); return; }
+                        showTooltip(e, 'generate');
+                      }}
+                      className="self-stretch inline-flex items-center justify-center px-2.5 text-sm border-l border-white/30 hover:bg-indigo-700 transition-colors"
+                      title="생성 로직 설명"
+                    >
+                      ?
+                    </button>
+                  </div>
                   <button
                     onClick={() => setShowInfoPopup(true)}
                     className="flex-shrink-0 inline-flex items-center gap-1.5 px-4 py-2 text-sm  bg-rose-500 text-white rounded-xl hover:bg-rose-600 whitespace-nowrap transition-all shadow-sm"
@@ -1466,7 +1491,7 @@ export default function Home() {
                   </button>
                 </div>
               </div>
-
+              {aiError && <p className="mt-2 text-sm font-medium text-red-500">{aiError}</p>}
             </div>
 
             {/* Body */}
@@ -1479,11 +1504,11 @@ export default function Home() {
                     <span className="inline-flex items-center gap-1.5 text-sm  text-violet-900 whitespace-nowrap">
                       🤖 Claude 추천 5개
                     </span>
-                    <span className="text-[12px] text-violet-400 font-medium hidden sm:block">밴드분산 · 홀짝균형 · 보너스후보 · 빈도상위 종합 점수 상위 5개</span>
+                    <span className="text-[14px] text-violet-400 font-medium hidden sm:block">조건분석 기반 3개(서로 번호 중복 없음, 80점 이상·3번째는 미달 가능) + 완전 무작위 50점 이상 2개(서로 번호 중복 없음)</span>
                   </div>
 
                   {/* 백테스팅 배지 — 5개 전체에 적용되는 과거 성과 참고치 */}
-                  <div className="flex items-center gap-2 mb-2 px-3 py-1.5 bg-white/70 rounded-lg text-[11px] flex-wrap">
+                  <div className="flex items-center gap-2 mb-2 px-3 py-1.5 bg-white/70 rounded-lg text-[14px] flex-wrap">
                     <span className="flex-shrink-0  text-violet-700 bg-violet-100 px-2 py-0.5 rounded-full">랜덤 모드</span>
                     {isGeneratingAI ? (
                       <span className="text-gray-400">백테스트로 과거 성과 확인 중...</span>
@@ -1505,20 +1530,17 @@ export default function Home() {
                       const bandCount = [combo.some(n => n <= 9), combo.some(n => n >= 10 && n <= 19),
                         combo.some(n => n >= 20 && n <= 29), combo.some(n => n >= 30 && n <= 39),
                         combo.some(n => n >= 40)].filter(Boolean).length;
-                      const checked = expertPickChecked.has(i);
-                      const atCap = !checked && expertPickChecked.size >= 5;
                       return (
                         <div
                           key={i}
-                          onClick={() => toggleExpertPick(i)}
-                          className={`flex items-center gap-2 px-3 py-2 transition-all ${atCap ? 'opacity-30 cursor-not-allowed' : `cursor-pointer hover:bg-violet-50/60 ${checked ? '' : 'opacity-50'}`}`}
+                          className="flex items-center gap-2 px-3 py-2"
                         >
-                          <span className={`flex-shrink-0 w-4 h-4 rounded border-2 flex items-center justify-center ${checked ? 'bg-violet-600 border-violet-600' : 'border-gray-300'}`}>
-                            {checked && <span className="text-white text-[9px] ">✓</span>}
+                          <span className="flex-shrink-0 w-5 h-5 rounded-full bg-violet-600 text-white text-[14px]  flex items-center justify-center">{rank + 1}</span>
+                          <span className={`flex-shrink-0 w-14 py-0.5 rounded-full text-[14px] text-center whitespace-nowrap ${rank < 3 ? 'bg-violet-100 text-violet-600' : 'bg-gray-100 text-gray-500'}`}>
+                            {rank < 3 ? '조건분석' : '무작위'}
                           </span>
-                          <span className="flex-shrink-0 w-5 h-5 rounded-full bg-violet-600 text-white text-[12px]  flex items-center justify-center">{rank + 1}</span>
                           <div className="flex gap-3 flex-1">
-                            {combo.map((num, j) => <NumberBall key={j} num={num} size="sm" highlighted={checked} />)}
+                            {combo.map((num, j) => <NumberBall key={j} num={num} size="sm" highlighted fontPx={20} sizePx={50} />)}
                           </div>
                           <div
                             className="flex-shrink-0 flex items-center gap-1.5 text-[14px] text-violet-500 font-medium whitespace-nowrap"
@@ -1537,168 +1559,83 @@ export default function Home() {
                 </div>
               )}
 
-              {/* 고급 — 게임 수 조절 · 전체 조합 보기 */}
-              <div className="flex-none rounded-2xl border border-gray-200 bg-gray-50/60 overflow-hidden">
-                <button
-                  onClick={() => setShowAdvanced(v => !v)}
-                  className="w-full flex items-center gap-2 px-4 py-2.5 text-xs  text-gray-500 hover:text-gray-700 transition-colors"
-                >
-                  <span className={`inline-block transition-transform ${showAdvanced ? 'rotate-90' : ''}`}>▸</span>
-                  고급 — 게임 수 조절 · 전체 조합 보기{type3Numbers.length > 0 ? ` (${type3Numbers.length}개)` : ''}
-                </button>
-                {showAdvanced && (
-                  <div className="px-4 pb-4 flex flex-col gap-3">
-                    {/* 게임 수 조절 패널 */}
-                    <div className="bg-indigo-50/70 rounded-xl border border-indigo-100 px-4 py-3">
-                      <div className="flex items-center gap-3 flex-wrap">
-                        <span className="text-sm  text-indigo-800 whitespace-nowrap">게임 수</span>
-                        <div className="flex-1 min-w-[120px]">
-                          <input
-                            type="range" min={5} max={maxGameCount} step={5} value={gameCount}
-                            onChange={(e) => setGameCount(Number(e.target.value))}
-                            className="w-full h-2 rounded-full appearance-none cursor-pointer accent-indigo-600 bg-indigo-200"
-                          />
-                          <div className="flex justify-between text-[12px] text-indigo-400 mt-0.5">
-                            <span>5</span><span>25</span><span>50</span><span>75</span><span>100</span>
-                          </div>
-                        </div>
-                        <div className="flex items-center gap-1">
-                          <input
-                            type="number" min={5} max={100} step={5} value={gameCount}
-                            onChange={(e) => setGameCount(Math.min(maxGameCount, Math.max(5, Number(e.target.value))))}
-                            className="w-14 border border-indigo-300 rounded-lg px-2 py-1 text-sm text-center  text-indigo-700 bg-white focus:outline-none focus:ring-2 focus:ring-indigo-400"
-                          />
-                          <span className="text-sm text-indigo-600 font-medium">게임</span>
-                        </div>
-                      </div>
-                      <div className="mt-2.5 grid grid-cols-3 gap-2">
-                        <div className="bg-white rounded-xl border border-indigo-100 px-2 py-2 text-center">
-                          <div className="text-[12px] text-gray-400 mb-0.5">구매 비용</div>
-                          <div className="text-sm  text-gray-800">{(gameCount * 1000).toLocaleString()}원</div>
-                        </div>
-                        <div className="bg-white rounded-xl border border-indigo-100 px-2 py-2 text-center">
-                          <div className="text-[12px] text-gray-400 mb-0.5">1등 확률</div>
-                          <div className="text-sm  text-indigo-600">1 / {Math.round(8145060 / gameCount).toLocaleString()}</div>
-                        </div>
-                        <div className="bg-white rounded-xl border border-amber-100 px-2 py-2 text-center">
-                          <div className="text-[12px] text-amber-500 mb-0.5">기본 대비</div>
-                          <div className="text-sm  text-amber-600">× {(gameCount / 5).toFixed(1)} 배</div>
-                        </div>
-                      </div>
-                    </div>
+              {/* 추천 5개 분석 */}
+              {rankedExpertPicks.length > 0 && (() => {
+                const combos = rankedExpertPicks.map(r => r.combo);
+                const scores = rankedExpertPicks.map(r => r.score);
+                const avgScore = scores.reduce((a, b) => a + b, 0) / scores.length;
 
-                    {/* Type 3 원본 조합 리스트 */}
-                    <div className="flex-none flex flex-col rounded-2xl border border-emerald-200 bg-emerald-50/60 px-4 py-4 md:px-5">
-                      <div className="flex-none flex items-center justify-between mb-3">
-                        <div className="flex items-center gap-2">
-                          <span className="text-base  text-emerald-900">
-                            랜덤 &times; {type3Numbers.length > 0 ? type3Numbers.length : gameCount}
-                          </span>
-                          {type3Numbers.length > 0 && (
-                            <button
-                              onClick={toggleAllCombos}
-                              className="text-xs text-emerald-600 font-medium hover:text-emerald-800 transition-colors"
-                            >
-                              {selectedComboIndices.size === type3Numbers.length ? '전체 해제' : '전체 선택'}
-                            </button>
-                          )}
+                const freqMap: Record<number, number> = {};
+                combos.flat().forEach(n => { freqMap[n] = (freqMap[n] ?? 0) + 1; });
+                const freqSorted = Object.entries(freqMap)
+                  .filter(([, cnt]) => cnt >= 2)
+                  .sort((a, b) => b[1] - a[1] || Number(a[0]) - Number(b[0]))
+                  .map(([n, cnt]) => ({ num: Number(n), cnt }));
+
+                // 조합 간 평균 중복 번호 수 (다양성 참고 지표)
+                let pairCount = 0, sharedTotal = 0;
+                for (let i = 0; i < combos.length; i++) {
+                  const setA = new Set(combos[i]);
+                  for (let j = i + 1; j < combos.length; j++) {
+                    sharedTotal += combos[j].filter(n => setA.has(n)).length;
+                    pairCount++;
+                  }
+                }
+                const avgOverlap = pairCount > 0 ? sharedTotal / pairCount : 0;
+
+                return (
+                  <div className="flex-none rounded-2xl border border-violet-200 bg-violet-50/60 px-4 py-4">
+                    <div className="flex items-center gap-2 mb-3">
+                      <span className="text-sm text-violet-900">📈 추천 5개 분석</span>
+                    </div>
+                    <div className="grid grid-cols-3 gap-2 mb-3">
+                      <div className="bg-white rounded-xl border border-violet-100 px-2 py-2 text-center">
+                        <div className="text-[14px] text-gray-400 mb-0.5">평균 점수</div>
+                        <div className="text-sm text-violet-700">{avgScore.toFixed(1)}점</div>
+                      </div>
+                      <div className="bg-white rounded-xl border border-violet-100 px-2 py-2 text-center">
+                        <div className="text-[14px] text-gray-400 mb-0.5">최고점 / 최저점</div>
+                        <div className="text-sm text-violet-700">{Math.max(...scores)} / {Math.min(...scores)}</div>
+                      </div>
+                      <div className="bg-white rounded-xl border border-violet-100 px-2 py-2 text-center">
+                        <div className="text-[14px] text-gray-400 mb-0.5">조합 간 평균 중복</div>
+                        <div className="text-sm text-violet-700">{avgOverlap.toFixed(1)}개</div>
+                      </div>
+                    </div>
+                    {freqSorted.length > 0 && (
+                      <div>
+                        <div className="flex items-center gap-1.5 mb-1.5 flex-wrap">
+                          <span className="text-[14px] text-violet-700">번호 출현 빈도</span>
+                          <span className="text-[14px] text-violet-400">5개 조합(30자리) 중 2회 이상 겹치는 번호</span>
                         </div>
-                        <div className="flex items-center gap-2">
-                          {confirmMsg && <span className="text-xs font-medium text-red-500">{confirmMsg}</span>}
-                          {isSavingPredicted && <span className="text-xs text-gray-400">저장 중...</span>}
-                          {type3Numbers.length > 0 && (
-                            <button
-                              onClick={confirmPurchase}
-                              disabled={isConfirming || results.length === 0 || selectedComboIndices.size === 0}
-                              className="inline-flex items-center gap-1 px-3 py-1 text-xs  bg-rose-500 text-white rounded-lg hover:bg-rose-600 disabled:opacity-40 transition-all"
-                            >
-                              {isConfirming
-                                ? <><span className="inline-block w-2.5 h-2.5 border-2 border-white border-t-transparent rounded-full animate-spin" />확정 중</>
-                                : `🎯 확정하기 ${selectedComboIndices.size > 0 ? `(${selectedComboIndices.size}개)` : ''}`}
-                            </button>
-                          )}
+                        <div className="flex flex-wrap gap-1.5">
+                          {freqSorted.map(({ num, cnt }) => (
+                            <span key={num} className="inline-flex items-center justify-center gap-1 pl-1 pr-1.5 py-0.5 rounded-full bg-white border border-violet-200" style={{ width: '100px' }}>
+                              <NumberBall num={num} size="sm" highlighted />
+                              <span className="text-[14px] text-violet-600">{cnt}회</span>
+                            </span>
+                          ))}
                         </div>
                       </div>
-                      {type3Numbers.length > 0 ? (
-                        <>
-                          {(() => {
-                            const useGrid = type3Numbers.length > 5;
-                            if (useGrid) {
-                              const half = Math.ceil(type3Numbers.length / 2);
-                              const renderCol = (combos: number[][], offset: number) => (
-                                <div className="flex flex-col divide-y divide-emerald-100 rounded-xl border border-emerald-200 bg-white overflow-hidden">
-                                  {combos.map((combo, i) => {
-                                    const idx = offset + i;
-                                    const selected = selectedComboIndices.has(idx);
-                                    return (
-                                      <div
-                                        key={i}
-                                        onClick={() => toggleComboSelection(idx)}
-                                        className={`flex items-center gap-1.5 py-2 px-2 cursor-pointer transition-all ${selected ? 'bg-indigo-50 ring-1 ring-inset ring-indigo-300' : 'hover:bg-gray-50'}`}
-                                      >
-                                        <span className={`w-4 h-4 flex-shrink-0 rounded-full border-2 flex items-center justify-center ${selected ? 'bg-indigo-500 border-indigo-500' : 'border-gray-300'}`}>
-                                          {selected && <span className="text-white text-[9px] ">✓</span>}
-                                        </span>
-                                        <div className="flex justify-center gap-1 flex-1">
-                                          {combo.map((num, j) => <NumberBall key={j} num={num} size="sm" highlighted={selected} />)}
-                                        </div>
-                                      </div>
-                                    );
-                                  })}
-                                </div>
-                              );
-                              return (
-                                <div className="grid grid-cols-2 gap-2">
-                                  {renderCol(type3Numbers.slice(0, half), 0)}
-                                  {renderCol(type3Numbers.slice(half), half)}
-                                </div>
-                              );
-                            }
-                            return (
-                              <div className="flex flex-col rounded-xl border border-emerald-200 bg-white overflow-hidden divide-y divide-emerald-100">
-                                {type3Numbers.map((combo, i) => {
-                                  const selected = selectedComboIndices.has(i);
-                                  return (
-                                    <div
-                                      key={i}
-                                      onClick={() => toggleComboSelection(i)}
-                                      className={`flex items-center gap-3 px-3 py-2.5 cursor-pointer transition-all ${selected ? 'bg-indigo-50 ring-1 ring-inset ring-indigo-300' : 'hover:bg-gray-50'}`}
-                                    >
-                                      <span className={`w-5 h-5 flex-shrink-0 rounded-full border-2 flex items-center justify-center ${selected ? 'bg-indigo-500 border-indigo-500' : 'border-gray-300'}`}>
-                                        {selected && <span className="text-white text-xs ">✓</span>}
-                                      </span>
-                                      <div className="flex justify-center gap-2.5 flex-1">
-                                        {combo.map((num, j) => <NumberBall key={j} num={num} size="md" highlighted={selected} />)}
-                                      </div>
-                                    </div>
-                                  );
-                                })}
-                              </div>
-                            );
-                          })()}
-                        </>
-                      ) : (
-                        <p className="text-sm text-gray-400">{aiError || '버튼을 눌러 번호를 생성하세요.'}</p>
-                      )}
-                    </div>
+                    )}
                   </div>
-                )}
-              </div>
+                );
+              })()}
 
-              {/* 최종 확정 트레이 — Claude 추천 체크 */}
+              {/* 최종 확정 트레이 — Claude 추천 5개 전부 확정 */}
               {expertPicks.length > 0 && (() => {
-                const totalSelected = expertPickChecked.size;
+                const totalSelected = expertPicks.length;
                 return (
                   <div className="sticky bottom-0 -mx-4 md:-mx-5 mt-auto px-4 md:px-5 py-3 bg-white/95 backdrop-blur-sm border-t border-gray-200 flex items-center justify-between gap-3">
                     <div>
-                      <div className="text-sm  text-gray-800">선택 {totalSelected}게임 <span className="text-[11px] font-normal text-gray-400">/ 최대 5게임 · 1세트로 확정</span></div>
-                      <div className="text-[11px] text-gray-400">
+                      <div className="text-sm  text-gray-800">{totalSelected}게임 <span className="text-[14px] font-normal text-gray-400">· 1세트로 확정</span></div>
+                      <div className="text-[14px] text-gray-400">
                         {(totalSelected * 1000).toLocaleString()}원
                         {totalSelected > 0 ? ` · 1등 확률 1 / ${Math.round(8145060 / totalSelected).toLocaleString()}` : ''}
                       </div>
                     </div>
                     <div className="flex items-center gap-2">
-                      {finalConfirmMsg && <span className="text-xs font-medium text-emerald-600">{finalConfirmMsg}</span>}
+                      {finalConfirmMsg && <span className="text-sm font-medium text-emerald-600">{finalConfirmMsg}</span>}
                       <button
                         onClick={confirmFinalSelection}
                         disabled={isConfirmingFinal || totalSelected === 0 || results.length === 0}
@@ -1742,7 +1679,7 @@ export default function Home() {
                 <div className="flex items-center justify-between mb-3">
                   <h4 className="text-sm  text-rose-800">📋 구매 이력</h4>
                   {confirmedPurchases.length > 0 && (
-                    <span className="text-[12px] text-gray-400">{new Set(confirmedPurchases.map(p => p.target_round)).size}회차 · {confirmedPurchases.length}종</span>
+                    <span className="text-[14px] text-gray-400">{new Set(confirmedPurchases.map(p => p.target_round)).size}회차 · {confirmedPurchases.length}종</span>
                   )}
                 </div>
                 {confirmedPurchases.length === 0 ? (
@@ -1785,14 +1722,14 @@ export default function Home() {
                             <div className="flex items-center gap-2 px-4 py-2.5 bg-rose-50 border-b border-rose-100">
                               <span className="text-sm  text-rose-800">{round}회</span>
                               {actual ? (
-                                <span className="text-[12px] text-gray-400">{actual.draw_date}</span>
+                                <span className="text-[14px] text-gray-400">{actual.draw_date}</span>
                               ) : (
-                                <span className="text-[12px] text-amber-500 ">추첨 대기</span>
+                                <span className="text-[14px] text-amber-500 ">추첨 대기</span>
                               )}
-                              <span className="text-[12px] text-gray-400">{purchases.length}종 확정</span>
+                              <span className="text-[14px] text-gray-400">{purchases.length}종 확정</span>
                               <div className="ml-auto flex items-center gap-2">
                                 {actual && roundBestTier !== '낙첨' && (
-                                  <span className={`text-[12px]  px-2 py-0.5 rounded-full border ${getTierStyle(roundBestTier)}`}>
+                                  <span className={`text-[14px]  px-2 py-0.5 rounded-full border ${getTierStyle(roundBestTier)}`}>
                                     최고 {roundBestTier}
                                   </span>
                                 )}
@@ -1800,7 +1737,7 @@ export default function Home() {
                                   <button
                                     onClick={() => sendTelegram(round)}
                                     disabled={sendingTelegramRound === round}
-                                    className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-[12px]  bg-sky-500 text-white hover:bg-sky-600 disabled:opacity-50 transition-all"
+                                    className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-[14px]  bg-sky-500 text-white hover:bg-sky-600 disabled:opacity-50 transition-all"
                                   >
                                     {sendingTelegramRound === round
                                       ? <><span className="inline-block w-2 h-2 border border-white border-t-transparent rounded-full animate-spin" />전송 중</>
@@ -1808,7 +1745,7 @@ export default function Home() {
                                   </button>
                                 )}
                                 {telegramMsg?.round === round && (
-                                  <span className={`text-[12px] font-medium ${telegramMsg.ok ? 'text-sky-600' : 'text-red-500'}`}>
+                                  <span className={`text-[14px] font-medium ${telegramMsg.ok ? 'text-sky-600' : 'text-red-500'}`}>
                                     {telegramMsg.text}
                                   </span>
                                 )}
@@ -1818,11 +1755,11 @@ export default function Home() {
                             {/* 당첨 번호 (추첨 완료 시) */}
                             {actual && (
                               <div className="flex items-center gap-2 px-4 py-2 border-b border-rose-100 bg-white/60">
-                                <span className="text-[12px] text-gray-400 flex-shrink-0 w-12">당첨번호</span>
+                                <span className="text-[14px] text-gray-400 flex-shrink-0 w-12">당첨번호</span>
                                 <div className="flex gap-1 flex-wrap">
                                   {winNums.map((num, j) => <NumberBall key={j} num={num} size="sm" highlighted />)}
                                   {actual.bonus1 != null && (
-                                    <><span className="text-[12px] text-gray-300 self-center">+</span>
+                                    <><span className="text-[14px] text-gray-300 self-center">+</span>
                                     <NumberBall num={actual.bonus1} size="sm" highlighted /></>
                                   )}
                                 </div>
@@ -1859,33 +1796,33 @@ export default function Home() {
                                         className="flex items-center gap-2 px-4 py-2.5 cursor-pointer hover:bg-rose-50/60 transition-colors select-none"
                                         onClick={() => setOpenConfirmedIds(prev => { const next = new Set(prev); isOpen ? next.delete(purchase.id) : next.add(purchase.id); return next; })}
                                       >
-                                        <span className="text-xs  text-rose-500 w-4">{slotLabels[slotIdx]}</span>
+                                        <span className="text-sm  text-rose-500 w-4">{slotLabels[slotIdx]}</span>
                                         {purchase.generation_mode && (
-                                          <span className="text-[12px]  px-1.5 py-0.5 rounded bg-violet-100 text-violet-700">
+                                          <span className="text-[14px]  px-1.5 py-0.5 rounded bg-violet-100 text-violet-700">
                                             {MODE_LABELS[purchase.generation_mode] ?? purchase.generation_mode}
                                           </span>
                                         )}
                                         {isSelected && (
                                           <span className="flex items-center gap-1">
-                                            <span className="text-[12px]  px-1.5 py-0.5 rounded bg-emerald-100 text-emerald-700 border border-emerald-200">
+                                            <span className="text-[14px]  px-1.5 py-0.5 rounded bg-emerald-100 text-emerald-700 border border-emerald-200">
                                               선정
                                             </span>
-                                            <span className="text-[12px] text-emerald-600">{selectionReason}</span>
+                                            <span className="text-[14px] text-emerald-600">{selectionReason}</span>
                                           </span>
                                         )}
                                         {actual && bestTier ? (
-                                          <span className={`text-[12px]  px-1.5 py-0.5 rounded-full border ${getTierStyle(bestTier)}`}>
+                                          <span className={`text-[14px]  px-1.5 py-0.5 rounded-full border ${getTierStyle(bestTier)}`}>
                                             최고 {bestTier}
                                           </span>
                                         ) : !actual ? (
-                                          <span className="text-[12px] text-gray-400">대기 중</span>
+                                          <span className="text-[14px] text-gray-400">대기 중</span>
                                         ) : null}
                                         <button
                                           onClick={(e) => { e.stopPropagation(); deleteConfirmed(purchase.id); }}
                                           className="ml-auto text-gray-300 hover:text-red-400 text-base leading-none transition-colors px-1"
                                           title="삭제"
                                         >×</button>
-                                        <span className="text-[12px] text-gray-300">{isOpen ? '▲' : '▼'}</span>
+                                        <span className="text-[14px] text-gray-300">{isOpen ? '▲' : '▼'}</span>
                                       </div>
 
                                       {/* 조합 상세 (펼쳐짐) */}
@@ -1900,7 +1837,7 @@ export default function Home() {
                                                   ))}
                                                 </div>
                                                 {analyses && (
-                                                  <span className={`flex-shrink-0 text-[12px]  px-1.5 py-0.5 rounded-full border ${getTierStyle(analyses[i].tier)}`}>
+                                                  <span className={`flex-shrink-0 text-[14px]  px-1.5 py-0.5 rounded-full border ${getTierStyle(analyses[i].tier)}`}>
                                                     {analyses[i].tier}
                                                   </span>
                                                 )}
@@ -1908,7 +1845,7 @@ export default function Home() {
                                             ))}
                                           </div>
                                           {analyses && bestTier && (
-                                            <div className="mt-2 pt-2 border-t border-rose-100 text-[11px] text-gray-500 text-center">
+                                            <div className="mt-2 pt-2 border-t border-rose-100 text-[14px] text-gray-500 text-center">
                                               최고 <b className={getTierTextColor(bestTier)}>{bestTier}</b>
                                               {' · '}평균 일치 <b className="text-gray-700">
                                                 {(analyses.reduce((s, a) => s + a.matchCount, 0) / analyses.length).toFixed(1)}개
@@ -1934,13 +1871,13 @@ export default function Home() {
               <div>
                 <div className="flex items-center gap-2 mb-3">
                   <h4 className="text-sm  text-indigo-800">⚙️ 생성 전략</h4>
-                  <span className="px-2 py-0.5 rounded-full text-[12px]  bg-indigo-100 text-indigo-700">랜덤</span>
+                  <span className="px-2 py-0.5 rounded-full text-[14px]  bg-indigo-100 text-indigo-700">랜덤</span>
                 </div>
                 <div className="rounded-xl border border-indigo-100 bg-indigo-50/40 px-4 py-4 flex flex-col gap-2.5">
                   {GENERATION_STRATEGY.map(({ tag, color, desc }) => (
                     <div key={tag} className="flex items-start gap-3">
-                      <span className={`flex-shrink-0 mt-0.5 inline-flex items-center justify-center w-[108px] px-2 py-1 rounded-lg text-xs  whitespace-nowrap ${color}`}>{tag}</span>
-                      <span className="text-xs text-gray-600 leading-snug pt-0.5">{desc}</span>
+                      <span className={`flex-shrink-0 mt-0.5 inline-flex items-center justify-center w-[108px] px-2 py-1 rounded-lg text-sm  whitespace-nowrap ${color}`}>{tag}</span>
+                      <span className="text-sm text-gray-600 leading-snug pt-0.5">{desc}</span>
                     </div>
                   ))}
                 </div>
@@ -1972,6 +1909,7 @@ export default function Home() {
           { label: '밴드커버', desc: '1~9·10~19·20~29·30~39·40~45 구간 중 지정한 개수 이상을 커버하는 회차만 모아, 그 안에서 가장 자주 나온 6개를 추출합니다.', required: '최소 커버 밴드 수 (4 또는 5, 이상)' },
           { label: '소수포함', desc: '소수(2,3,5,7,11...) 개수가 지정한 값과 일치하는 회차만 모아, 그 안에서 가장 자주 나온 6개를 추출합니다.', required: '소수 개수 (0~6, 정확히 일치)' },
           { label: '끝수다양', desc: '끝자리 숫자(0~9)의 종류 수가 지정한 값 이상인 회차만 모아, 그 안에서 가장 자주 나온 6개를 추출합니다.', required: '최소 고유 끝수 종류 수 (이상)' },
+          { label: '미출현', desc: '다른 조건과 반대로 "자주 나온 번호"가 아니라, 지정한 기간(또는 전체 회차) 안에서 마지막 등장 이후 가장 오래 안 나온 번호 6개를 추출합니다.', required: '연도, 개월 수 (둘 다 0이면 전체 회차 대상)' },
         ];
         return (
           <div
@@ -1979,7 +1917,7 @@ export default function Home() {
             onClick={() => setShowConditionHelp(false)}
           >
             <div
-              className="bg-white rounded-2xl shadow-2xl px-6 py-5 w-[700px] max-w-[92vw] max-h-[80vh] overflow-y-auto"
+              className="bg-white rounded-2xl shadow-2xl px-6 py-5 w-[800px] max-w-[92vw]"
               onClick={(e) => e.stopPropagation()}
             >
               <div className="flex items-center justify-between mb-3">
@@ -1996,7 +1934,7 @@ export default function Home() {
                   <button
                     key={key}
                     onClick={() => setConditionHelpTab(key)}
-                    className={`px-2.5 py-1 rounded-md text-xs  transition-all ${
+                    className={`px-2.5 py-1 rounded-md text-sm  transition-all ${
                       conditionHelpTab === key ? 'bg-white text-emerald-700 shadow-sm' : 'text-gray-500 hover:text-gray-700'
                     }`}
                   >
@@ -2005,40 +1943,39 @@ export default function Home() {
                 ))}
               </div>
 
-              {conditionHelpTab === 'relation' ? (
-                <>
-                  <p className="text-xs text-gray-600 leading-relaxed mb-4">
+              <div className="grid">
+                <div className={`col-start-1 row-start-1 ${conditionHelpTab === 'relation' ? '' : 'invisible pointer-events-none'}`}>
+                  <p className="text-sm text-gray-600 leading-relaxed mb-4">
                     번호 생성은 항상 <b>완전 무작위(랜덤)</b>이며, 조건분석 결과가 조합 자체를 바꾸지는 않습니다.
                     대신 각 조건 행의 상위6 번호와 보너스 번호가 모여 <b>보너스 후보(2등 전략)</b>·<b>빈도 상위(3등 전략)</b>
                     번호를 만들고, 이 번호들이 아래 두 단계에서 쓰입니다.
                   </p>
                   <div className="flex flex-col divide-y divide-gray-100">
                     <div className="py-2.5 flex flex-col gap-1">
-                      <span className="text-xs  text-violet-700">1) 조합 100개 생성</span>
-                      <p className="text-xs text-gray-600 leading-relaxed">1~45 중 6개를 완전 무작위로 뽑아 게임 수만큼 생성합니다. 조건분석 결과는 이 단계에 전혀 관여하지 않습니다.</p>
+                      <span className="text-sm  text-violet-700">1) 조합 100개 생성</span>
+                      <p className="text-sm text-gray-600 leading-relaxed">1~45 중 6개를 완전 무작위로 뽑아 게임 수만큼 생성합니다. 조건분석 결과는 이 단계에 전혀 관여하지 않습니다.</p>
                     </div>
                     <div className="py-2.5 flex flex-col gap-1">
-                      <span className="text-xs  text-violet-700">2) Claude 추천 5개 선정</span>
-                      <p className="text-xs text-gray-600 leading-relaxed">생성된 100개 중, 조건분석에서 나온 보너스 후보·빈도 상위 번호를 많이 포함한 조합일수록 점수가 높아져 상위 5개로 추천됩니다. 조건분석을 실행해두지 않으면 이 가중치 없이 밴드분산·홀짝균형 등 조합 자체의 구조적 점수만으로 5개가 선정됩니다.</p>
+                      <span className="text-sm  text-violet-700">2) Claude 추천 5개 선정</span>
+                      <p className="text-sm text-gray-600 leading-relaxed">1단계의 100개 생성과는 별개로, 3개는 조건분석에서 나온 보너스 후보·빈도 상위 번호를 반영해 점수 80점 이상이 나올 때까지 탐색하되, 서로 번호가 겹치지 않는 것을 최우선으로 합니다 — 앞선 두 조합이 재료(보너스 후보·빈도 상위 번호)를 이미 많이 써버리면 3번째는 무겹침을 지키는 대신 80점에 못 미칠 수 있습니다. 나머지 2개도 서로 겹치지 않게, 조건분석 가중치를 전혀 쓰지 않고 밴드분산·홀짝균형·합계범위·끝수다양성 같은 구조적 점수(최대 70점)만으로 50점 이상이 나올 때까지 무작위 조합을 계속 시도해 찾아냅니다. 조건분석을 실행해두지 않으면 1·2번째 80점 이상을 찾지 못해 안내 메시지가 뜹니다.</p>
                     </div>
                   </div>
-                </>
-              ) : (
-                <>
-                  <div className="flex flex-col divide-y divide-gray-100">
+                </div>
+                <div className={`col-start-1 row-start-1 ${conditionHelpTab === 'types' ? '' : 'invisible pointer-events-none'}`}>
+                  <div className="grid grid-cols-2 gap-x-5 gap-y-2">
                     {CONDITION_HELP.map(({ label, desc, required }) => (
-                      <div key={label} className="py-2.5 flex flex-col gap-1">
-                        <span className="text-xs  text-emerald-700">{label}</span>
-                        <p className="text-xs text-gray-600 leading-relaxed">{desc}</p>
-                        <p className="text-[11px] text-gray-400">필수 지정: {required}</p>
+                      <div key={label} className="py-1 flex flex-col gap-0.5 border-b border-gray-100">
+                        <span className="text-sm  text-emerald-700">{label}</span>
+                        <p className="text-sm text-gray-600 leading-snug">{desc}</p>
+                        <p className="text-[14px] text-gray-400">필수 지정: {required}</p>
                       </div>
                     ))}
                   </div>
-                  <p className="text-[12px] text-gray-300 text-center mt-4">
+                  <p className="text-[14px] text-gray-300 text-center mt-2">
                     각 조건 행에서 유형을 선택하면 위 방식대로 필터링된 회차 안에서 상위 6개 번호를 계산합니다.
                   </p>
-                </>
-              )}
+                </div>
+              </div>
             </div>
           </div>
         );
@@ -2135,7 +2072,7 @@ export default function Home() {
                 <h3 className="text-base  text-gray-800">📊 성과 대시보드</h3>
                 <div className="flex items-center gap-3">
                   {pendingRounds > 0 && (
-                    <span className="text-[11px] text-amber-600 bg-amber-50 border border-amber-200 rounded-full px-2 py-0.5">
+                    <span className="text-[14px] text-amber-600 bg-amber-50 border border-amber-200 rounded-full px-2 py-0.5">
                       대기 {pendingRounds}회차
                     </span>
                   )}
@@ -2149,7 +2086,7 @@ export default function Home() {
                   <div className="flex flex-col items-center justify-center py-16 text-gray-400">
                     <span className="text-4xl mb-3">🎰</span>
                     <p className="text-sm font-medium">분석된 구매 이력이 없습니다</p>
-                    <p className="text-xs mt-1 text-gray-300">추첨 결과가 반영된 구매 이력이 있어야 성과를 확인할 수 있습니다.</p>
+                    <p className="text-sm mt-1 text-gray-300">추첨 결과가 반영된 구매 이력이 있어야 성과를 확인할 수 있습니다.</p>
                   </div>
                 ) : (
                   <>
@@ -2162,16 +2099,16 @@ export default function Home() {
                         { label: '확정 당첨금', value: `${fixedPrize.toLocaleString()}원`, sub: `5등×${cnt5} + 4등×${cnt4}`, color: fixedPrize > 0 ? 'border-amber-200 bg-amber-50' : 'border-gray-100 bg-gray-50', valueColor: fixedPrize > 0 ? 'text-amber-700' : 'text-gray-400' },
                       ].map(card => (
                         <div key={card.label} className={`rounded-xl border ${card.color} px-3 py-3 text-center`}>
-                          <div className="text-[12px] text-gray-500 mb-1">{card.label}</div>
+                          <div className="text-[14px] text-gray-500 mb-1">{card.label}</div>
                           <div className={`text-base  ${card.valueColor}`}>{card.value}</div>
-                          <div className="text-[12px] text-gray-400 mt-0.5">{card.sub}</div>
+                          <div className="text-[14px] text-gray-400 mt-0.5">{card.sub}</div>
                         </div>
                       ))}
                     </div>
 
                     {/* 등수 분포 */}
                     <div className="rounded-xl border border-gray-100 bg-gray-50 px-4 py-3">
-                      <p className="text-xs  text-gray-600 mb-3">
+                      <p className="text-sm  text-gray-600 mb-3">
                         회차별 최고 등수 분포
                         <span className="ml-2 text-gray-400 font-normal">({totalAnalyzedRounds}회차 기준)</span>
                       </p>
@@ -2181,11 +2118,11 @@ export default function Home() {
                           const pct = totalAnalyzedRounds > 0 ? cnt / totalAnalyzedRounds * 100 : 0;
                           return (
                             <div key={tier} className="flex items-center gap-2">
-                              <span className={`w-10 text-right text-[12px]  px-1 py-0.5 rounded border ${TIER_BADGE2[tier]}`}>{tier}</span>
+                              <span className={`w-10 text-right text-[14px]  px-1 py-0.5 rounded border ${TIER_BADGE2[tier]}`}>{tier}</span>
                               <div className="flex-1 h-4 bg-white rounded border border-gray-100 overflow-hidden">
                                 <div className={`h-full rounded transition-all duration-500 ${TIER_COLOR[tier]}`} style={{ width: `${pct}%` }} />
                               </div>
-                              <span className="w-20 text-[12px] text-gray-500 text-right">
+                              <span className="w-20 text-[14px] text-gray-500 text-right">
                                 {cnt}회 <span className="text-gray-400">({pct.toFixed(1)}%)</span>
                               </span>
                             </div>
@@ -2197,7 +2134,7 @@ export default function Home() {
                     {/* 전략별 성과 */}
                     {Object.keys(modeStats).length > 0 && (
                       <div className="rounded-xl border border-gray-100 bg-gray-50 px-4 py-3">
-                        <p className="text-xs  text-gray-600 mb-3">전략별 적중률</p>
+                        <p className="text-sm  text-gray-600 mb-3">전략별 적중률</p>
                         <div className="grid grid-cols-2 gap-2">
                           {Object.entries(modeStats)
                             .sort((a, b) => (b[1].hits / Math.max(b[1].rounds, 1)) - (a[1].hits / Math.max(a[1].rounds, 1)))
@@ -2205,10 +2142,10 @@ export default function Home() {
                               const rate = stat.rounds > 0 ? stat.hits / stat.rounds * 100 : 0;
                               return (
                                 <div key={mode} className="bg-white rounded-lg border border-gray-100 px-3 py-2 flex items-center justify-between gap-2">
-                                  <span className="text-[11px]  text-gray-700 px-1.5 py-0.5 rounded bg-violet-100 text-violet-700">{MODE_LABEL[mode] ?? mode}</span>
+                                  <span className="text-[14px]  text-gray-700 px-1.5 py-0.5 rounded bg-violet-100 text-violet-700">{MODE_LABEL[mode] ?? mode}</span>
                                   <div className="text-right">
-                                    <div className="text-xs  text-gray-800">{rate.toFixed(1)}%</div>
-                                    <div className="text-[12px] text-gray-400">{stat.hits}/{stat.rounds}회</div>
+                                    <div className="text-sm  text-gray-800">{rate.toFixed(1)}%</div>
+                                    <div className="text-[14px] text-gray-400">{stat.hits}/{stat.rounds}회</div>
                                   </div>
                                 </div>
                               );
@@ -2219,9 +2156,9 @@ export default function Home() {
 
                     {/* 회차별 이력 */}
                     <div>
-                      <p className="text-xs  text-gray-600 mb-2">회차별 이력 <span className="text-gray-400 font-normal">({roundStats.length}회차)</span></p>
+                      <p className="text-sm  text-gray-600 mb-2">회차별 이력 <span className="text-gray-400 font-normal">({roundStats.length}회차)</span></p>
                       <div className="rounded-xl border border-gray-100 overflow-hidden">
-                        <table className="w-full text-xs">
+                        <table className="w-full text-sm">
                           <thead>
                             <tr className="bg-gray-50 border-b border-gray-100 text-gray-500">
                               <th className="text-left px-3 py-2 font-medium whitespace-nowrap">회차</th>
@@ -2243,7 +2180,7 @@ export default function Home() {
                                   <td className="px-3 py-2">
                                     <div className="flex gap-1 flex-wrap">
                                       {r.modes.map(m => (
-                                        <span key={m} className="text-[12px] px-1.5 py-0.5 rounded bg-violet-100 text-violet-700 font-medium">
+                                        <span key={m} className="text-[14px] px-1.5 py-0.5 rounded bg-violet-100 text-violet-700 font-medium">
                                           {MODE_LABEL[m] ?? m}
                                         </span>
                                       ))}
@@ -2251,7 +2188,7 @@ export default function Home() {
                                   </td>
                                   <td className="px-3 py-2 text-center text-gray-500">{r.games}</td>
                                   <td className="px-3 py-2 text-center">
-                                    <span className={`inline-block px-1.5 py-0.5 rounded border text-[12px]  ${TIER_BADGE2[r.bestTier] ?? ''}`}>
+                                    <span className={`inline-block px-1.5 py-0.5 rounded border text-[14px]  ${TIER_BADGE2[r.bestTier] ?? ''}`}>
                                       {r.bestTier}
                                     </span>
                                   </td>
@@ -2260,7 +2197,7 @@ export default function Home() {
                                       {allMatchCounts.map((mc, i) => (
                                         <span
                                           key={i}
-                                          className={`inline-flex items-center justify-center w-5 h-5 rounded-full text-[9px]                                             ${mc >= 5 ? 'bg-rose-100 text-rose-600' : mc === 4 ? 'bg-blue-100 text-blue-600' : mc === 3 ? 'bg-emerald-100 text-emerald-700' : 'bg-gray-100 text-gray-400'}`}
+                                          className={`inline-flex items-center justify-center w-5 h-5 rounded-full text-[14px]                                             ${mc >= 5 ? 'bg-rose-100 text-rose-600' : mc === 4 ? 'bg-blue-100 text-blue-600' : mc === 3 ? 'bg-emerald-100 text-emerald-700' : 'bg-gray-100 text-gray-400'}`}
                                         >
                                           {mc}
                                         </span>
@@ -2276,7 +2213,7 @@ export default function Home() {
                     </div>
 
                     {/* 안내 */}
-                    <p className="text-[12px] text-gray-300 text-center">
+                    <p className="text-[14px] text-gray-300 text-center">
                       5등(3일치)=5,000원·4등(4일치)=50,000원 고정 기준. 3등 이상은 실제 당첨금 별도 확인 필요.
                     </p>
                   </>
@@ -2294,7 +2231,7 @@ export default function Home() {
         generate: {
           title: '🎲 생성',
           titleColor: 'text-indigo-300',
-          desc: '1~45 중 6개를 완전 무작위로 100개 생성하고, 조건분석 기반 점수로 상위 5개를 추천합니다. 최근 100회차 백테스트 성과도 함께 표시됩니다.',
+          desc: '1) 1~45 중 6개를 완전 무작위로 100개 생성해 예상번호로 저장합니다.\n\n2) 이 100개와는 별개로 Claude 추천 5개를 찾습니다 — 3개는 조건분석에서 나온 보너스후보·빈도상위 번호를 반영해 점수 80점 이상이 나올 때까지 탐색하되 서로 번호 중복 없이 뽑고, 재료 부족으로 3번째만 무겹침 유지를 위해 80점 미달이 될 수 있습니다. 나머지 2개도 서로 겹치지 않게, 조건분석 가중치 없이 구조적 점수(최대 70점)만으로 50점 이상이 나올 때까지 무작위 조합을 계속 시도합니다. (조건분석을 실행해두지 않으면 1·2번째 80점 이상을 못 찾아 안내 메시지가 뜰 수 있습니다)\n\n3) 최근 100회차 기준 백테스트 성과(3등 이상 적중률·ROI)를 참고용 배지로 함께 표시합니다.',
         },
         'combo-stats': {
           title: '📊 조합 통계 · 점수 산정식',
@@ -2306,12 +2243,13 @@ export default function Home() {
       if (!tip) return null;
       return (
         <div
-          className="pointer-events-none fixed z-[300] w-64 max-w-[80vw] rounded-xl bg-gray-900 px-3 py-2.5 text-xs text-white shadow-2xl"
+          ref={tooltipRef}
+          className="pointer-events-none fixed z-[300] w-64 max-w-[80vw] rounded-xl bg-gray-900 px-3 py-2.5 text-sm text-white shadow-2xl"
           style={{
             left: tooltipInfo.x,
             top: tooltipInfo.y,
             width: tip.desc.length > 80 ? '20rem' : undefined,
-            transform: `translateX(-50%) ${tooltipInfo.above ? 'translateY(-100%)' : 'translateY(0)'}`,
+            transform: `translateX(-50%) ${tooltipInfo.above ? 'translateY(-100%)' : 'translateY(0)'} translateY(${tooltipDy}px)`,
           }}
         >
           <p className={` mb-1 ${tip.titleColor}`}>{tip.title}</p>
