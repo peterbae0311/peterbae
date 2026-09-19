@@ -170,14 +170,14 @@ export default function DashboardPage() {
     })();
   }, [loadOverrides]);
 
-  // 배포 시각은 개인화 데이터가 아니라 앱 전역 속성이라 로그인 여부와 무관하게 별도로 불러온다
-  // (app_deployments는 RLS로 누구나 읽을 수 있게 열어둠 — GitHub Actions가 배포 완료 시 기록).
+  // 배포 시각은 GitHub 커밋 히스토리에서 직접 조회한다(/api/dashboard/deploy-times 참고 —
+  // 원래 계획이던 CI 웹훅 방식은 nginx SSO 게이트에 막혀서 이 방식으로 교체했다).
   useEffect(() => {
     (async () => {
-      const { data } = await supabase.from('app_deployments').select('app_key, deployed_at');
-      const map: Record<string, string> = {};
-      (data ?? []).forEach(row => { map[row.app_key as string] = row.deployed_at as string; });
-      setDeployTimes(map);
+      const res = await fetch('/api/dashboard/deploy-times');
+      if (!res.ok) return;
+      const data = await res.json();
+      setDeployTimes(data.deployTimes ?? {});
     })();
   }, []);
 
