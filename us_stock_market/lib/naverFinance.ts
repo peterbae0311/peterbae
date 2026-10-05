@@ -1,29 +1,23 @@
 /**
- * NAVER Finance scraper — server-side only, never import on the client.
+ * NAVER Finance data — server-side only, never import on the client.
  *
- * NAVER Finance HTML is EUC-KR encoded. We fetch as ArrayBuffer and decode
- * with TextDecoder('euc-kr') to handle the encoding correctly.
+ * 2026-10: NAVER retired the old finance.naver.com/sise/* HTML pages (they now
+ * 302/410 to the new stock.naver.com SPA). All market-data fetches below use
+ * that SPA's JSON API instead of HTML scraping.
  */
 
-const HEADERS = {
-  'User-Agent':
-    'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
-  Accept: 'text/html,application/xhtml+xml',
-  'Accept-Language': 'ko-KR,ko;q=0.9',
-  Referer: 'https://finance.naver.com/',
-};
+const USER_AGENT =
+  'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36';
 
-const SECTOR_LIST_URL =
-  'https://finance.naver.com/sise/sise_group.naver?type=upjong';
-const SECTOR_DETAIL_URL =
-  'https://finance.naver.com/sise/sise_group_detail.naver?type=upjong&no=';
-
-// 외국인/기관 순매수·순매도 상위 랭킹 — iframe 버전 (실제 HTML 테이블 포함)
-// investor_gubun: 9000 = 외국인, 1000 = 기관
-// type: buy = 순매수 상위, sell = 순매도 상위
-// sosok: 01 = KOSPI, 02 = KOSDAQ
-const DEAL_RANK_IFRAME =
-  'https://finance.naver.com/sise/sise_deal_rank_iframe.naver';
+// 업종 등락율 랭킹 (구 finance.naver.com/sise/sise_group.naver 대체)
+const INDUSTRY_RANKING_URL =
+  'https://stock.naver.com/api/stockSecurity/rankings/v2/domestic/industries';
+// 업종별 종목 리스트 (구 sise_group_detail.naver 대체) — 뒤에 /{업종코드}/stocklist 를 붙여 사용
+const INDUSTRY_STOCKLIST_URL =
+  'https://stock.naver.com/api/domestic/market/upjong';
+// 외국인/기관 순매수·순매도 상위 랭킹 (구 sise_deal_rank_iframe.naver 대체)
+const TREND_FOREIGN_ORG_URL =
+  'https://stock.naver.com/api/domestic/market/trend/trendForeignOrg';
 
 // ── Types ──────────────────────────────────────────────────────────────────────
 
@@ -63,195 +57,79 @@ export interface InvestorTradeData {
 // ── Helpers ────────────────────────────────────────────────────────────────────
 
 /**
- * Fetch a NAVER Finance page as EUC-KR decoded HTML string.
+ * Fetch and parse a stock.naver.com JSON API response.
  */
-async function fetchEucKrPage(url: string): Promise<string> {
+async function fetchJson<T>(url: string): Promise<T> {
   const res = await fetch(url, {
-    headers: HEADERS,
+    headers: { 'User-Agent': USER_AGENT, Accept: 'application/json' },
     next: { revalidate: 0 },
   });
   if (!res.ok) {
     throw new Error(`NAVER Finance fetch failed: HTTP ${res.status} for ${url}`);
   }
-  const buffer = await res.arrayBuffer();
-  const html = new TextDecoder('euc-kr').decode(buffer);
-  return html;
+  return res.json() as Promise<T>;
 }
 
-/**
- * Parse a number string from NAVER Finance HTML.
- * Strips inner HTML tags, Korean comma formatting, %, ▲, ▼ symbols.
- */
-function parseNaverNumber(raw: string): number {
-  // Strip any remaining HTML tags
-  let s = raw.replace(/<[^>]+>/g, ' ').trim();
-  // ▲ = positive (remove), ▼ = negative (mark with leading -)
-  s = s.replace(/▲/g, '').replace(/▼\s*/g, '-').trim();
-  // Strip commas and % signs
-  s = s.replace(/,/g, '').replace(/%/g, '').trim();
-  // Normalise double-minus
-  s = s.replace(/--/g, '-');
-  // Find first number (with optional leading sign)
-  const match = s.match(/[-+]?\d+\.?\d*/);
-  if (!match) return 0;
-  const n = parseFloat(match[0]);
+function toNum(s: string | undefined): number {
+  if (!s) return 0;
+  const n = parseFloat(s);
   return isNaN(n) ? 0 : n;
 }
 
-// ── Sector list parser ─────────────────────────────────────────────────────────
+// ── Sector ranking (stock.naver.com) ────────────────────────────────────────────
 
-interface SectorEntry {
-  no: string;
+interface IndustryRankingItem {
+  code: string;
   name: string;
-  changeRate: number;
+  changeRate: string;
 }
 
-/**
- * Parse the sector list HTML.
- *
- * Each sector row looks like:
- *   <a href="sise_group_detail.naver?type=upjong&amp;no=4">의약품</a>
- * The change rate appears in a nearby <td class="number"> cell.
- *
- * Strategy: extract the anchor tags with their sector numbers/names, then
- * walk the surrounding text to find associated change-rate values.
- */
-function parseSectorList(html: string): SectorEntry[] {
-  const sectors: SectorEntry[] = [];
-
-  // Match every table row block that contains a sector link
-  // Each row: <tr> ... <a href="...&no=NNN">NAME</a> ... <td ...>NUMBER</td> ...
-  const rowRegex =
-    /<tr[^>]*>([\s\S]*?)<\/tr>/gi;
-
-  // Anchor pattern — actual HTML uses bare & (not &amp;)
-  const anchorRegex =
-    /sise_group_detail\.naver\?type=upjong&(?:amp;)?no=(\d+)"[^>]*>([^<]+)<\/a>/;
-
-  // <td class="number"> — content may contain nested <span>/<em> tags
-  const tdNumberRegex = /<td[^>]*class="number"[^>]*>([\s\S]*?)<\/td>/gi;
-
-  let rowMatch: RegExpExecArray | null;
-  while ((rowMatch = rowRegex.exec(html)) !== null) {
-    const rowHtml = rowMatch[1];
-    const anchor = anchorRegex.exec(rowHtml);
-    if (!anchor) continue;
-
-    const no = anchor[1];
-    const name = anchor[2].trim();
-
-    // Collect all number cells in this row, stripping inner tags
-    const nums: string[] = [];
-    let tdMatch: RegExpExecArray | null;
-    const tdClone = new RegExp(tdNumberRegex.source, 'gi');
-    while ((tdMatch = tdClone.exec(rowHtml)) !== null) {
-      const inner = tdMatch[1].replace(/<[^>]+>/g, ' ').trim();
-      nums.push(inner);
-    }
-
-    // NAVER upjong list row layout (columns):
-    // 업종명 | 현재 등락율 | 전일 등락율 | ... (varies by page version)
-    // The first non-empty number cell after the name link is the change rate.
-    let changeRate = 0;
-    for (const raw of nums) {
-      const stripped = raw.replace(/[▲▼%,+\s]/g, '');
-      if (stripped === '' || stripped === '-') continue;
-      changeRate = parseNaverNumber(raw);
-      break;
-    }
-
-    sectors.push({ no, name, changeRate });
-  }
-
-  return sectors;
+interface IndustryRankingResponse {
+  items: IndustryRankingItem[];
 }
 
-// ── Sector detail parser ───────────────────────────────────────────────────────
-
-/**
- * Parse the sector detail HTML for a list of stocks.
- *
- * Stock name row:
- *   <td class="name"><a href="/item/main.naver?code=XXXXXX">종목명</a></td>
- *
- * Following <td class="number"> cells (in order within the same <tr>):
- *   현재가 | 전일비(등락액) | 등락률 | ...
- */
-function parseSectorStocks(html: string): KrStock[] {
-  const stocks: KrStock[] = [];
-
-  // Match rows that contain a stock name cell
-  const rowRegex = /<tr[^>]*>([\s\S]*?)<\/tr>/gi;
-  const nameRegex =
-    /class="name"[^>]*>[\s\S]*?code=([A-Z0-9]{6})"[^>]*>([^<]+)<\/a>/i;
-  const tdNumberRegex = /<td[^>]*class="number"[^>]*>([\s\S]*?)<\/td>/gi;
-
-  let rowMatch: RegExpExecArray | null;
-  while ((rowMatch = rowRegex.exec(html)) !== null) {
-    const rowHtml = rowMatch[1];
-    const nameMatch = nameRegex.exec(rowHtml);
-    if (!nameMatch) continue;
-
-    const code = nameMatch[1];
-    const name = nameMatch[2].trim();
-
-    // Extract all number cells in order
-    const nums: string[] = [];
-    let tdMatch: RegExpExecArray | null;
-    const tdClone = new RegExp(tdNumberRegex.source, 'gi');
-    while ((tdMatch = tdClone.exec(rowHtml)) !== null) {
-      // Strip inner tags (e.g. <span>) to get plain text
-      const inner = tdMatch[1].replace(/<[^>]+>/g, '').trim();
-      nums.push(inner);
-    }
-
-    if (nums.length < 2) continue;
-
-    // Column order on sise_group_detail: 현재가 | 전일비 | 등락률 | ...
-    const price = parseNaverNumber(nums[0]);
-    const changeAmount = parseNaverNumber(nums[1]);
-    const changeRate = nums[2] !== undefined ? parseNaverNumber(nums[2]) : 0;
-
-    if (price === 0 && changeAmount === 0) continue; // likely a header/empty row
-
-    stocks.push({ code, name, price, changeRate, changeAmount });
-  }
-
-  return stocks;
+interface UpjongStockItem {
+  itemcode: string;
+  itemname: string;
+  nowPrice: string;
+  prevChangeRate: string;
+  prevChangePrice: string;
 }
 
 // ── Public API ─────────────────────────────────────────────────────────────────
 
 /**
  * Returns the top N Korean sectors (sorted by changeRate descending),
- * each populated with their top 5 stocks also sorted by changeRate descending.
+ * each populated with their top 10 stocks also sorted by changeRate descending.
  *
- * On any per-sector fetch/parse error, that sector will have an empty stocks array.
+ * On any per-sector fetch error, that sector will have an empty stocks array.
  */
 export async function getTopKrSectorsWithStocks(
   topN: number,
 ): Promise<KrSectorWithStocks[]> {
-  // Step 1: fetch and parse the sector list
-  const listHtml = await fetchEucKrPage(SECTOR_LIST_URL);
-  const allSectors = parseSectorList(listHtml);
+  const listRes = await fetchJson<IndustryRankingResponse>(
+    `${INDUSTRY_RANKING_URL}?sortType=changeRate&size=${topN}&period=daily`,
+  );
 
-  // Sort by change rate descending (highest gainers first)
-  const topSectors = allSectors
+  const topSectors = (listRes.items ?? [])
+    .map((it) => ({ no: it.code, name: it.name, changeRate: toNum(it.changeRate) }))
     .sort((a, b) => b.changeRate - a.changeRate)
     .slice(0, topN);
 
-  // Step 2: fetch each sector's stock list in parallel
   const stocksResults = await Promise.all(
     topSectors.map(async (sector) => {
       try {
-        const detailHtml = await fetchEucKrPage(
-          `${SECTOR_DETAIL_URL}${sector.no}`,
+        const list = await fetchJson<UpjongStockItem[]>(
+          `${INDUSTRY_STOCKLIST_URL}/${sector.no}/stocklist?marketType=ALL&orderType=up&startIdx=0&pageSize=10`,
         );
-        const allStocks = parseSectorStocks(detailHtml);
-        const top10 = allStocks
-          .sort((a, b) => b.changeRate - a.changeRate)
-          .slice(0, 10);
-        return top10;
+        const stocks: KrStock[] = list.map((s) => ({
+          code: s.itemcode,
+          name: s.itemname,
+          price: toNum(s.nowPrice),
+          changeRate: toNum(s.prevChangeRate),
+          changeAmount: toNum(s.prevChangePrice),
+        }));
+        return stocks.sort((a, b) => b.changeRate - a.changeRate).slice(0, 10);
       } catch {
         return [] as KrStock[];
       }
@@ -282,158 +160,73 @@ function isNonStock(name: string): boolean {
   return false;
 }
 
-/**
- * sise_deal_rank_iframe.naver 페이지 파서.
- *
- * 페이지에는 당일/전일 등 여러 <table class="type_1"> 블록이 있고,
- * 각 블록의 행 구조:
- *   col[0]: 종목명 (anchor with code=XXXXXX)
- *   col[1]: 순매수수량 (천주)
- *   col[2]: 순매수금액 (백만원)
- *   col[3]: 당일거래량
- *
- * 중복 코드는 마지막 등장(당일 데이터)을 우선 사용.
- */
-function parseDealRankIframe(html: string): TradeStock[] {
-  const rowRegex = /<tr[^>]*>([\s\S]*?)<\/tr>/gi;
-  const nameRegex = /href="[^"]*code=([0-9]{6})"[^>]*>\s*([^<]+)\s*<\/a>/i;
-  const tdAllRegex = /<td[^>]*>([\s\S]*?)<\/td>/gi;
-
-  // code → stock map (last occurrence = 당일 데이터)
-  const map = new Map<string, TradeStock>();
-  let rank = 1;
-
-  let rowMatch: RegExpExecArray | null;
-  while ((rowMatch = rowRegex.exec(html)) !== null) {
-    const rowHtml = rowMatch[1];
-
-    const nameMatch = nameRegex.exec(rowHtml);
-    if (!nameMatch) continue;
-
-    const code = nameMatch[1];
-    const name = nameMatch[2].trim();
-    if (!code || !name) continue;
-
-    const rawCells: string[] = [];
-    let tdMatch: RegExpExecArray | null;
-    const tdClone = new RegExp(tdAllRegex.source, 'gi');
-    while ((tdMatch = tdClone.exec(rowHtml)) !== null) {
-      rawCells.push(tdMatch[1].replace(/<[^>]+>/g, '').trim());
-    }
-
-    // 최소 3개 (종목명, 수량, 금액)
-    if (rawCells.length < 3) continue;
-
-    // col[1]=순매수수량(천주) → ×1000 = 실제 주수
-    // col[2]=순매수금액(백만원)
-    // col[3]=당일거래량 (없으면 0)
-    const netVolume    = parseNaverNumber(rawCells[1]) * 1000;
-    const netAmount    = parseNaverNumber(rawCells[2]);
-    const tradingVolume = rawCells[3] !== undefined ? parseNaverNumber(rawCells[3]) : 0;
-
-    if (netVolume === 0 && netAmount === 0) continue;
-
-    map.set(code, { rank: rank++, code, name, price: 0, changeRate: 0, changeAmount: 0, netVolume, netAmount, tradingVolume });
-  }
-
-  return Array.from(map.values());
+interface TrendForeignOrgItem {
+  itemcode: string;
+  itemname: string;
+  nowPrice: string;
+  prevChangeRate: string;
+  prevChangePrice: string;
+  accTradeVolume: string; // 순매수/순매도 수량 (주) — 매도 리스트에서는 음수
+  accTradeAmount: string; // 순매수/순매도 금액 (원) — 매도 리스트에서는 음수
+  dailyTradeVolume: string; // 당일 전체 거래량
 }
 
-interface StockPriceInfo {
-  price: number;
-  changeRate: number;
-  changeAmount: number;
-}
-
-/**
- * NAVER 모바일 API로 종목 가격 정보를 병렬 fetch.
- * 실패한 종목은 0으로 채워 반환.
- */
-async function fetchStockPrices(codes: string[]): Promise<Map<string, StockPriceInfo>> {
-  const toNum = (v: unknown): number => {
-    if (typeof v === 'number') return v;
-    if (typeof v === 'string') {
-      const n = parseFloat(v.replace(/,/g, '').replace(/[+%▲]/g, '').replace(/▼/g, '-'));
-      return isNaN(n) ? 0 : n;
-    }
-    return 0;
+interface TrendForeignOrgResponse {
+  sections: {
+    buyRankList: TrendForeignOrgItem[];
+    sellRankList: TrendForeignOrgItem[];
   };
-
-  const entries = await Promise.all(
-    codes.map(async (code): Promise<[string, StockPriceInfo]> => {
-      try {
-        const res = await fetch(`https://m.stock.naver.com/api/stock/${code}/basic`, {
-          headers: {
-            'User-Agent': HEADERS['User-Agent'],
-            Accept: 'application/json',
-            Referer: 'https://m.stock.naver.com/',
-          },
-          next: { revalidate: 0 },
-        });
-        if (!res.ok) return [code, { price: 0, changeRate: 0, changeAmount: 0 }];
-
-        const json = await res.json() as Record<string, unknown>;
-        return [code, {
-          price: toNum(json.closePrice),
-          changeAmount: toNum(json.compareToPreviousClosePrice),
-          changeRate: toNum(json.fluctuationsRatio),
-        }];
-      } catch {
-        return [code, { price: 0, changeRate: 0, changeAmount: 0 }];
-      }
-    }),
-  );
-
-  return new Map(entries);
 }
 
 /**
- * iframe URL로 순매수/순매도 상위 30개(ETF·선물·스팩 제외)를 반환.
- * 페이지가 전체 랭킹을 1회 로드하므로 페이지네이션 불필요.
+ * 순매수/순매도 상위 30개(ETF·선물·스팩 제외)를 반환.
  */
 async function fetchTradeRankingTop30(
-  investorType: 'frgn' | 'org',
+  investorType: 'FOREIGNER' | 'ORGANIZATION',
   direction: 'buy' | 'sell',
 ): Promise<TradeStock[]> {
-  const investorGubun = investorType === 'frgn' ? '9000' : '1000';
-  const url = `${DEAL_RANK_IFRAME}?sosok=01&investor_gubun=${investorGubun}&type=${direction}`;
+  const res = await fetchJson<TrendForeignOrgResponse>(
+    `${TREND_FOREIGN_ORG_URL}?investorType=${investorType}&tradeType=KRX&marketType=KOSPI&startIdx=0&pageSize=30&periodType=DAY`,
+  );
+  const list = direction === 'buy' ? res.sections.buyRankList : res.sections.sellRankList;
 
-  const html = await fetchEucKrPage(url);
-  const all = parseDealRankIframe(html);
-
-  const filtered = all
-    .filter(s => !isNonStock(s.name))
+  const filtered = (list ?? [])
+    .filter(s => !isNonStock(s.itemname))
     .slice(0, 30);
 
-  // 종가/등락율/등락액 병렬 fetch
-  const priceMap = await fetchStockPrices(filtered.map(s => s.code));
-
-  return filtered.map((s, i) => {
-    const p = priceMap.get(s.code) ?? { price: 0, changeRate: 0, changeAmount: 0 };
-    return { ...s, rank: i + 1, price: p.price, changeRate: p.changeRate, changeAmount: p.changeAmount };
-  });
+  return filtered.map((s, i): TradeStock => ({
+    rank: i + 1,
+    code: s.itemcode,
+    name: s.itemname,
+    price: toNum(s.nowPrice),
+    changeRate: toNum(s.prevChangeRate),
+    changeAmount: toNum(s.prevChangePrice),
+    netVolume: Math.abs(toNum(s.accTradeVolume)),
+    netAmount: Math.abs(toNum(s.accTradeAmount)) / 1_000_000, // 원 → 백만원
+    tradingVolume: toNum(s.dailyTradeVolume),
+  }));
 }
 
 /**
  * Returns foreign investor (외국인) net-buy top 30 and net-sell top 30
- * for KOSPI stocks, scraped live from NAVER Finance.
+ * for KOSPI stocks.
  */
 export async function getForeignTradeRanking(): Promise<InvestorTradeData> {
   const [buyTop, sellTop] = await Promise.all([
-    fetchTradeRankingTop30('frgn', 'buy'),
-    fetchTradeRankingTop30('frgn', 'sell'),
+    fetchTradeRankingTop30('FOREIGNER', 'buy'),
+    fetchTradeRankingTop30('FOREIGNER', 'sell'),
   ]);
   return { buyTop, sellTop };
 }
 
 /**
  * Returns institutional investor (기관) net-buy top 30 and net-sell top 30
- * for KOSPI stocks, scraped live from NAVER Finance.
+ * for KOSPI stocks.
  */
 export async function getInstitutionalTradeRanking(): Promise<InvestorTradeData> {
   const [buyTop, sellTop] = await Promise.all([
-    fetchTradeRankingTop30('org', 'buy'),
-    fetchTradeRankingTop30('org', 'sell'),
+    fetchTradeRankingTop30('ORGANIZATION', 'buy'),
+    fetchTradeRankingTop30('ORGANIZATION', 'sell'),
   ]);
   return { buyTop, sellTop };
 }
@@ -464,7 +257,7 @@ export interface KrStockFundamentals {
 }
 
 const MOBILE_HEADERS = {
-  'User-Agent': HEADERS['User-Agent'],
+  'User-Agent': USER_AGENT,
   Accept: 'application/json',
   Referer: 'https://m.stock.naver.com/',
 };
