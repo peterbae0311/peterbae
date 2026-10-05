@@ -121,7 +121,7 @@ export default function KrInvestorTradeModal({ type, onClose, onStockClick }: Kr
   const [error, setError] = useState<string | null>(null);
 
   const label = type === 'foreign' ? '외국인' : '기관';
-  const endpoint = type === 'foreign' ? '/api/kr/foreign-trade' : '/api/kr/institutional-trade';
+  const endpoint = type === 'foreign' ? '/us_stock_market/api/kr/foreign-trade' : '/us_stock_market/api/kr/institutional-trade';
 
   useEffect(() => {
     setLoading(true);
