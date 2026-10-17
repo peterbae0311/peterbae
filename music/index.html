@@ -1,0 +1,135 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <link rel="icon" href="data:,">
+  <script>
+    // 서버에서는 /music/ 아래에서 제공된다. 끝에 '/' 없이 /music 으로 들어오면 상대 경로
+    // (style.css, models/… 등)가 루트 기준으로 풀려 깨지므로 '/'를 붙여 다시 연다.
+    if (/\/music$/.test(location.pathname)) location.replace(location.pathname + '/' + location.search + location.hash);
+  </script>
+  <script>
+    // 스킨은 페이지를 그리기 전에 정한다(새로고침할 때 어두운 화면이 잠깐 비치지 않게).
+    // 저장된 선택 → 없으면 밝은 화면
+    (function () {
+      var t = null;
+      try { t = localStorage.getItem('music.theme'); } catch (e) {}
+      if (t !== 'light' && t !== 'dark') t = 'light';
+      document.documentElement.dataset.theme = t;
+    })();
+  </script>
+  <title>악기 믹서</title>
+  <link rel="preconnect" href="https://cdn.jsdelivr.net" crossorigin>
+  <link rel="stylesheet" crossorigin
+        href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/static/pretendard.css">
+  <!-- 파일을 고치면 ?v= 값을 올려 브라우저 캐시에 남은 예전 파일을 쓰지 않게 한다 -->
+  <link rel="stylesheet" href="style.css?v=20261018d">
+</head>
+<body>
+  <header class="hero">
+    <div>
+      <h1>악기 믹서</h1>
+      <p>악기를 누르면 바로 소리가 나고, 여러 개를 고르면 같은 박자·같은 코드 위에서 함께 연주됩니다.</p>
+    </div>
+    <div class="theme-switch" role="group" aria-label="화면 스킨">
+      <button data-theme-set="dark">어두운 화면</button>
+      <button data-theme-set="light">밝은 화면</button>
+    </div>
+  </header>
+
+  <div class="transport">
+    <button id="play" class="play" aria-label="재생"><span class="icon"></span></button>
+    <div class="pos">
+      <div id="chords" class="chords"></div>
+      <div id="beats" class="beats"></div>
+    </div>
+    <label class="slider">
+      <span>BPM <b id="bpm-val">140</b></span>
+      <input id="bpm" type="range" min="60" max="180" value="140">
+    </label>
+    <label class="slider">
+      <span>마스터 음량</span>
+      <input id="master" type="range" min="-30" max="6" value="-4">
+    </label>
+    <div class="sel">
+      <button id="count" class="ghost count" title="선택된 악기 목록을 클립보드에 복사"></button>
+      <button id="clear" class="ghost">모두 해제</button>
+    </div>
+  </div>
+
+  <main>
+    <section class="panel">
+      <div class="ptabs" role="tablist" aria-label="조합 만들기 방법">
+        <button class="ptab" role="tab" id="tab-presets" aria-controls="panel-presets">추천 조합 <span id="preset-current" class="cur"></span></button>
+        <button class="ptab" role="tab" id="tab-upload" aria-controls="panel-upload">곡으로 조합 만들기</button>
+        <button class="ptab" role="tab" id="tab-suno" aria-controls="panel-suno">Suno Style Builder</button>
+      </div>
+
+      <div class="ppanel" role="tabpanel" id="panel-presets" aria-labelledby="tab-presets">
+        <button class="pdesc" aria-expanded="false" aria-controls="body-presets">
+          <span>장르를 고른 뒤 세부 장르를 누르면 어울리는 악기 조합과 BPM으로 바로 재생합니다.</span><span class="chev" aria-hidden="true"></span>
+        </button>
+        <div class="pbody" id="body-presets" hidden>
+          <div id="genre-tabs" class="gtabs" role="tablist" aria-label="장르"></div>
+          <div id="presets" class="presets"></div>
+        </div>
+      </div>
+
+      <div class="ppanel" role="tabpanel" id="panel-upload" aria-labelledby="tab-upload" hidden>
+        <button class="pdesc" aria-expanded="false" aria-controls="body-upload">
+          <span>곡 파일을 올리면 쓰인 악기·BPM·키를 분석해서 비슷한 조합을 자동으로 켭니다. 파일은 이 브라우저 밖으로 전송되지 않습니다.</span><span class="chev" aria-hidden="true"></span>
+        </button>
+        <div class="pbody" id="body-upload" hidden>
+          <label id="drop" class="drop">
+            <input id="file" type="file" accept="audio/*,.mp3,.wav,.m4a,.flac,.ogg" hidden>
+            <b>곡 파일 선택</b><span>또는 여기로 끌어다 놓기</span><small>MP3 · WAV · M4A · FLAC · OGG</small>
+          </label>
+          <div id="progress" class="progress" hidden><div class="bar"><i></i></div><span></span></div>
+          <div id="result" class="result" hidden></div>
+        </div>
+      </div>
+
+      <div class="ppanel" role="tabpanel" id="panel-suno" aria-labelledby="tab-suno" hidden>
+        <button class="pdesc" aria-expanded="false" aria-controls="body-suno">
+          <span>항목을 고르면 Suno에 붙여 넣을 스타일(Style of Music)을 자동으로 만듭니다.</span><span class="chev" aria-hidden="true"></span>
+        </button>
+        <div class="pbody" id="body-suno" hidden>
+          <div class="sb-tools">
+            <button class="ghost" id="sb-from-mixer">현재 믹서 불러오기</button>
+            <button class="ghost" id="sb-from-song">곡 분석 불러오기</button>
+            <button class="ghost" id="sb-preview">고른 악기 믹서로 듣기</button>
+            <button class="ghost danger" id="sb-reset">선택 모두 지우기</button>
+          </div>
+          <div class="sb">
+            <div class="sb-form" id="sb-form"></div>
+            <div class="sb-out">
+              <div class="sb-field">
+                <div class="sb-field-head"><b>Style of Music</b><small id="sb-style-count"></small>
+                  <span class="sb-btns">
+                    <button class="primary" id="sb-gen" title="고른 항목을 '번호.항목 : 선택값' 형식으로 정리">생성</button>
+                    <button class="ghost" id="sb-copy-style">복사</button>
+                    <button class="ghost" id="sb-clear-style" title="이 칸의 내용만 지웁니다(선택값은 그대로)">출력 지우기</button>
+                  </span>
+                </div>
+                <small class="sb-where">Suno Custom 모드 → 스타일 입력란 · 항목을 고른 뒤 [생성]을 누르세요</small>
+                <textarea id="sb-style" rows="24" readonly></textarea>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <div id="board"></div>
+  </main>
+
+  <div id="toast" class="toast" role="status" aria-live="polite"></div>
+
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/tone/14.8.49/Tone.js"></script>
+  <script src="instruments.js?v=20261018d"></script>
+  <script src="app.js?v=20261018d"></script>
+  <script src="upload.js?v=20261018d"></script>
+  <script src="suno.js?v=20261018d"></script>
+</body>
+</html>

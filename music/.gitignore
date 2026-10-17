@@ -1,0 +1,11 @@
+# 테스트용으로 넣어 둔 곡(저작권 있음)·기획 문서는 저장소와 서버에 올리지 않는다.
+# 정적 사이트 배포(deploy.yml static-sites)는 커밋된 파일만 서버로 복사한다.
+*.mp3
+*.wav
+*.m4a
+*.flac
+*.ogg
+*.xlsx
+~$*
+*.png
+.test_songs/

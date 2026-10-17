@@ -19,3 +19,4 @@ peterbae0311 및 paul-bae 두 GitHub 계정에 흩어져 있던 프로젝트들�
 - career
 - newsclip
 - manage_token
+- music

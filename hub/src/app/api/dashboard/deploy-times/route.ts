@@ -33,6 +33,7 @@ const APP_PATHS: Record<string, string> = {
   outside_instructor: 'outside_instructor',
   manage_token: 'manage_token',
   'My-Claude': 'My-Claude',
+  music: 'music',
   'good-words': 'hub/src/app/good-words',
   refine_objectives: 'hub/src/app/refine_objectives',
 };

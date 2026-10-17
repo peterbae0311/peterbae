@@ -25,6 +25,7 @@ export const APPS: AppEntry[] = [
   { key: 'manage_token',      label: '토큰 관리',              path: '/manage_token' },
   { key: 'refine_objectives', label: '학습목표 개선',          path: '/refine_objectives' },
   { key: 'My-Claude',         label: '퀴즈 마스터',            path: '/My-Claude' },
+  { key: 'music',             label: '악기 믹서',              path: '/music/' },
 ];
 
 export const SUPER_ADMIN_EMAIL = 'peter.bae0311@gmail.com';

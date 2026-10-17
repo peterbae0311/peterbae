@@ -35,6 +35,7 @@ jobs:
       manage_instructor: ${{ steps.filter.outputs.manage_instructor }}
       outside_instructor: ${{ steps.filter.outputs.outside_instructor }}
       manage_token: ${{ steps.filter.outputs.manage_token }}
+      music: ${{ steps.filter.outputs.music }}
     steps:
       - uses: actions/checkout@v4
       - uses: dorny/paths-filter@v3
@@ -88,6 +89,9 @@ jobs:
               - '.github/workflows/deploy.yml'
             manage_token:
               - 'manage_token/**'
+              - '.github/workflows/deploy.yml'
+            music:
+              - 'music/**'
               - '.github/workflows/deploy.yml'
 
   career:
@@ -317,6 +321,7 @@ jobs:
           - manage_instructor
           - outside_instructor
           - manage_token
+          - music
     steps:
       - uses: actions/checkout@v4
       - name: Deploy static site
