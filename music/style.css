@@ -218,7 +218,8 @@ main { max-width: 1800px; margin: 0 auto; padding: 20px 24px 40px; }
   font-size: 12px; padding: 4px 9px; min-height: 26px; color: var(--muted);
 }
 .card.soloed .solo { background: var(--c); border-color: var(--c); color: #111; font-weight: 700; }
-body.has-solo .card.active:not(.soloed) .card-main,
+body.has-solo .card.active:not(.soloed) .card-top,
+body.has-solo .card.active:not(.soloed) .ko,
 body.has-solo .card.active:not(.soloed) .meter,
 body.has-solo .card.active:not(.soloed) .vol { opacity: 0.6; }
 body.has-solo .card.active:not(.soloed) .solo { color: var(--text); }
@@ -363,11 +364,16 @@ body.has-solo .card.active:not(.soloed) .solo { color: var(--text); }
 }
 .sb-chip:hover:not(:disabled) { color: var(--text); border-color: var(--hover-line); }
 .sb-chip[aria-pressed="true"] { color: var(--text-strong); background: var(--accent-soft-2); border-color: var(--accent); }
-.sb-chip:disabled { opacity: 0.35; cursor: default; }
+/* 흐리게 할 땐 글자(.lbl)만 — 버튼 전체에 opacity를 주면 안에 든 말풍선까지 반투명해져 읽을 수 없다 */
+.sb-chip:disabled { cursor: default; }
+.sb-chip:disabled .lbl { opacity: 0.4; }
+.sb-chip.is-main { border-style: dashed; border-color: var(--accent); color: var(--accent); }
 .sb-chip, .sb-tipwrap { position: relative; }
 .sb-tipwrap { display: inline-flex; align-items: center; gap: 6px; }
 .sb-chip .desc, .sb-tipwrap .desc { left: 0; right: auto; width: 250px; text-align: left; font-weight: 400; }
 .sb-tipwrap .desc { width: 320px; }
+.desc .fits { display: block; margin-top: 6px; padding-top: 6px; border-top: 1px solid var(--tip-line); }
+.desc .fits span { display: block; font-size: 12px; color: var(--text); }
 .desc em { display: block; margin-top: 4px; font-style: normal; font-size: 11.5px; color: var(--muted); font-family: ui-monospace, Consolas, monospace; }
 .sb-chip:hover, .sb-tipwrap:hover { z-index: 30; }
 .sb-chip:hover .desc, .sb-chip:focus-visible .desc, .sb-tipwrap:hover .desc { display: block; animation: tip-in 0.12s 0.25s both; }
@@ -375,7 +381,7 @@ body.has-solo .card.active:not(.soloed) .solo { color: var(--text); }
 .sb-gtab { border-radius: 7px; padding: 3px 9px; font-size: 12px; }
 .sb-hint { font-size: 12px; color: var(--subtle); margin-left: 4px; }
 .sb-hint.full { color: var(--warn-text); }
-.sb-chip.full { opacity: 0.45; }
+.sb-chip.full .lbl { opacity: 0.45; }
 .sb-select, .sb-num {
   background: var(--panel-2); color: var(--text); border: 1px solid var(--line); border-radius: 8px;
   padding: 5px 8px; font: inherit; font-size: 13px;
@@ -420,3 +426,77 @@ body.has-solo .card.active:not(.soloed) .solo { color: var(--text); }
 
 .ghost.danger { border-color: var(--danger-line); color: var(--danger-text); }
 .ghost.danger:hover { border-color: var(--error-text); }
+
+/* ---------- Suno 작곡(곡 목록) ---------- */
+body.tab-songs #board { display: none; }
+.song-head { display: flex; align-items: flex-start; justify-content: space-between; gap: 16px; flex-wrap: wrap; margin-bottom: 12px; }
+.pdesc-static { margin: 0; font-size: 13px; color: var(--muted); max-width: 760px; }
+.pdesc-static b { color: var(--text); font-weight: 600; }
+.song-tools { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.song-table-wrap { position: relative; overflow-x: auto; border: 1px solid var(--line); border-radius: 10px; }
+.song-table { width: 100%; border-collapse: collapse; font-size: 13px; }
+.song-table th { text-align: left; font-weight: 600; font-size: 12px; color: var(--muted); padding: 9px 12px; border-bottom: 1px solid var(--line); white-space: nowrap; background: var(--panel-2); }
+.song-table td { padding: 9px 12px; border-bottom: 1px solid var(--line); vertical-align: middle; white-space: nowrap; }
+.song-table tbody tr { cursor: pointer; }
+.song-table tbody tr:hover { background: var(--accent-faint); }
+.song-table tbody tr:focus-visible { outline-offset: -2px; }
+.song-table tbody tr:last-child td { border-bottom: 0; }
+.song-table .num { font-variant-numeric: tabular-nums; }
+.song-title { white-space: normal !important; min-width: 180px; }
+.song-title b { display: block; font-size: 13.5px; }
+.song-title small, .song-usage small { display: block; font-size: 12px; color: var(--muted); }
+.song-usage { white-space: normal !important; min-width: 110px; }
+.song-table a { color: var(--accent); text-decoration: none; }
+.song-table a:hover { text-decoration: underline; }
+.song-table .ghost { padding: 4px 10px; font-size: 12px; }
+/* 평가 등급 배지: 작곡 전(0) · S(1) ~ D(5) */
+.song-grade { display: inline-block; min-width: 28px; padding: 2px 8px; border-radius: 999px; font-size: 12px; font-weight: 700; text-align: center; border: 1px solid var(--line); color: var(--muted); }
+.song-grade.g-0 { font-weight: 500; font-size: 11.5px; }
+.song-grade.g-1 { color: #fff; background: #d97706; border-color: #d97706; }
+.song-grade.g-2 { color: #fff; background: #16a34a; border-color: #16a34a; }
+.song-grade.g-3 { color: #fff; background: #2563eb; border-color: #2563eb; }
+.song-grade.g-4 { color: var(--text); background: var(--panel-2); }
+.song-grade.g-5 { color: var(--error-text); border-color: currentColor; }
+.song-empty { margin: 0; padding: 28px 16px; text-align: center; color: var(--muted); font-size: 13px; }
+.sr-only { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+
+.song-dialog {
+  width: min(760px, calc(100vw - 32px)); max-height: calc(100vh - 48px); padding: 0;
+  border: 1px solid var(--line); border-radius: var(--radius); background: var(--panel); color: var(--text);
+  box-shadow: 0 24px 64px rgba(0, 0, 0, 0.35); overflow: hidden;
+}
+.song-dialog::backdrop { background: rgba(10, 12, 18, 0.55); }
+.song-dialog form { display: flex; flex-direction: column; max-height: calc(100vh - 48px); }
+.sd-head { display: flex; align-items: center; justify-content: space-between; padding: 16px 20px; border-bottom: 1px solid var(--line); }
+.sd-head h2 { margin: 0; font-size: 16px; }
+.sd-body { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 12px 16px; padding: 16px 20px; overflow-y: auto; overflow-x: hidden; }
+/* 버튼이 함께 있는 항목(Suno Style)은 label 안에 버튼을 넣으면 이름만 눌러도 버튼이 실행돼 div로 감싼다 */
+.sd-body > label, .sd-body .sd-field { display: flex; flex-direction: column; gap: 5px; min-width: 0; font-size: 12.5px; font-weight: 600; color: var(--muted); }
+.sd-body .lb { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; min-height: 22px; } /* 복사 아이콘(22px) 유무와 상관없이 이름 줄 높이를 맞춰 옆 칸과 입력칸이 나란히 */
+.sd-body input, .sd-body select, .sd-body textarea { width: 100%; min-width: 0; }
+.sd-body .wide { grid-column: 1 / -1; }
+.sd-body em { font-style: normal; font-weight: 600; font-size: 11px; color: var(--error-text); }
+.sd-body input, .sd-body select, .sd-body textarea {
+  font: inherit; font-size: 13.5px; font-weight: 400; color: var(--text); background: var(--field-bg);
+  border: 1px solid var(--line); border-radius: 8px; padding: 8px 10px;
+}
+.sd-body textarea { resize: vertical; line-height: 1.5; }
+.sd-body input:focus, .sd-body select:focus, .sd-body textarea:focus { outline: 2px solid var(--focus); outline-offset: 0; border-color: transparent; }
+.sd-mini { padding: 3px 9px; font-size: 11.5px; font-weight: 500; }
+.sd-body .lb label { cursor: pointer; }
+.sd-copy {
+  display: inline-grid; place-items: center; width: 22px; height: 22px; padding: 0;
+  background: none; border: 1px solid transparent; border-radius: 6px; color: var(--muted);
+}
+.sd-copy:hover { color: var(--accent); border-color: var(--line); background: var(--panel-2); }
+.sd-copy.done { color: #16a34a; border-color: currentColor; }
+.sd-file { display: flex; align-items: center; gap: 8px; font-weight: 400; color: var(--text); font-size: 12.5px; }
+.sd-file:empty { display: none; }
+.sd-file .ghost { padding: 2px 8px; font-size: 11.5px; }
+.sd-error { margin: 0; padding: 0 20px; min-height: 18px; font-size: 12.5px; color: var(--error-text); }
+.sd-foot { display: flex; justify-content: space-between; gap: 8px; padding: 12px 20px 16px; border-top: 1px solid var(--line); }
+.sd-foot .primary { min-width: 96px; }
+@media (max-width: 720px) {
+  .sd-body { grid-template-columns: minmax(0, 1fr); padding: 14px 16px; }
+  .sd-head, .sd-foot { padding-left: 16px; padding-right: 16px; }
+}

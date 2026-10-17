@@ -4,7 +4,7 @@ const ANALYSIS_SCRIPTS = [
   'https://cdn.jsdelivr.net/npm/onnxruntime-web@1.19.2/dist/ort.min.js',
   'https://cdn.jsdelivr.net/npm/essentia.js@0.1.3/dist/essentia-wasm.web.js',
   'https://cdn.jsdelivr.net/npm/essentia.js@0.1.3/dist/essentia.js-core.umd.js',
-  'analyzer.js?v=20261018d',
+  'analyzer.js?v=20261018u',
 ];
 
 const up = {

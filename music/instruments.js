@@ -510,7 +510,7 @@ const INSTRUMENTS = [
   /* ---------- 드럼 ---------- */
   {
     id: 'boombap', cat: 'drums', en: 'Boom Bap Drums', ko: '붐뱁 드럼',
-    desc: '묵직한 킥과 강한 스네어를 중심으로 클래식 힙합 특유의 리듬 표현',
+    desc: '묵직한 킥과 강한 스네어를 중심으로 붐뱁 힙합 특유의 리듬 표현',
     ...drumInstrument(
       () => ({ kickDecay: 0.5, kickPD: 0.03, kickVol: -2, snareTone: 1200, snareDecay: 0.22, snareVol: -4, hatVol: -18, fx: [crusher(8, 0.3), new Tone.Filter(9000, 'lowpass')] }),
       { k: 'X.....x...X..x..', s: '....X.......X...', h: 'x.x.x.x.x.x.x.xo' },
@@ -564,7 +564,7 @@ const INSTRUMENTS = [
   },
   {
     id: 'trap', cat: 'drums', en: 'Trap Drums', ko: '트랩 드럼',
-    desc: '빠른 하이햇 롤과 강한 808 킥을 활용하여 현대적인 힙합 리듬 구현',
+    desc: '빠른 하이햇 롤과 강한 808 킥을 활용하여 트랩 힙합 리듬 구현',
     ...drumInstrument(
       { kickPD: 0.06, kickOct: 2.5, kickDecay: 1.3, kickVol: 0, hatVol: -18, clapVol: -2 },
       {

@@ -257,6 +257,7 @@ function buildPanelTabs() {
       t.tabIndex = on ? 0 : -1;
       document.getElementById(t.getAttribute('aria-controls')).hidden = !on;
     });
+    document.body.classList.toggle('tab-songs', id === 'tab-songs'); // Suno 작곡 탭에서는 악기 목록을 숨김
     try { localStorage.setItem('music.panelTab.v2', id); } catch {}
   };
   tabs.forEach((t, i) => {
@@ -412,6 +413,7 @@ function buildUI() {
   document.addEventListener('keydown', (e) => {
     if (e.code !== 'Space' || e.repeat) return;
     if (/^(INPUT|BUTTON|SELECT|TEXTAREA|A)$/.test(document.activeElement.tagName)) return;
+    if (document.activeElement.closest?.('dialog, .song-table')) return; // 곡 목록·팝업에서는 믹서를 건드리지 않음
     e.preventDefault();
     togglePlay();
   });

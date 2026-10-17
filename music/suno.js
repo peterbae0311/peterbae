@@ -29,11 +29,12 @@ const GENRE_EN = {
 const o = (ko, en, tip, shown) => ({ ko, en, tip, shown });
 
 // 세부 장르의 소리 특징(영어). 장르 이름만 줄 때보다 Suno가 의도를 더 정확히 따른다
+// 시대(80s·90s·retro 등) 표현은 넣지 않는다: 장르는 현재 기준으로 해석하고, 레트로 느낌은 분위기·사운드 항목에서 고른다
 const GENRE_TRAITS = {
   '재즈 발라드': 'slow tempo, intimate piano, soft saxophone, brushed drums',
   '스윙 재즈': 'swinging ride cymbal, walking bass, big band horns',
   '보사노바 재즈': 'nylon guitar, gentle bossa rhythm, soft percussion',
-  '컨템포러리 재즈': 'modern jazz harmony, rhodes, smooth electric textures',
+  '컨템포러리 재즈': 'sophisticated jazz harmony, rhodes, smooth electric textures',
   '재즈 팝': 'jazzy chords, catchy pop melody, warm horns',
   '팝 발라드': 'emotional piano, sweeping strings, big chorus',
   '어쿠스틱 발라드': 'acoustic guitar, intimate piano, stripped-back',
@@ -41,13 +42,13 @@ const GENRE_TRAITS = {
   '록 발라드': 'power ballad, building band sound, emotional guitar',
   '시네마틱 발라드': 'orchestral strings, dramatic build, film score feel',
   '어쿠스틱 팝': 'bright acoustic guitar, light percussion, warm and breezy',
-  '신스 팝': '80s synths, drum machine, retro electronic pop',
+  '신스 팝': 'synth-driven, drum machine, electronic pop',
   '인디 팝': 'jangly guitars, quirky synths, lo-fi charm',
   '드림 팝': 'reverb-drenched guitars, hazy pads, ethereal',
-  '시티 팝': '80s japanese city pop, funky bass, lush chords, glossy production',
+  '시티 팝': 'urban pop, funky bass, lush chords, glossy production',
   '로파이 힙합': 'dusty drums, mellow keys, vinyl texture, relaxed',
   '재즈 힙합': 'jazzy samples, upright bass, boom bap groove',
-  '붐뱁 힙합': 'hard-hitting kick and snare, sampled loops, 90s hip hop',
+  '붐뱁 힙합': 'hard-hitting kick and snare, sampled loops, head-nodding groove',
   '멜로딕 힙합': 'melodic hooks, atmospheric pads, trap-influenced beat',
   '칠 힙합': 'laid-back beat, soft keys, mellow atmosphere',
   '트랩': 'rolling hi-hats, heavy 808 bass, dark atmosphere',
@@ -103,7 +104,7 @@ const GENRE_DESC = {
   '재즈 발라드': '느린 템포에 피아노·색소폰이 감성적으로 노래하는 재즈입니다.',
   '스윙 재즈': '통통 튀는 스윙 리듬과 브라스가 어우러진 빅밴드풍 재즈입니다.',
   '보사노바 재즈': '브라질풍 나일론 기타와 부드럽게 흔들리는 리듬의 재즈입니다.',
-  '컨템포러리 재즈': '현대적인 화성과 전자 사운드를 섞은 세련된 재즈입니다.',
+  '컨템포러리 재즈': '세련된 화성과 전자 사운드를 섞은 재즈입니다.',
   '재즈 팝': '재즈 화성에 팝의 친근한 멜로디를 더한 장르입니다.',
   '팝 발라드': '피아노·스트링스 위에 감정을 쌓아 올리는 대중 발라드입니다.',
   '어쿠스틱 발라드': '어쿠스틱 기타·피아노 중심의 담백한 발라드입니다.',
@@ -111,16 +112,16 @@ const GENRE_DESC = {
   '록 발라드': '밴드 사운드로 점점 커지며 웅장해지는 발라드입니다.',
   '시네마틱 발라드': '오케스트라로 영화음악처럼 극적으로 펼쳐지는 발라드입니다.',
   '어쿠스틱 팝': '어쿠스틱 악기로 가볍고 따뜻하게 만든 팝입니다.',
-  '신스 팝': '신시사이저와 드럼 머신 중심의 80년대풍 전자 팝입니다.',
+  '신스 팝': '신시사이저와 드럼 머신 중심의 전자 팝입니다.',
   '인디 팝': '기타와 신스가 섞인 감각적이고 자유로운 분위기의 팝입니다.',
   '드림 팝': '리버브 가득한 기타·패드로 몽환적으로 퍼지는 팝입니다.',
-  '시티 팝': '80년대 일본풍. 세련된 코드와 펑키한 베이스의 도시적인 팝입니다.',
+  '시티 팝': '세련된 코드와 펑키한 베이스의 도시적인 팝입니다.',
   '로파이 힙합': '느슨한 비트와 따뜻한 잡음의, 공부·휴식할 때 듣기 좋은 힙합입니다.',
   '재즈 힙합': '재즈 샘플과 업라이트 베이스를 쓴 여유 있는 힙합입니다.',
-  '붐뱁 힙합': '묵직한 킥과 강한 스네어의 90년대 클래식 힙합입니다.',
-  '멜로딕 힙합': '랩보다 노래하듯 멜로디가 강한 현대 힙합입니다.',
+  '붐뱁 힙합': '묵직한 킥과 강한 스네어, 샘플 루프 중심의 힙합입니다.',
+  '멜로딕 힙합': '랩보다 노래하듯 멜로디가 강한 힙합입니다.',
   '칠 힙합': '여유롭고 편안한 분위기의 힙합입니다.',
-  '트랩': '빠른 하이햇 롤과 묵직한 808 저음의 현대 힙합입니다.',
+  '트랩': '빠른 하이햇 롤과 묵직한 808 저음의 힙합입니다.',
   '하우스·EDM': '4박 킥이 계속 이어지는 클럽 댄스 음악입니다.',
   '펑크': '끊어 치는 기타와 탄력 있는 베이스의 그루브 음악입니다.',
   '록': '일렉 기타와 라이브 드럼 중심의 밴드 음악입니다.',
@@ -133,14 +134,23 @@ const MINOR_KEYS = ['C', 'C#', 'D', 'Eb', 'E', 'F', 'F#', 'G', 'G#', 'A', 'Bb', 
 const SB_STEPS = [
   { n: 1, title: 'Intro', ko: '인트로', groups: [
     { key: 'intro', type: 'single', options: [
-      o('인트로 없음', '', '인트로 없이 곧바로 본 곡(벌스나 메인 테마)으로 시작합니다.', ''),
-      o('피아노 인트로', 'soft piano', '잔잔한 피아노 연주로 조용히 시작합니다. 발라드·재즈에 어울립니다.', 'soft piano intro'),
-      o('패드 인트로', 'ambient pads', '길게 깔리는 신스 패드로 공간감 있게 시작합니다. 드림 팝·앰비언트에 어울립니다.', 'ambient pads intro'),
-      o('드럼 필', 'drum fill', '짧은 드럼 연타로 힘 있게 곡을 엽니다. 록·펑크·댄스에 어울립니다.', 'drum fill intro'),
-      o('기타 리프', 'guitar riff', '귀에 남는 짧은 기타 프레이즈로 시작합니다. 록·인디에 어울립니다.', 'guitar riff intro'),
-      o('아카펠라', 'a cappella vocals', '반주 없이 목소리만으로 시작합니다. 10번에서 보컬을 고를 때 어울립니다.', 'a cappella vocals intro'),
-      o('시네마틱 빌드업', 'cinematic build-up', '현악기와 효과음으로 영화처럼 점점 고조시키며 시작합니다.', 'cinematic build-up intro'),
-      o('바이닐 노이즈', 'vinyl crackle', '레코드판 잡음으로 로파이·복고 분위기를 깔고 시작합니다.', 'vinyl crackle intro'),
+      // fits: 3번과 같이 대표 장르부터(일반적인 장르 관행 기준)
+      { ...o('인트로 없음', '', '인트로 없이 곧바로 본 곡(벌스나 메인 테마)으로 시작합니다.', ''),
+        fits: { 힙합: ['붐뱁 힙합', '멜로딕 힙합'], 팝: ['신스 팝', '인디 팝'], '일렉트로닉·밴드': ['펑크'] } },
+      { ...o('피아노 인트로', 'soft piano', '잔잔한 피아노 연주로 조용히 시작합니다.', 'soft piano intro'),
+        fits: { 발라드: ['팝 발라드', '시네마틱 발라드'], 재즈: ['재즈 발라드'], 힙합: ['칠 힙합'] } },
+      { ...o('패드 인트로', 'ambient pads', '길게 깔리는 신스 패드로 공간감 있게 시작합니다. 앰비언트에서도 많이 씁니다.', 'ambient pads intro'),
+        fits: { 팝: ['드림 팝', '신스 팝'], '일렉트로닉·밴드': ['하우스·EDM'], 발라드: ['R&B 발라드'] } },
+      { ...o('드럼 필', 'drum fill', '짧은 드럼 연타로 힘 있게 곡을 엽니다.', 'drum fill intro'),
+        fits: { '일렉트로닉·밴드': ['록', '펑크'], 팝: ['인디 팝'], 재즈: ['스윙 재즈'] } },
+      { ...o('기타 리프', 'guitar riff', '귀에 남는 짧은 기타 프레이즈로 시작합니다.', 'guitar riff intro'),
+        fits: { '일렉트로닉·밴드': ['록', '펑크'], 팝: ['인디 팝', '시티 팝'], 발라드: ['록 발라드'] } },
+      { ...o('아카펠라', 'a cappella vocals', '반주 없이 목소리만으로 시작합니다. 10번에서 보컬을 고를 때 어울립니다.', 'a cappella vocals intro'),
+        fits: { 발라드: ['팝 발라드', 'R&B 발라드'], 팝: ['어쿠스틱 팝'] } },
+      { ...o('시네마틱 빌드업', 'cinematic build-up', '현악기와 효과음으로 영화처럼 점점 고조시키며 시작합니다.', 'cinematic build-up intro'),
+        fits: { 발라드: ['시네마틱 발라드', '록 발라드'], '일렉트로닉·밴드': ['하우스·EDM'] } },
+      { ...o('바이닐 노이즈', 'vinyl crackle', '레코드판 잡음으로 복고 분위기를 깔고 시작합니다.', 'vinyl crackle intro'),
+        fits: { 힙합: ['로파이 힙합', '재즈 힙합', '칠 힙합'], 재즈: ['재즈 발라드'] } },
     ] },
   ] },
   { n: 2, title: 'Main Instrument', ko: '주 악기', groups: [{ key: 'main', type: 'instrument' }] },
@@ -148,86 +158,142 @@ const SB_STEPS = [
     { key: 'bpm', type: 'number', min: 60, max: 180, unit: 'BPM',
       tip: '곡의 빠르기(1분에 들어가는 박 수). 대략 발라드 60~80 · 힙합 80~100 · 팝 100~130 · 하우스·댄스 120~130 · 펑크 록 160 이상' },
     { key: 'feel', type: 'multi', max: 2, options: [
-      o('스트레이트', 'straight beat', '박을 고르게 나누는 가장 기본적인 리듬. 팝·록에서 흔합니다.'),
-      o('스윙', 'swing feel', '8분음표를 "길게-짧게" 튕겨 치는 재즈식 리듬입니다.'),
-      o('셔플', 'shuffle groove', '셋잇단음표처럼 통통 튀는 리듬. 블루스·로큰롤에 많습니다.'),
-      o('하프타임', 'half-time', '스네어를 한 마디에 한 번만 쳐서 BPM보다 절반 느리게 느껴지는 리듬. 트랩·발라드에 많습니다.'),
-      o('포온더플로어', 'four-on-the-floor', '킥 드럼이 매 박마다 "쿵 쿵 쿵 쿵" 들어가는 리듬. 하우스·디스코·EDM의 기본입니다.'),
-      o('싱코페이션', 'syncopated groove', '강박을 일부러 엇박으로 밀어서 그루브를 만드는 리듬. 펑크·R&B에 많습니다.'),
-      o('레이드백', 'laid-back groove', '박보다 살짝 늦게 치듯 여유 있게 늘어지는 느낌. 로파이·네오소울에 어울립니다.'),
-      o('드라이빙', 'driving beat', '쉬지 않고 앞으로 밀고 나가는 힘 있는 리듬. 록·댄스에 어울립니다.'),
+      // fits: 어울리는 장르/세부 장르(추천 조합의 GENRES 이름과 같게) — 말풍선에 설명 아래 줄로 표시.
+      // 순서는 그 리듬이 가장 잘 드러나는(대표하는) 장르부터. 사용 통계가 아니라 일반적인 장르 관행 기준이다.
+      { ...o('스트레이트', 'straight beat', '박을 고르게 나누는 가장 기본적인 리듬입니다.'),
+        fits: { '일렉트로닉·밴드': ['록'], 팝: ['인디 팝', '어쿠스틱 팝'], 발라드: ['록 발라드', '팝 발라드'] } },
+      { ...o('스윙', 'swing feel', '8분음표를 "길게-짧게" 튕겨 치는 재즈식 리듬입니다.'),
+        fits: { 재즈: ['스윙 재즈', '재즈 발라드'], 힙합: ['재즈 힙합'] } },
+      { ...o('셔플', 'shuffle groove', '셋잇단음표처럼 통통 튀는 리듬입니다. 블루스·로큰롤의 기본 리듬이기도 합니다.'),
+        fits: { '일렉트로닉·밴드': ['록'], 재즈: ['스윙 재즈', '재즈 팝'] } },
+      { ...o('하프타임', 'half-time', '스네어를 한 마디에 한 번만 쳐서 BPM보다 절반 느리게 느껴지는 리듬입니다.'),
+        fits: { '일렉트로닉·밴드': ['트랩'], 힙합: ['멜로딕 힙합'], 발라드: ['R&B 발라드', '시네마틱 발라드'] } },
+      { ...o('포온더플로어', 'four-on-the-floor', '킥 드럼이 매 박마다 "쿵 쿵 쿵 쿵" 들어가는 리듬입니다. 디스코의 기본 리듬이기도 합니다.'),
+        fits: { '일렉트로닉·밴드': ['하우스·EDM'], 팝: ['신스 팝'] } },
+      { ...o('싱코페이션', 'syncopated groove', '강박을 일부러 엇박으로 밀어서 그루브를 만드는 리듬입니다.'),
+        fits: { '일렉트로닉·밴드': ['펑크'], 발라드: ['R&B 발라드'], 팝: ['시티 팝'], 재즈: ['보사노바 재즈', '컨템포러리 재즈'] } },
+      { ...o('레이드백', 'laid-back groove', '박보다 살짝 늦게 치듯 여유 있게 늘어지는 느낌입니다.'),
+        fits: { 힙합: ['로파이 힙합', '칠 힙합', '붐뱁 힙합'], 재즈: ['컨템포러리 재즈'] } },
+      { ...o('드라이빙', 'driving beat', '쉬지 않고 앞으로 밀고 나가는 힘 있는 리듬입니다.'),
+        fits: { '일렉트로닉·밴드': ['록', '하우스·EDM'], 팝: ['인디 팝'] } },
     ] },
   ] },
   { n: 4, title: 'Genre', ko: '장르', groups: [{ key: 'genre', type: 'genre' }] },
   { n: 5, title: 'Supporting Instruments', ko: '반주 악기', groups: [{ key: 'support', type: 'instruments', max: 4 }] },
   { n: 6, title: 'Mood & Energy', ko: '분위기·에너지', groups: [
     { key: 'mood', type: 'multi', max: 3, options: [
-      o('감성적', 'emotional', '마음을 울리는, 감정이 풍부한 분위기입니다.'),
-      o('우울한', 'melancholic', '쓸쓸하고 슬픈 분위기입니다.'),
-      o('희망찬', 'uplifting', '기운을 북돋우는 밝고 긍정적인 분위기입니다.'),
-      o('몽환적', 'dreamy', '꿈속처럼 흐릿하게 떠다니는 분위기입니다.'),
-      o('로맨틱', 'romantic', '사랑스럽고 달콤한 분위기입니다.'),
-      o('향수', 'nostalgic', '옛 추억을 떠올리게 하는 그리운 분위기입니다.'),
-      o('어두운', 'dark', '무겁고 긴장감 있는 분위기입니다.'),
-      o('편안한', 'chill', '긴장을 풀어 주는 느긋한 분위기입니다.'),
-      o('웅장한', 'epic', '크고 장엄하게 몰아치는 분위기입니다.'),
-      o('경쾌한', 'playful', '가볍고 장난스럽게 통통 튀는 분위기입니다.'),
+      { ...o('감성적', 'emotional', '마음을 울리는, 감정이 풍부한 분위기입니다.'),
+        fits: { 발라드: ['팝 발라드', 'R&B 발라드', '어쿠스틱 발라드'], 힙합: ['멜로딕 힙합'] } },
+      { ...o('우울한', 'melancholic', '쓸쓸하고 슬픈 분위기입니다.'),
+        fits: { 발라드: ['시네마틱 발라드', '어쿠스틱 발라드'], 힙합: ['로파이 힙합'], 팝: ['드림 팝'] } },
+      { ...o('희망찬', 'uplifting', '기운을 북돋우는 밝고 긍정적인 분위기입니다.'),
+        fits: { 팝: ['어쿠스틱 팝', '인디 팝'], 발라드: ['록 발라드'], '일렉트로닉·밴드': ['하우스·EDM'] } },
+      { ...o('몽환적', 'dreamy', '꿈속처럼 흐릿하게 떠다니는 분위기입니다.'),
+        fits: { 팝: ['드림 팝'], 힙합: ['칠 힙합'], 재즈: ['컨템포러리 재즈'] } },
+      { ...o('로맨틱', 'romantic', '사랑스럽고 달콤한 분위기입니다.'),
+        fits: { 재즈: ['재즈 발라드', '보사노바 재즈'], 발라드: ['R&B 발라드', '팝 발라드'] } },
+      { ...o('향수', 'nostalgic', '옛 추억을 떠올리게 하는 그리운 분위기입니다.'),
+        fits: { 팝: ['시티 팝'], 힙합: ['로파이 힙합', '붐뱁 힙합'], 재즈: ['스윙 재즈'] } },
+      { ...o('레트로', 'retro', '지난 시대의 사운드를 되살린 복고풍 분위기입니다. 장르를 옛 스타일로 해석하게 할 때 고릅니다.'),
+        fits: { 팝: ['신스 팝', '시티 팝'], '일렉트로닉·밴드': ['펑크'], 재즈: ['스윙 재즈'] } },
+      { ...o('어두운', 'dark', '무겁고 긴장감 있는 분위기입니다.'),
+        fits: { '일렉트로닉·밴드': ['트랩'], 힙합: ['붐뱁 힙합'], 발라드: ['시네마틱 발라드'] } },
+      { ...o('편안한', 'chill', '긴장을 풀어 주는 느긋한 분위기입니다.'),
+        fits: { 힙합: ['칠 힙합', '로파이 힙합'], 재즈: ['보사노바 재즈'], 팝: ['어쿠스틱 팝'] } },
+      { ...o('웅장한', 'epic', '크고 장엄하게 몰아치는 분위기입니다.'),
+        fits: { 발라드: ['시네마틱 발라드', '록 발라드'], '일렉트로닉·밴드': ['록'] } },
+      { ...o('경쾌한', 'playful', '가볍고 장난스럽게 통통 튀는 분위기입니다.'),
+        fits: { 재즈: ['스윙 재즈', '재즈 팝'], 팝: ['어쿠스틱 팝', '시티 팝'], '일렉트로닉·밴드': ['펑크'] } },
     ] },
     { key: 'energy', type: 'single', options: [
-      o('낮음', 'low energy', '조용하고 잔잔하게, 배경음악처럼 흘러갑니다.'),
-      o('중간', 'medium energy', '적당히 움직임이 있는 일상적인 에너지입니다.'),
-      o('높음', 'high energy', '처음부터 힘 있고 신나게 몰아칩니다.'),
-      o('점점 고조', 'building energy', '조용히 시작해서 뒤로 갈수록 커지고 강해집니다.'),
+      { ...o('낮음', 'low energy', '조용하고 잔잔하게, 배경음악처럼 흘러갑니다.'),
+        fits: { 힙합: ['로파이 힙합', '칠 힙합'], 재즈: ['재즈 발라드', '보사노바 재즈'], 발라드: ['어쿠스틱 발라드'] } },
+      { ...o('중간', 'medium energy', '적당히 움직임이 있는 일상적인 에너지입니다.'),
+        fits: { 팝: ['시티 팝', '인디 팝'], 재즈: ['재즈 팝'], 힙합: ['붐뱁 힙합'] } },
+      { ...o('높음', 'high energy', '처음부터 힘 있고 신나게 몰아칩니다.'),
+        fits: { '일렉트로닉·밴드': ['하우스·EDM', '록', '펑크'], 팝: ['신스 팝'] } },
+      { ...o('점점 고조', 'building energy', '조용히 시작해서 뒤로 갈수록 커지고 강해집니다.'),
+        fits: { 발라드: ['록 발라드', '시네마틱 발라드'], '일렉트로닉·밴드': ['하우스·EDM'] } },
     ] },
   ] },
   { n: 7, title: 'Melody & Harmony', ko: '멜로디·화성', groups: [
     { key: 'key', type: 'select', options: [o('키 지정 안 함', ''), ...MAJOR_KEYS.flatMap((k, i) => [o(`${k} major`, `${k} major`), o(`${MINOR_KEYS[i]} minor`, `${MINOR_KEYS[i]} minor`)])],
       tip: '곡의 조성(키). major(장조)는 밝고 경쾌하게, minor(단조)는 어둡고 감성적으로 들립니다. 지정하지 않으면 Suno가 알아서 정합니다. 4번에서 세부 장르를 골랐으면 그 장르의 코드 진행도 이 키로 옮겨서 함께 넣습니다.' },
     { key: 'harmony', type: 'multi', max: 2, options: [
-      o('중독성 훅', 'catchy hook', '한 번 들으면 귀에 맴도는 짧고 반복되는 멜로디를 강조합니다. 팝·K-pop에 어울립니다.'),
-      o('서정적 멜로디', 'lyrical melody', '노래하듯 길고 부드럽게 흐르는 멜로디입니다. 발라드에 어울립니다.'),
-      o('재즈 7th 코드', 'jazzy seventh chords', '7음을 더한 코드로 세련되고 따뜻한 화성을 냅니다. 재즈·로파이·네오소울에 어울립니다.'),
-      o('단순한 팝 진행', 'simple pop chord progression', '기본 코드 3~4개를 반복하는 익숙하고 따라 부르기 쉬운 진행입니다.'),
-      o('풍성한 화성', 'lush harmonies', '여러 음과 화음을 겹쳐 풍부하고 꽉 찬 화성을 만듭니다. 코러스·스트링스가 있을 때 효과적입니다.'),
-      o('모달', 'modal harmony', '일반 장조·단조 대신 도리안 같은 선법을 써서 독특하고 몽환적인 분위기를 냅니다.'),
+      // fits: 3번과 같이 대표 장르부터(일반적인 장르 관행 기준)
+      { ...o('중독성 훅', 'catchy hook', '한 번 들으면 귀에 맴도는 짧고 반복되는 멜로디를 강조합니다. K-pop의 핵심 요소이기도 합니다.'),
+        fits: { 팝: ['신스 팝', '시티 팝', '인디 팝'], '일렉트로닉·밴드': ['하우스·EDM'], 힙합: ['멜로딕 힙합'] } },
+      { ...o('서정적 멜로디', 'lyrical melody', '노래하듯 길고 부드럽게 흐르는 멜로디입니다.'),
+        fits: { 발라드: ['팝 발라드', '어쿠스틱 발라드', '시네마틱 발라드'], 재즈: ['재즈 발라드'] } },
+      { ...o('재즈 7th 코드', 'jazzy seventh chords', '7음을 더한 코드로 세련되고 따뜻한 화성을 냅니다. 네오소울에서도 즐겨 씁니다.'),
+        fits: { 재즈: ['재즈 발라드', '컨템포러리 재즈', '스윙 재즈'], 힙합: ['로파이 힙합', '재즈 힙합', '칠 힙합'], 팝: ['시티 팝'], 발라드: ['R&B 발라드'] } },
+      { ...o('단순한 팝 진행', 'simple pop chord progression', '기본 코드 3~4개를 반복하는 익숙하고 따라 부르기 쉬운 진행입니다.'),
+        fits: { 팝: ['어쿠스틱 팝', '인디 팝'], 발라드: ['팝 발라드'], '일렉트로닉·밴드': ['하우스·EDM', '록'] } },
+      { ...o('풍성한 화성', 'lush harmonies', '여러 음과 화음을 겹쳐 풍부하고 꽉 찬 화성을 만듭니다. 코러스·스트링스가 있을 때 효과적입니다.'),
+        fits: { 발라드: ['시네마틱 발라드', 'R&B 발라드'], 재즈: ['컨템포러리 재즈'], 팝: ['시티 팝', '드림 팝'] } },
+      { ...o('모달', 'modal harmony', '일반 장조·단조 대신 도리안 같은 선법을 써서 독특하고 몽환적인 분위기를 냅니다.'),
+        fits: { 재즈: ['컨템포러리 재즈'], '일렉트로닉·밴드': ['펑크'], 팝: ['드림 팝'] } },
     ] },
   ] },
   { n: 8, title: 'Arrangement', ko: '편곡·구성', groups: [
     { key: 'arr', type: 'multi', max: 3, options: [
-      o('미니멀', 'minimal', '악기 수를 줄이고 빈 공간을 살린 담백한 편곡입니다.', 'minimal arrangement'),
-      o('층층이 쌓기', 'layered', '악기와 소리를 겹겹이 쌓아 풍성하고 꽉 찬 편곡입니다.', 'layered arrangement'),
-      o('벌스-코러스', 'verse-chorus', '절(벌스)과 후렴(코러스)이 번갈아 나오는 대중가요 기본 구성입니다.', 'verse-chorus structure'),
-      o('빌드업 → 드롭', 'build-up-drop', '긴장감을 점점 끌어올린 뒤 한 번에 터뜨리는 구간을 넣습니다. EDM·팝에 많습니다.', 'build-up and drop'),
-      o('브레이크다운', 'breakdown', '마지막 후렴 앞에서 악기를 덜어 내 잠시 숨을 고르는 구간을 넣습니다.', 'breakdown'),
-      o('페이드아웃 엔딩', 'fade-out', '곡 끝에서 소리가 점점 작아지며 사라지게 끝냅니다.', 'fade-out ending'),
+      { ...o('미니멀', 'minimal', '악기 수를 줄이고 빈 공간을 살린 담백한 편곡입니다.', 'minimal arrangement'),
+        fits: { 힙합: ['칠 힙합', '로파이 힙합'], 발라드: ['어쿠스틱 발라드'], 재즈: ['재즈 발라드'] } },
+      { ...o('층층이 쌓기', 'layered', '악기와 소리를 겹겹이 쌓아 풍성하고 꽉 찬 편곡입니다.', 'layered arrangement'),
+        fits: { 발라드: ['시네마틱 발라드', '록 발라드'], 팝: ['드림 팝', '신스 팝'], '일렉트로닉·밴드': ['하우스·EDM'] } },
+      { ...o('벌스-코러스', 'verse-chorus', '절(벌스)과 후렴(코러스)이 번갈아 나오는 대중가요 기본 구성입니다.', 'verse-chorus structure'),
+        fits: { 팝: ['어쿠스틱 팝', '인디 팝', '신스 팝'], 발라드: ['팝 발라드', '록 발라드'], '일렉트로닉·밴드': ['록'] } },
+      { ...o('빌드업 → 드롭', 'build-up-drop', '긴장감을 점점 끌어올린 뒤 한 번에 터뜨리는 구간을 넣습니다.', 'build-up and drop'),
+        fits: { '일렉트로닉·밴드': ['하우스·EDM', '트랩'], 팝: ['신스 팝'] } },
+      { ...o('브레이크다운', 'breakdown', '마지막 후렴 앞에서 악기를 덜어 내 잠시 숨을 고르는 구간을 넣습니다.', 'breakdown'),
+        fits: { '일렉트로닉·밴드': ['하우스·EDM', '펑크'], 팝: ['시티 팝'], 발라드: ['록 발라드'] } },
+      { ...o('페이드아웃 엔딩', 'fade-out', '곡 끝에서 소리가 점점 작아지며 사라지게 끝냅니다.', 'fade-out ending'),
+        fits: { 팝: ['시티 팝', '드림 팝'], 힙합: ['로파이 힙합', '칠 힙합'], '일렉트로닉·밴드': ['펑크'] } },
     ] },
   ] },
   { n: 9, title: 'Sound & Mixing', ko: '사운드·믹싱', groups: [
     { key: 'mix', type: 'multi', max: 3, options: [
-      o('로파이 따뜻함', 'warm lo-fi mix', '고음을 살짝 깎고 잡음을 더해 오래된 녹음처럼 포근하게 들리게 합니다.'),
-      o('빈티지 아날로그', 'vintage analog warmth', '70~80년대 아날로그 장비로 녹음한 듯 따뜻하고 두툼한 소리입니다.'),
-      o('깔끔한 모던', 'polished modern production', '요즘 차트 곡처럼 선명하고 깨끗하게 다듬은 소리입니다.'),
-      o('넓은 스테레오', 'wide stereo', '소리를 좌우로 넓게 펼쳐 공간이 넓게 느껴지게 합니다.'),
-      o('리버브 풍부', 'lush reverb', '넓은 공간에서 울리는 듯한 잔향을 넉넉하게 줍니다. 발라드·앰비언트에 어울립니다.'),
-      o('펀치감 드럼', 'punchy drums', '킥과 스네어가 또렷하고 세게 때리는 드럼 소리입니다. 힙합·록·댄스에 어울립니다.'),
-      o('테이프 질감', 'tape saturation', '카세트·릴 테이프 특유의 살짝 찌그러진 따뜻한 질감을 더합니다.'),
+      { ...o('로파이 따뜻함', 'warm lo-fi mix', '고음을 살짝 깎고 잡음을 더해 오래된 녹음처럼 포근하게 들리게 합니다.'),
+        fits: { 힙합: ['로파이 힙합', '칠 힙합', '재즈 힙합'] } },
+      { ...o('빈티지 아날로그', 'vintage analog warmth', '70~80년대 아날로그 장비로 녹음한 듯 따뜻하고 두툼한 소리입니다.'),
+        fits: { 팝: ['시티 팝'], '일렉트로닉·밴드': ['펑크', '록'], 재즈: ['스윙 재즈', '재즈 발라드'] } },
+      { ...o('깔끔한 모던', 'polished modern production', '요즘 차트 곡처럼 선명하고 깨끗하게 다듬은 소리입니다. K-pop의 기본 사운드이기도 합니다.'),
+        fits: { 팝: ['신스 팝', '어쿠스틱 팝'], '일렉트로닉·밴드': ['하우스·EDM', '트랩'], 발라드: ['팝 발라드'] } },
+      { ...o('넓은 스테레오', 'wide stereo', '소리를 좌우로 넓게 펼쳐 공간이 넓게 느껴지게 합니다.'),
+        fits: { '일렉트로닉·밴드': ['하우스·EDM'], 팝: ['드림 팝', '신스 팝'], 발라드: ['시네마틱 발라드'] } },
+      { ...o('리버브 풍부', 'lush reverb', '넓은 공간에서 울리는 듯한 잔향을 넉넉하게 줍니다. 앰비언트에서도 많이 씁니다.'),
+        fits: { 발라드: ['시네마틱 발라드', '팝 발라드'], 팝: ['드림 팝'], 재즈: ['재즈 발라드'] } },
+      { ...o('펀치감 드럼', 'punchy drums', '킥과 스네어가 또렷하고 세게 때리는 드럼 소리입니다.'),
+        fits: { 힙합: ['붐뱁 힙합', '멜로딕 힙합'], '일렉트로닉·밴드': ['트랩', '록', '하우스·EDM'], 팝: ['인디 팝'] } },
+      { ...o('테이프 질감', 'tape saturation', '카세트·릴 테이프 특유의 살짝 찌그러진 따뜻한 질감을 더합니다.'),
+        fits: { 힙합: ['로파이 힙합', '붐뱁 힙합'], 팝: ['시티 팝', '인디 팝'], '일렉트로닉·밴드': ['펑크'] } },
     ] },
   ] },
   { n: 10, title: 'Vocal Style', ko: '보컬', groups: [
     { key: 'vocal', type: 'single', options: [
-      o('연주곡', 'instrumental', '노래 없이 악기로만 만듭니다. 보컬 톤·언어 선택이 꺼지고, 제외 항목에 vocals가 자동으로 들어갑니다.'),
+      // 남성·여성, 한국어·영어는 장르와 관계가 없어(성별을 장르에 묶으면 근거 없는 고정관념이 됨) 장르 줄을 넣지 않는다
+      { ...o('연주곡', 'instrumental', '노래 없이 악기로만 만듭니다. 보컬 톤·언어 선택이 꺼지고, 제외 항목에 vocals가 자동으로 들어갑니다.'),
+        fits: { 힙합: ['로파이 힙합', '칠 힙합'], 재즈: ['스윙 재즈', '컨템포러리 재즈'], '일렉트로닉·밴드': ['하우스·EDM'] } },
       o('남성', 'male vocals', '남성 보컬이 부릅니다.'),
       o('여성', 'female vocals', '여성 보컬이 부릅니다.'),
-      o('듀엣', 'male and female duet', '남녀가 주고받거나 함께 부르는 듀엣입니다.'),
-      o('합창', 'choir', '여러 명이 함께 부르는 합창입니다.'),
+      { ...o('듀엣', 'male and female duet', '남녀가 주고받거나 함께 부르는 듀엣입니다.'),
+        fits: { 발라드: ['팝 발라드', 'R&B 발라드'], 팝: ['시티 팝'] } },
+      { ...o('합창', 'choir', '여러 명이 함께 부르는 합창입니다.'),
+        fits: { 발라드: ['시네마틱 발라드'], '일렉트로닉·밴드': ['록'] } },
     ] },
     { key: 'tone', type: 'multi', max: 2, needsVocal: true, options: [
-      o('숨소리 섞인', 'breathy', '숨이 섞여 가볍고 속삭이는 듯한 음색입니다.'),
-      o('소울풀', 'soulful', '감정을 깊게 담아 굴리듯 부르는 소울 창법입니다.'),
-      o('파워풀', 'powerful', '성량이 크고 고음이 시원하게 뻗는 목소리입니다.'),
-      o('허스키', 'raspy', '거칠고 살짝 갈라지는 매력적인 목소리입니다.'),
-      o('속삭이듯', 'whispery', '귓속말하듯 아주 작고 가깝게 부릅니다.'),
-      o('부드러운', 'smooth', '매끄럽고 편안하게 흐르는 음색입니다.'),
+      { ...o('숨소리 섞인', 'breathy', '숨이 섞여 가볍고 속삭이는 듯한 음색입니다.'),
+        fits: { 팝: ['드림 팝', '인디 팝'], 재즈: ['보사노바 재즈'], 발라드: ['어쿠스틱 발라드'] } },
+      { ...o('소울풀', 'soulful', '감정을 깊게 담아 굴리듯 부르는 소울 창법입니다.'),
+        fits: { 발라드: ['R&B 발라드'], 재즈: ['재즈 팝'], '일렉트로닉·밴드': ['펑크'] } },
+      { ...o('파워풀', 'powerful', '성량이 크고 고음이 시원하게 뻗는 목소리입니다.'),
+        fits: { 발라드: ['록 발라드', '팝 발라드'], '일렉트로닉·밴드': ['록'] } },
+      { ...o('허스키', 'raspy', '거칠고 살짝 갈라지는 매력적인 목소리입니다.'),
+        fits: { '일렉트로닉·밴드': ['록'], 발라드: ['록 발라드'], 재즈: ['재즈 발라드'] } },
+      { ...o('속삭이듯', 'whispery', '귓속말하듯 아주 작고 가깝게 부릅니다.'),
+        fits: { 팝: ['드림 팝'], 재즈: ['보사노바 재즈'], 힙합: ['칠 힙합'] } },
+      { ...o('부드러운', 'smooth', '매끄럽고 편안하게 흐르는 음색입니다.'),
+        fits: { 재즈: ['재즈 발라드', '재즈 팝'], 발라드: ['R&B 발라드'], 팝: ['시티 팝'] } },
     ] },
     { key: 'lang', type: 'single', needsVocal: true, options: [
       o('한국어', 'korean lyrics', '한국어로 부르게 합니다. 가사 칸에 한국어 가사를 넣으면 더 정확합니다.'),
@@ -302,7 +368,7 @@ function tipEl(tip, en) {
 function chip(label, on, onClick, disabled = false, tip = '', en = '') {
   const b = document.createElement('button');
   b.className = 'sb-chip';
-  b.textContent = label;
+  b.append(Object.assign(document.createElement('span'), { className: 'lbl', textContent: label }));
   if (tip) b.append(tipEl(tip, en));
   b.setAttribute('aria-pressed', String(on));
   b.disabled = disabled;
@@ -333,6 +399,11 @@ const syncGenreTab = () => {
   const i = GENRES.findIndex((g) => g.items.some((it) => it.name === sb.genre));
   if (i >= 0) sbGenreTab = i;
 };
+// 말풍선: 설명 아래에 '장르 / 세부 장르' 줄(대표 장르부터)을 붙인다
+const withFits = (tip, x) => tip + (x.fits
+  ? `<span class="fits">${Object.entries(x.fits).map(([gr, subs]) => `<span>${gr} / ${subs.join(', ')}</span>`).join('')}</span>`
+  : '');
+
 function renderGroup(g) {
   const box = document.createElement('div');
   box.className = 'sb-group';
@@ -342,12 +413,12 @@ function renderGroup(g) {
     g.options.forEach((x) => box.append(chip(x.ko, sb[g.key] === x.en, () => {
       sb[g.key] = sb[g.key] === x.en ? '' : x.en;
       commit();
-    }, off, x.tip, x.shown ?? x.en)));
+    }, off, withFits(x.tip, x), x.shown ?? x.en)));
   } else if (g.type === 'multi') {
     g.options.forEach((x) => {
       const conflict = g.key === 'excl' && exclConflict(x.en);
-      box.append(chip(x.ko, sb[g.key].includes(x.en), () => toggleMulti(g.key, x.en, g.max), off || !!conflict,
-        conflict ? `${x.tip}<br>(${conflict[2]})` : x.tip, x.shown ?? x.en));
+      const tip = withFits(conflict ? `${x.tip}<br>(${conflict[2]})` : x.tip, x);
+      box.append(chip(x.ko, sb[g.key].includes(x.en), () => toggleMulti(g.key, x.en, g.max), off || !!conflict, tip, x.shown ?? x.en));
     });
     if (g.max < g.options.length) limitHint(box, g.key, g.max);
   } else if (g.type === 'select') {
@@ -389,8 +460,22 @@ function renderGroup(g) {
     wrap.append(s, tipEl(tip, d ? SUNO_TERM[d.id] : ''));
     box.append(wrap);
   } else if (g.type === 'instruments') {
-    INSTRUMENTS.forEach((d) => box.append(chip(d.ko, sb.support.includes(d.id), () => toggleMulti('support', d.id, g.max), d.id === sb.main,
-      d.id === sb.main ? `${d.desc}<br>(주 악기로 골라서 반주에서는 뺐습니다)` : d.desc, SUNO_TERM[d.id])));
+    INSTRUMENTS.forEach((d) => {
+      if (d.id !== sb.main) {
+        box.append(chip(d.ko, sb.support.includes(d.id), () => toggleMulti('support', d.id, g.max), false, d.desc, SUNO_TERM[d.id]));
+        return;
+      }
+      // 주 악기로 고른 악기는 반주에 겹쳐 넣지 않는다. 누르면 주 악기에서 빼고 반주로 옮긴다
+      const c = chip(`${d.ko} · 주 악기`, false, () => {
+        if (sb.support.length >= g.max) return flash(`반주 악기가 이미 ${g.max}개입니다. 하나를 먼저 해제해 주세요.`, 'warn');
+        sb.main = '';
+        sb.support = [...sb.support, d.id];
+        commit();
+        flash(`${d.ko}을(를) 주 악기에서 반주 악기로 옮겼습니다. 2번에서 주 악기를 다시 골라 주세요.`, 'ok');
+      }, false, `${d.desc}<br>(2번 주 악기로 골라 둔 악기입니다. 누르면 주 악기에서 빼고 반주 악기로 옮깁니다)`, SUNO_TERM[d.id]);
+      c.classList.add('is-main');
+      box.append(c);
+    });
     limitHint(box, 'support', g.max);
   } else if (g.type === 'genre') {
     const tabs = document.createElement('div');
