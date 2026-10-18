@@ -43,7 +43,10 @@ const USAGE_TYPES = ['플레이리스트', '영상 음악', '단독 음원'];
 const LLM_TYPES = ['ChatGPT', 'Claude', 'Gemini', 'Etc']; // 가사·스타일 등을 만들 때 쓴 LLM
 // 팝업 입력칸 이름(파일 제외). 순서는 화면 순서와 같다
 const RATINGS = ['작곡 전', 'S', 'A', 'B', 'C', 'D']; // Suno 곡 평가(작곡 전 = 아직 만들지 않음)
-const SONG_FIELDS = ['rating', 'ratingNote', 'titleKo', 'titleEn', 'usage', 'sourceName', 'genre', 'bpm', 'duration', 'style', 'lyricsKo', 'lyricsEn', 'sunoUrl', 'llm', 'createdOn', 'prompt'];
+// Suno 생성 설정의 기본값(새 곡, 그리고 이 항목이 생기기 전에 저장한 곡)
+const SUNO_DEFAULTS = { maxMode: 'Off', weirdness: '20', styleInfluence: '80', variety: 'Off', personalize: 'Off' };
+const SONG_FIELDS = ['rating', 'ratingNote', 'titleKo', 'titleEn', 'usage', 'sourceName', 'genre', 'bpm', 'duration', 'style',
+  'vocalGender', 'maxMode', 'weirdness', 'styleInfluence', 'variety', 'personalize', 'lyricsKo', 'lyricsEn', 'sunoUrl', 'llm', 'createdOn', 'prompt'];
 // 장르 선택지: 추천 조합의 세부 장르(영문) + 자주 쓰는 큰 장르
 const SONG_GENRES = [...new Set([
   ...Object.values(GENRE_EN).flatMap((g) => g.split(', ')),
@@ -194,12 +197,20 @@ function openSong(s = null) {
   const v = s ?? { createdOn: today() };
   for (const k of SONG_FIELDS) f(k).value = v[k] ?? '';
   if (!RATINGS.includes(f('rating').value)) f('rating').value = '작곡 전'; // 새 곡·평가 항목이 없던 예전 곡
+  for (const [k, d] of Object.entries(SUNO_DEFAULTS)) if (v[k] == null || v[k] === '') f(k).value = d;
+  showRanges();
   // 예전에 고른 장르가 목록에 없으면(직접 입력 등) 선택지로 넣어 둔다
   if (v.genre && !SONG_GENRES.includes(v.genre)) f('genre').append(new Option(v.genre, v.genre, true, true));
   renderFileState(s?.fileName, s?.fileSize);
   songEl.dialog.showModal();
   f('titleKo').focus();
 }
+
+// Weirdness·Style Influence 막대 옆에 지금 값(%)을 보여 준다
+function showRanges() {
+  songEl.form.querySelectorAll('output[data-for]').forEach((o) => { o.value = `${f(o.dataset.for).value}%`; });
+}
+songEl.form.addEventListener('input', (e) => { if (e.target.type === 'range') showRanges(); });
 
 // 음원 파일을 고르면 재생시간을 비어 있을 때 자동으로 채운다
 f('file').onchange = () => {

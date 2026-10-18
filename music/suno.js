@@ -179,7 +179,7 @@ const SB_STEPS = [
     ] },
   ] },
   { n: 4, title: 'Genre', ko: '장르', groups: [{ key: 'genre', type: 'genre' }] },
-  { n: 5, title: 'Supporting Instruments', ko: '반주 악기', groups: [{ key: 'support', type: 'instruments', max: 4 }] },
+  { n: 5, title: 'Supporting Instruments', ko: '반주 악기', groups: [{ key: 'support', type: 'instruments' }] }, // 개수 제한 없음
   { n: 6, title: 'Mood & Energy', ko: '분위기·에너지', groups: [
     { key: 'mood', type: 'multi', max: 3, options: [
       { ...o('감성적', 'emotional', '마음을 울리는, 감정이 풍부한 분위기입니다.'),
@@ -467,7 +467,6 @@ function renderGroup(g) {
       }
       // 주 악기로 고른 악기는 반주에 겹쳐 넣지 않는다. 누르면 주 악기에서 빼고 반주로 옮긴다
       const c = chip(`${d.ko} · 주 악기`, false, () => {
-        if (sb.support.length >= g.max) return flash(`반주 악기가 이미 ${g.max}개입니다. 하나를 먼저 해제해 주세요.`, 'warn');
         sb.main = '';
         sb.support = [...sb.support, d.id];
         commit();
@@ -476,7 +475,7 @@ function renderGroup(g) {
       c.classList.add('is-main');
       box.append(c);
     });
-    limitHint(box, 'support', g.max);
+    if (sb.support.length) box.append(Object.assign(document.createElement('small'), { className: 'sb-hint', textContent: `${sb.support.length}개 선택` }));
   } else if (g.type === 'genre') {
     const tabs = document.createElement('div');
     tabs.className = 'sb-gtabs';
@@ -488,9 +487,9 @@ function renderGroup(g) {
     box.append(tabs);
     GENRES[sbGenreTab].items.forEach((it) => box.append(chip(it.name, sb.genre === it.name, () => {
       sb.genre = sb.genre === it.name ? '' : it.name;
-      if (sb.genre) sb.bpm = it.bpm;
+      // BPM은 3번에서 정한 값을 그대로 둔다(장르의 BPM은 말풍선에 추천값으로만 보여 줌)
       commit();
-    }, false, `${GENRE_DESC[it.name]}<br>${it.bpm} BPM · ${it.prog.join(' – ')} (믹서 추천 조합 기준)`, genreLine(it.name))));
+    }, false, `${GENRE_DESC[it.name]}<br>추천 ${it.bpm} BPM · ${it.prog.join(' – ')} (믹서 추천 조합 기준)`, genreLine(it.name))));
     if (sb.genreCustom) {
       const c = chip(`분석: ${sb.genreCustom}`, true, () => { sb.genreCustom = ''; commit(); });
       c.title = '곡 분석에서 가져온 장르(누르면 제거)';
@@ -590,7 +589,7 @@ function setInstrumentsFrom(ids) {
   sb.main = sorted[0] || '';
   // 반주는 리듬(드럼·베이스)부터 채워 곡의 뼈대가 먼저 전달되게
   const rest = sorted.slice(1).sort((a, b) => MAIN_PRIORITY.indexOf(byId[b].cat) - MAIN_PRIORITY.indexOf(byId[a].cat));
-  sb.support = rest.slice(0, 4);
+  sb.support = rest;
 }
 
 function fromMixer() {

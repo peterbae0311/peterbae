@@ -24,7 +24,7 @@
   <link rel="stylesheet" crossorigin
         href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/static/pretendard.css">
   <!-- 파일을 고치면 ?v= 값을 올려 브라우저 캐시에 남은 예전 파일을 쓰지 않게 한다 -->
-  <link rel="stylesheet" href="style.css?v=20261018u">
+  <link rel="stylesheet" href="style.css?v=20261018y">
 </head>
 <body>
   <header class="hero">
@@ -160,6 +160,14 @@
           <div class="sd-field"><span class="lb"><label for="song-bpm">BPM</label><button type="button" class="sd-copy" data-copy="bpm" aria-label="BPM 복사" title="BPM 복사"><svg viewBox="0 0 24 24" width="14" height="14" aria-hidden="true"><rect x="9" y="9" width="11" height="11" rx="2" fill="none" stroke="currentColor" stroke-width="2"/><path d="M5 15V5a2 2 0 0 1 2-2h8" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg></button></span><input id="song-bpm" name="bpm" type="number" min="20" max="300" step="1" inputmode="numeric"></div>
           <label><span class="lb">재생시간</span><input name="duration" placeholder="03:45" maxlength="6" inputmode="numeric"></label>
           <div class="wide sd-field"><span class="lb"><label for="song-style">Suno Style</label><button type="button" class="sd-copy" data-copy="style" aria-label="Suno Style 복사" title="Suno Style 복사"><svg viewBox="0 0 24 24" width="14" height="14" aria-hidden="true"><rect x="9" y="9" width="11" height="11" rx="2" fill="none" stroke="currentColor" stroke-width="2"/><path d="M5 15V5a2 2 0 0 1 2-2h8" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg></button><button type="button" class="ghost sd-mini" id="song-style-import">Style Builder 결과 가져오기</button></span><textarea id="song-style" name="style" rows="4"></textarea></div>
+          <fieldset class="wide sd-suno"><legend>Suno 설정</legend>
+            <label><span class="lb"><span class="sd-help" tabindex="0">Vocal Gender<span class="desc" role="tooltip">보컬 성별을 정합니다. 비워 두면 Suno가 스타일과 가사를 보고 정합니다.</span></span></span><select name="vocalGender"><option value="">선택 안 함</option><option value="Male">Male</option><option value="Female">Female</option></select></label>
+            <label><span class="lb"><span class="sd-help" tabindex="0">Max Mode<span class="desc" role="tooltip">음질과 디테일을 최대로 끌어올리는 모드입니다. 켜면 생성이 더 오래 걸릴 수 있습니다.</span></span></span><select name="maxMode"><option value="Off">Off</option><option value="On">On</option></select></label>
+            <label><span class="lb"><span class="sd-help" tabindex="0">Personalize<span class="desc" role="tooltip">내가 만들고 좋아한 곡들의 취향을 반영해 생성합니다.</span></span></span><select name="personalize"><option value="Off">Off</option><option value="On">On</option></select></label>
+            <label><span class="lb"><span class="sd-help" tabindex="0">Weirdness<span class="desc" role="tooltip">결과가 얼마나 실험적일지 정합니다. 낮을수록 무난하고 예측 가능한 곡, 높을수록 낯설고 예상 밖의 곡이 나옵니다.</span></span></span><span class="sd-range"><input name="weirdness" type="range" min="0" max="100" step="1"><output data-for="weirdness"></output></span></label>
+            <label><span class="lb"><span class="sd-help" tabindex="0">Style Influence<span class="desc" role="tooltip">Style 칸에 쓴 지시를 얼마나 강하게 따를지 정합니다. 높을수록 입력한 스타일에 충실하고, 낮을수록 Suno가 자유롭게 해석합니다.</span></span></span><span class="sd-range"><input name="styleInfluence" type="range" min="0" max="100" step="1"><output data-for="styleInfluence"></output></span></label>
+            <label><span class="lb"><span class="sd-help" tabindex="0">Variety<span class="desc" role="tooltip">같은 설정으로 여러 곡을 만들 때 결과끼리 얼마나 다르게 나올지 정합니다. Off는 서로 비슷하게, Max는 매번 크게 다르게 만듭니다.</span></span></span><select name="variety"><option value="Off">Off</option><option value="Normal">Normal</option><option value="High">High</option><option value="Extra">Extra</option><option value="Max">Max</option></select></label>
+          </fieldset>
           <div class="wide sd-field"><span class="lb"><label for="song-lyricsKo">가사(KO)</label><button type="button" class="sd-copy" data-copy="lyricsKo" aria-label="가사(KO) 복사" title="가사(KO) 복사"><svg viewBox="0 0 24 24" width="14" height="14" aria-hidden="true"><rect x="9" y="9" width="11" height="11" rx="2" fill="none" stroke="currentColor" stroke-width="2"/><path d="M5 15V5a2 2 0 0 1 2-2h8" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg></button></span><textarea id="song-lyricsKo" name="lyricsKo" rows="6"></textarea></div>
           <div class="wide sd-field"><span class="lb"><label for="song-lyricsEn">가사(EN)</label><button type="button" class="sd-copy" data-copy="lyricsEn" aria-label="가사(EN) 복사" title="가사(EN) 복사"><svg viewBox="0 0 24 24" width="14" height="14" aria-hidden="true"><rect x="9" y="9" width="11" height="11" rx="2" fill="none" stroke="currentColor" stroke-width="2"/><path d="M5 15V5a2 2 0 0 1 2-2h8" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg></button></span><textarea id="song-lyricsEn" name="lyricsEn" rows="6"></textarea></div>
           <label><span class="lb">음원 파일</span><input name="file" type="file" accept="audio/*,.mp3,.wav,.m4a,.flac,.ogg"><span id="song-file-state" class="sd-file"></span></label>
@@ -180,10 +188,10 @@
   <div id="toast" class="toast" role="status" aria-live="polite"></div>
 
   <script src="https://cdnjs.cloudflare.com/ajax/libs/tone/14.8.49/Tone.js"></script>
-  <script src="instruments.js?v=20261018u"></script>
-  <script src="app.js?v=20261018u"></script>
-  <script src="upload.js?v=20261018u"></script>
-  <script src="suno.js?v=20261018u"></script>
-  <script src="songs.js?v=20261018u"></script>
+  <script src="instruments.js?v=20261018y"></script>
+  <script src="app.js?v=20261018y"></script>
+  <script src="upload.js?v=20261018y"></script>
+  <script src="suno.js?v=20261018y"></script>
+  <script src="songs.js?v=20261018y"></script>
 </body>
 </html>
