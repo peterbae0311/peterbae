@@ -321,12 +321,32 @@ body.has-solo .card.active:not(.soloed) .solo { color: var(--text); }
 .progress .bar { flex: 1; height: 6px; background: var(--line); border-radius: 3px; overflow: hidden; }
 .progress .bar i { display: block; height: 100%; background: var(--accent); transform-origin: left; transform: scaleX(0); transition: transform 0.2s; }
 
-.result { display: grid; grid-template-columns: minmax(300px, 380px) minmax(0, 1fr); gap: 28px; align-items: start; }
+/* 선택 곡 | 장르·악기 | Suno Style */
+.result { display: grid; grid-template-columns: minmax(260px, 320px) minmax(0, 1fr) minmax(0, 1fr); gap: 28px; align-items: start; }
 .has-result .result { margin-top: 0; }
 .has-result .progress { margin-top: 0; margin-bottom: 14px; }
 .progress + .result, .drop + .progress + .result { margin-top: 14px; }
 .r-left { display: flex; flex-direction: column; gap: 8px; min-width: 0; }
-.r-right { display: flex; flex-direction: column; gap: 8px; min-width: 0; padding-top: 2px; }
+.r-mid { display: flex; flex-direction: column; gap: 8px; min-width: 0; padding-top: 2px; }
+.r-style { display: flex; flex-direction: column; gap: 6px; min-width: 0; padding-top: 2px; }
+/* 목록형/문장형 탭(Style Builder 출력 칸과 곡 분석 결과 칸이 같이 씀) */
+.fmt-tabs { display: inline-flex; gap: 2px; padding: 2px; border: 1px solid var(--line); border-radius: 8px; align-self: flex-start; }
+.fmt-tabs button { padding: 3px 10px; font-size: 12px; border: 0; border-radius: 6px; background: none; color: var(--muted); }
+.fmt-tabs button:hover { color: var(--text); }
+.fmt-tabs button[aria-selected="true"] { background: var(--accent-faint); color: var(--accent); font-weight: 600; }
+/* 복사 아이콘은 입력칸 오른쪽 위 모서리에 얹는다(글자와 겹치지 않게 오른쪽 여백 확보) */
+.r-style-box { position: relative; }
+.r-style textarea {
+  display: block; width: 100%; height: 272px; resize: vertical; /* 목록형 1~9번이 넓은 화면에서 줄바꿈 포함 13줄까지 다 보이는 높이 */ background: var(--field-bg); color: var(--text); border: 1px solid var(--line); border-radius: 8px;
+  padding: 9px 36px 9px 10px; font: 12.5px/1.55 ui-monospace, 'Cascadia Mono', Consolas, monospace;
+}
+.r-style .sd-copy { position: absolute; top: 6px; right: 6px; background: var(--field-bg); }
+.r-style small { font-size: 11.5px; line-height: 1.5; }
+/* 중간 폭: 선택 곡 | 장르·악기 두 칸, Suno Style은 아래 줄 전체 */
+@media (min-width: 721px) and (max-width: 1100px) {
+  .result { grid-template-columns: minmax(260px, 320px) minmax(0, 1fr); }
+  .r-style { grid-column: 1 / -1; }
+}
 .r-name { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; }
 .r-name > div { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
 .r-name b { font-size: 15px; overflow-wrap: anywhere; }

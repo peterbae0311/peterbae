@@ -58,47 +58,11 @@ const GENRE_TRAITS = {
 };
 const genreLine = (name) => `${GENRE_EN[name]} (${GENRE_TRAITS[name]})`;
 
-/* ---------------- 코드 진행(7번 줄) ----------------
- * 세부 장르의 추천 조합 진행을 쓰고, 7번에서 키를 골랐으면 그 키로 옮긴다.
- * 옮기려면 진행마다 기준 키가 필요해서 따로 적어 둔다(app.js GENRES의 prog와 짝). */
-const PROG_KEY = {
-  '재즈 발라드': 'C major', '스윙 재즈': 'C major', '보사노바 재즈': 'F major', '컨템포러리 재즈': 'D minor', '재즈 팝': 'A minor',
-  '팝 발라드': 'C major', '어쿠스틱 발라드': 'G major', 'R&B 발라드': 'G minor', '록 발라드': 'D major', '시네마틱 발라드': 'A minor',
-  '어쿠스틱 팝': 'C major', '신스 팝': 'D minor', '인디 팝': 'C major', '드림 팝': 'C major', '시티 팝': 'A minor',
-  '로파이 힙합': 'C major', '재즈 힙합': 'C major', '붐뱁 힙합': 'A minor', '멜로딕 힙합': 'A minor', '칠 힙합': 'C major',
-  '트랩': 'A minor', '하우스·EDM': 'A minor', '펑크': 'E minor', '록': 'A major',
-};
+// 키 이름 → 음 번호(0~11). 분석 키를 7번 키 목록 표기로 맞출 때 쓴다
+// 코드 진행은 스타일에 넣지 않는다: 곡과 무관한 장르 기본 진행이 Suno의 화성을 엉뚱하게 끌고 갈 수 있다
 const SHARP_NAMES = ['C', 'C#', 'D', 'D#', 'E', 'F', 'F#', 'G', 'G#', 'A', 'A#', 'B'];
 const FLAT_NAMES = ['C', 'Db', 'D', 'Eb', 'E', 'F', 'Gb', 'G', 'Ab', 'A', 'Bb', 'B'];
 const pcOf = (name) => (SHARP_NAMES.includes(name) ? SHARP_NAMES : FLAT_NAMES).indexOf(name);
-
-// 'A minor' → { root: 9, minor: true }
-const parseKey = (k) => { const [r, m] = k.split(' '); return { root: pcOf(r), minor: m === 'minor' }; };
-
-function transposeProg(prog, fromKey, toKey) {
-  const from = parseKey(fromKey);
-  const to = parseKey(toKey);
-  // 장조↔단조가 다르면 나란한조로 맞춘 뒤 옮긴다(예: C major 진행을 A minor로 → 그대로)
-  let target = to.root;
-  if (from.minor && !to.minor) target = (to.root + 9) % 12;
-  if (!from.minor && to.minor) target = (to.root + 3) % 12;
-  const semis = (target - from.root + 12) % 12;
-  // 옮긴 키의 관용 표기: #키는 #, 그 외는 b
-  const majorRoot = from.minor ? (target + 3) % 12 : target;
-  const names = [7, 2, 9, 4, 11, 6].includes(majorRoot) ? SHARP_NAMES : FLAT_NAMES;
-  return prog.map((c) => {
-    const m = /^([A-G][b#]?)(.*)$/.exec(c);
-    return names[(pcOf(m[1]) + semis) % 12] + m[2];
-  });
-}
-
-function progressionFor() {
-  const preset = GENRES.flatMap((g) => g.items).find((p) => p.name === sb.genre);
-  if (preset) return sb.key ? transposeProg(preset.prog, PROG_KEY[preset.name], sb.key) : preset.prog;
-  // 장르 없이 키만 있으면 믹서 기본 진행(A minor)을 그 키로 — 곡 분석 뒤 믹서가 실제로 연주하는 진행과 같다
-  if (sb.key) return transposeProg(DEFAULT_PROG, 'A minor', sb.key);
-  return null;
-}
 
 const GENRE_DESC = {
   '재즈 발라드': '느린 템포에 피아노·색소폰이 감성적으로 노래하는 재즈입니다.',
@@ -143,6 +107,8 @@ const SB_STEPS = [
         fits: { 팝: ['드림 팝', '신스 팝'], '일렉트로닉·밴드': ['하우스·EDM'], 발라드: ['R&B 발라드'] } },
       { ...o('드럼 필', 'drum fill', '짧은 드럼 연타로 힘 있게 곡을 엽니다.', 'drum fill intro'),
         fits: { '일렉트로닉·밴드': ['록', '펑크'], 팝: ['인디 팝'], 재즈: ['스윙 재즈'] } },
+      { ...o('드럼 필 + 신스 베이스', 'drum fill and synth bass', '드럼 연타로 열고 신스 베이스가 바로 그루브를 받쳐 주며 시작합니다. 곡 분석에서 도입부 드럼·베이스가 함께 두드러지면 자동으로 골라집니다.', 'drum fill and synth bass intro'),
+        fits: { '일렉트로닉·밴드': ['하우스·EDM'], 팝: ['신스 팝'] } },
       { ...o('기타 리프', 'guitar riff', '귀에 남는 짧은 기타 프레이즈로 시작합니다.', 'guitar riff intro'),
         fits: { '일렉트로닉·밴드': ['록', '펑크'], 팝: ['인디 팝', '시티 팝'], 발라드: ['록 발라드'] } },
       { ...o('아카펠라', 'a cappella vocals', '반주 없이 목소리만으로 시작합니다. 10번에서 보컬을 고를 때 어울립니다.', 'a cappella vocals intro'),
@@ -218,7 +184,7 @@ const SB_STEPS = [
   ] },
   { n: 7, title: 'Melody & Harmony', ko: '멜로디·화성', groups: [
     { key: 'key', type: 'select', options: [o('키 지정 안 함', ''), ...MAJOR_KEYS.flatMap((k, i) => [o(`${k} major`, `${k} major`), o(`${MINOR_KEYS[i]} minor`, `${MINOR_KEYS[i]} minor`)])],
-      tip: '곡의 조성(키). major(장조)는 밝고 경쾌하게, minor(단조)는 어둡고 감성적으로 들립니다. 지정하지 않으면 Suno가 알아서 정합니다. 4번에서 세부 장르를 골랐으면 그 장르의 코드 진행도 이 키로 옮겨서 함께 넣습니다.' },
+      tip: '곡의 조성(키). major(장조)는 밝고 경쾌하게, minor(단조)는 어둡고 감성적으로 들립니다. 지정하지 않으면 Suno가 알아서 정합니다.' },
     { key: 'harmony', type: 'multi', max: 2, options: [
       // fits: 3번과 같이 대표 장르부터(일반적인 장르 관행 기준)
       { ...o('중독성 훅', 'catchy hook', '한 번 들으면 귀에 맴도는 짧고 반복되는 멜로디를 강조합니다. K-pop의 핵심 요소이기도 합니다.'),
@@ -314,16 +280,27 @@ const SB_STEPS = [
   ] },
 ];
 
+// 선택지 en → 한글, 항목별(곡 분석 결과 칸에서 씀). 예: OPTION_KO.feel['driving beat'] → '드라이빙'
+const OPTION_KO = Object.fromEntries(SB_STEPS.flatMap((st) => st.groups).filter((g) => g.options)
+  .map((g) => [g.key, Object.fromEntries(g.options.map((x) => [x.en, x.ko]))]));
+
 const SB_KEY = 'music.suno.v1';
+// 11번 제외 항목은 보컬만 빼고 모두 켜 둔다(보컬은 10번에서 연주곡을 고를 때만 자동으로 들어감)
+const EXCL_DEFAULT = () => SB_STEPS.find((st) => st.n === 11).groups[0].options.map((x) => x.en).filter((en) => en !== 'vocals');
 const SB_DEFAULT = () => ({
   intro: '', main: '', bpm: 120, feel: [], genre: '', genreCustom: '', support: [], mood: [], energy: '',
-  key: '', harmony: [], arr: [], mix: [], vocal: '', tone: [], lang: '', excl: [],
+  key: '', harmony: [], arr: [], mix: [], vocal: '', tone: [], lang: '', excl: EXCL_DEFAULT(),
 });
 let sb = SB_DEFAULT();
 try {
   const saved = JSON.parse(localStorage.getItem(SB_KEY) || '{}');
   for (const [k, v] of Object.entries(sb)) {
     if (k in saved && Array.isArray(v) === Array.isArray(saved[k]) && typeof v === typeof saved[k]) sb[k] = saved[k];
+  }
+  // 제외 기본값이 생기기 전에 저장된 선택(제외 없음)에는 한 번만 기본값을 채운다. 이후에 직접 끈 항목은 그대로 둔다
+  if (!localStorage.getItem('music.suno.exclDefault')) {
+    if (!sb.excl.length) sb.excl = EXCL_DEFAULT();
+    localStorage.setItem('music.suno.exclDefault', '1');
   }
 } catch {}
 if (sb.key) {
@@ -338,22 +315,27 @@ const hasVocal = () => sb.vocal && sb.vocal !== 'instrumental';
 
 /* ---------------- 제외 항목 ---------------- */
 // 11번에서 고른 값 + 연주곡이면 vocals. Style of Music 11번 줄에 'no …'로 들어간다
-const excludeWords = () => [...new Set([...sb.excl, ...(sb.vocal === 'instrumental' ? ['vocals'] : [])])];
+const excludeWords = (s = sb) => [...new Set([...s.excl, ...(s.vocal === 'instrumental' ? ['vocals'] : [])])];
 
 const usesTrap = () => sb.main === 'trap' || sb.support.includes('trap');
 // 제외 항목 중 지금 고른 다른 값과 부딪치는 것: [제외 값, 이유]
 const EXCL_CONFLICTS = [
   ['vocals', () => hasVocal(), '10번에서 보컬을 골라서 보컬은 제외할 수 없습니다'],
   ['808 bass', usesTrap, '트랩 드럼(808 포함)을 골라서 808은 제외할 수 없습니다'],
+  ['edm drop', () => sb.arr.includes('build-up-drop'), '8번에서 빌드업 → 드롭을 골라서 EDM 드롭은 제외할 수 없습니다'],
+  ['excessive reverb', () => sb.mix.includes('lush reverb'), '9번에서 리버브 풍부를 골라서 과한 리버브는 제외할 수 없습니다'],
 ];
 const exclConflict = (en) => EXCL_CONFLICTS.find(([v, on]) => v === en && on());
 
 // 나중에 고른 값과 부딪치는 제외 항목은 자동으로 해제하고 알려 준다
-function resolveConflicts() {
+// 해제한 이유 목록을 돌려준다. quiet면 알림 없이 정리만(페이지를 열 때, 다른 알림과 합쳐 보여 줄 때)
+function resolveConflicts(quiet = false) {
   const removed = EXCL_CONFLICTS.filter(([v, on]) => on() && sb.excl.includes(v));
-  if (!removed.length) return;
+  if (!removed.length) return [];
   sb.excl = sb.excl.filter((x) => !removed.some(([v]) => v === x));
-  flash(`제외 항목에서 해제했습니다: ${removed.map(([, , why]) => why).join(' · ')}`, 'warn');
+  const why = removed.map(([, , w]) => w);
+  if (!quiet) flash(`제외 항목에서 해제했습니다: ${why.join(' · ')}`, 'warn');
+  return why;
 }
 
 /* ---------------- 화면 ---------------- */
@@ -414,6 +396,12 @@ function renderGroup(g) {
       sb[g.key] = sb[g.key] === x.en ? '' : x.en;
       commit();
     }, off, withFits(x.tip, x), x.shown ?? x.en)));
+    // 곡 분석에서 가져와 선택지에 없는 값(예: 인트로 'electronic drums')은 따로 보여 주고 누르면 지운다
+    if (sb[g.key] && !g.options.some((x) => x.en === sb[g.key])) {
+      const c = chip(`분석: ${sb[g.key]}`, true, () => { sb[g.key] = ''; commit(); }, off);
+      c.title = '곡 분석에서 가져온 값(누르면 제거)';
+      box.append(c);
+    }
   } else if (g.type === 'multi') {
     g.options.forEach((x) => {
       const conflict = g.key === 'excl' && exclConflict(x.en);
@@ -524,45 +512,101 @@ const ARR_EN = {
 };
 
 // 항목마다 고른 값을 영어로 모은다. 비어 있으면 그 줄은 생략
-function stepValues(n) {
+function stepValues(n, s = sb) {
   switch (n) {
-    case 1: return [sb.intro && `${sb.intro} intro`];
-    case 2: return [sb.main && SUNO_TERM[sb.main]];
-    case 3: return [`${sb.bpm} bpm`, ...sb.feel];
-    case 4: return [sb.genre && genreLine(sb.genre), sb.genreCustom];
-    case 5: return sb.support.map((id) => SUNO_TERM[id]);
-    case 6: return [...sb.mood, sb.energy];
-    case 7: {
-      const prog = progressionFor();
-      return [sb.key && `${sb.key} key`, prog && `chord progression ${prog.join(' - ')}`, ...sb.harmony];
-    }
-    case 8: return sb.arr.map((a) => ARR_EN[a]);
-    case 9: return sb.mix;
-    case 10: return sb.vocal === 'instrumental' ? ['instrumental'] : [[sb.tone.join(', '), sb.vocal].filter(Boolean).join(' '), sb.lang];
+    case 1: return [s.intro && `${s.intro} intro`];
+    case 2: return [s.main && SUNO_TERM[s.main]];
+    case 3: return [`${s.bpm} bpm`, ...s.feel];
+    case 4: return [s.genre && genreLine(s.genre), s.genreCustom];
+    case 5: return s.support.map((id) => SUNO_TERM[id]);
+    case 6: return [...s.mood, s.energy];
+    case 7: return [s.key && `${s.key} key`, ...s.harmony];
+    case 8: return s.arr.map((a) => ARR_EN[a]);
+    case 9: return s.mix;
+    case 10: return s.vocal === 'instrumental' ? ['instrumental'] : [[s.tone.join(', '), s.vocal].filter(Boolean).join(' '), s.lang];
     // 11번: 단어만 쓰면 Suno가 오히려 그 소리를 넣을 수 있어 'no'를 붙인다
-    case 11: return excludeWords().map((x) => `no ${x}`);
+    case 11: return excludeWords(s).map((x) => `no ${x}`);
     default: return [];
   }
 }
 
+// 선택값 → '번호.항목 : 값' 줄 목록(값이 없는 항목은 생략)
+const styleLines = (s, steps = SB_STEPS) => steps
+  .map((st) => [st, stepValues(st.n, s).filter(Boolean)])
+  .filter(([, v]) => v.length)
+  .map(([st, v]) => `${st.n}.${st.title} : ${v.join(', ')}`);
+
+/* ---------------- 문장형 출력 ----------------
+ * 같은 선택값을 Suno가 읽기 좋은 영어 문장으로 쓴다. 앞쪽 단어일수록 영향이 커서 분위기·장르·BPM·리듬을 첫 문장에 모으고,
+ * 항목 이름(1.Intro 등)은 지시가 아니라 단어로 읽히므로 넣지 않는다 */
+const ENERGY_ADJ = { 'low energy': 'low-energy', 'medium energy': 'mid-energy', 'high energy': 'high-energy', 'building energy': 'gradually building' };
+const PUNCHY_INTRO = /drum|riff|bass/; // 바로 몰아치는 인트로는 느린 도입이 붙지 않게 막는다
+const joinAnd = (xs) => (xs.length <= 1 ? xs.join('') : `${xs.slice(0, -1).join(', ')} and ${xs.at(-1)}`);
+const sentence = (t) => `${t[0].toUpperCase()}${t.slice(1)}.`;
+
+function styleProse(s) {
+  const head = [...s.mood, ENERGY_ADJ[s.energy]].filter(Boolean).join(', ');
+  const genre = [s.genre && genreLine(s.genre), s.genreCustom].filter(Boolean).join(', ');
+  const out = [sentence([[head, genre].filter(Boolean).join(' '), `${s.bpm} BPM`, ...s.feel].filter(Boolean).join(', '))];
+  if (s.intro) out.push(sentence(`begin with ${s.intro}${PUNCHY_INTRO.test(s.intro) ? ', no slow or atmospheric intro' : ''}`));
+  const support = s.support.map((id) => SUNO_TERM[id]);
+  if (s.main) out.push(sentence(`${SUNO_TERM[s.main]} drives the song${support.length ? `, supported by ${joinAnd(support)}` : ''}`));
+  else if (support.length) out.push(sentence(`featuring ${joinAnd(support)}`));
+  const harmony = [s.key && `${s.key} key`, ...s.harmony].filter(Boolean);
+  if (harmony.length) out.push(sentence(harmony.join(', ')));
+  if (s.arr.length) out.push(sentence(joinAnd(s.arr.map((a) => ARR_EN[a]))));
+  if (s.mix.length) out.push(sentence(s.mix.join(', ')));
+  const vocal = stepValues(10, s).filter(Boolean);
+  if (vocal.length) out.push(sentence(vocal.join(', ')));
+  // 끝맺음을 정하지 않으면 흐지부지 사라지기 쉬워, 페이드아웃을 고르지 않았으면 깔끔한 엔딩을 붙인다
+  if (!s.arr.includes('fade-out') && out.length > 1) out.push('Clean, decisive ending.');
+  const excl = excludeWords(s);
+  if (excl.length) out.push(sentence(excl.map((x) => `no ${x}`).join(', ')));
+  return out.join(' ');
+}
+
+// 출력 형식(목록형/문장형). Style Builder와 곡 분석 결과 칸이 같은 선택을 쓴다
+const STYLE_FMTS = ['list', 'prose'];
+let styleFmt = 'list';
+try { const f = localStorage.getItem('music.suno.styleFmt'); if (STYLE_FMTS.includes(f)) styleFmt = f; } catch {}
+const fmtTabsHtml = (id) => `<span class="fmt-tabs" role="tablist" aria-label="출력 형식" id="${id}">${
+  [['list', '목록형'], ['prose', '문장형']].map(([f, ko]) => `<button type="button" role="tab" data-fmt="${f}" aria-selected="${f === styleFmt}">${ko}</button>`).join('')}</span>`;
+// 탭 묶음에 클릭을 건다. 어느 쪽에서 바꾸든 모든 탭 묶음과 출력 칸(id별 onPick)이 같은 형식으로 바뀐다
+const fmtViews = {};
+function bindFmtTabs(box, onPick) {
+  fmtViews[box.id] = onPick;
+  box.onclick = (e) => {
+    const b = e.target.closest('[data-fmt]');
+    if (!b) return;
+    styleFmt = b.dataset.fmt;
+    try { localStorage.setItem('music.suno.styleFmt', styleFmt); } catch {}
+    document.querySelectorAll('.fmt-tabs [data-fmt]').forEach((x) => x.setAttribute('aria-selected', String(x.dataset.fmt === styleFmt)));
+    Object.entries(fmtViews).forEach(([id, f]) => document.getElementById(id) && f(styleFmt));
+  };
+}
+
 let styleSnapshot = null; // 마지막 [생성] 때의 선택값. 바뀌면 다시 생성하라고 알려 준다
-function generateStyle() {
-  const lines = SB_STEPS
-    .map((s) => [s, stepValues(s.n).filter(Boolean)])
-    .filter(([, v]) => v.length)
-    .map(([s, v]) => `${s.n}.${s.title} : ${v.join(', ')}`);
-  if (lines.length <= 1 && !sb.feel.length) return flash('항목을 하나 이상 골라 주세요.', 'warn');
-  $('#sb-style').value = lines.join('\n');
-  styleSnapshot = JSON.stringify(sb);
-  try { localStorage.setItem('music.suno.style', $('#sb-style').value); localStorage.setItem('music.suno.styleSnap', styleSnapshot); } catch {}
+let styleOut = { list: '', prose: '' };
+function showStyle() {
+  $('#sb-style').value = styleOut[styleFmt] ?? '';
+  $('#sb-fmt').querySelectorAll('[data-fmt]').forEach((x) => x.setAttribute('aria-selected', String(x.dataset.fmt === styleFmt)));
   renderStyleCount();
 }
 
+function generateStyle() {
+  const lines = styleLines(sb);
+  if (lines.length <= 1 && !sb.feel.length) return flash('항목을 하나 이상 골라 주세요.', 'warn');
+  styleOut = { list: lines.join('\n'), prose: styleProse(sb) };
+  styleSnapshot = JSON.stringify(sb);
+  try { localStorage.setItem('music.suno.styleOut', JSON.stringify(styleOut)); localStorage.setItem('music.suno.styleSnap', styleSnapshot); } catch {}
+  showStyle();
+}
+
 function clearStyle() {
-  $('#sb-style').value = '';
+  styleOut = { list: '', prose: '' };
   styleSnapshot = null;
-  try { localStorage.removeItem('music.suno.style'); localStorage.removeItem('music.suno.styleSnap'); } catch {}
-  renderStyleCount();
+  try { ['music.suno.styleOut', 'music.suno.style', 'music.suno.styleSnap'].forEach((k) => localStorage.removeItem(k)); } catch {}
+  showStyle();
 }
 
 function renderStyleCount() {
@@ -584,18 +628,45 @@ function commit() {
 /* ---------------- 불러오기 ---------------- */
 // 주 악기 고르는 우선순위: 멜로디·화성을 끄는 악기 → 리듬 악기
 const MAIN_PRIORITY = ['keys', 'guitar', 'wind', 'strings', 'synth', 'dj', 'bass', 'perc', 'drums'];
-function setInstrumentsFrom(ids) {
-  const sorted = [...ids].sort((a, b) => MAIN_PRIORITY.indexOf(byId[a].cat) - MAIN_PRIORITY.indexOf(byId[b].cat));
-  sb.main = sorted[0] || '';
+// main을 주지 않으면(믹서처럼 소리 비중을 모를 때) 우선순위 분류로 고른다
+function instrumentsFrom(ids, main) {
+  main ??= [...ids].sort((a, b) => MAIN_PRIORITY.indexOf(byId[a].cat) - MAIN_PRIORITY.indexOf(byId[b].cat))[0] || '';
   // 반주는 리듬(드럼·베이스)부터 채워 곡의 뼈대가 먼저 전달되게
-  const rest = sorted.slice(1).sort((a, b) => MAIN_PRIORITY.indexOf(byId[b].cat) - MAIN_PRIORITY.indexOf(byId[a].cat));
-  sb.support = rest;
+  const rest = ids.filter((id) => id !== main).sort((a, b) => MAIN_PRIORITY.indexOf(byId[b].cat) - MAIN_PRIORITY.indexOf(byId[a].cat));
+  return { main, support: rest };
+}
+
+// 곡 분석 결과 → 선택값(인트로·악기·BPM·리듬·장르·분위기·키·편곡·사운드). 보컬은 분석으로 알 수 없어 비워 둔다
+// 주 악기는 인식 점수가 가장 높은 악기(picks는 점수순), 인트로는 앞부분에서 가장 두드러진 악기
+function songSb({ res, mix, intro, feel = [], hints = {} }) {
+  const ids = mix.picks.map((p) => p.id);
+  // 분석은 #/b 어느 쪽으로든 줄 수 있어 키 목록의 표기로 맞춘다(예: 장조 C# → Db, 단조 Db → C#)
+  const minor = res.scale === 'minor';
+  const pc = pcOf(res.key);
+  return {
+    ...SB_DEFAULT(),
+    excl: [], // 제외는 분석과 무관한 기본값이라 결과 칸에는 넣지 않는다(예: 힙합 곡에 no rap이 붙지 않게)
+    ...instrumentsFrom(ids, ids[0] || ''),
+    // 'drum fill'만 있으면 1번 '드럼 필' 선택지와 같은 값이라 Style Builder에서 그 칩이 켜진다
+    intro: intro?.drumFill ? (intro.bass ? `drum fill and ${SUNO_TERM[intro.bass]}` : 'drum fill') : intro ? SUNO_TERM[intro.id] : '',
+    bpm: res.bpm,
+    feel,
+    mood: hints.mood ?? [], energy: hints.energy ?? '', arr: hints.arr ?? [], mix: hints.mix ?? [],
+    key: pc >= 0 ? `${(minor ? MINOR_KEYS : MAJOR_KEYS)[pc]} ${minor ? 'minor' : 'major'}` : '',
+    genreCustom: res.genres.slice(0, 2).map(([g]) => g.split('---').pop().toLowerCase()).join(', '),
+  };
+}
+
+// '곡으로 조합 만들기' 결과의 Suno Style 칸(목록형은 1~10번)
+function songStyleOut(an) {
+  const s = songSb(an);
+  return { list: styleLines(s, SB_STEPS.filter((st) => st.n <= 10)).join('\n'), prose: styleProse(s) };
 }
 
 function fromMixer() {
   const ids = INSTRUMENTS.filter((d) => state[d.id]?.active).map((d) => d.id);
   if (!ids.length) return flash('믹서에 켜진 악기가 없습니다. 악기나 추천 조합을 먼저 골라 주세요.', 'warn');
-  setInstrumentsFrom(ids);
+  Object.assign(sb, instrumentsFrom(ids));
   sb.bpm = +el.bpm.value; // Transport.bpm은 rampTo 중이면 중간값일 수 있음
   if (currentPreset) { sb.genre = currentPreset; sb.genreCustom = ''; }
   commit();
@@ -605,19 +676,17 @@ function fromMixer() {
 function fromSong() {
   if (!last) return flash('먼저 "곡으로 조합 만들기" 탭에서 곡을 분석해 주세요.', 'warn');
   const { res, mix } = last;
-  setInstrumentsFrom(mix.picks.map((p) => p.id));
-  sb.bpm = res.bpm;
-  // 분석은 #/b 어느 쪽으로든 줄 수 있어 키 목록의 표기로 맞춘다(예: 장조 C# → Db, 단조 Db → C#)
-  const minor = res.scale === 'minor';
-  const list = minor ? MINOR_KEYS : MAJOR_KEYS;
-  const pc = pcOf(res.key);
-  sb.key = pc >= 0 ? `${list[pc]} ${minor ? 'minor' : 'major'}` : '';
-  sb.genre = '';
-  sb.genreCustom = res.genres.slice(0, 2).map(([g]) => g.split('---').pop().toLowerCase()).join(', ');
+  const s = songSb(last);
+  Object.assign(sb, { main: s.main, support: s.support, bpm: s.bpm, key: s.key, genre: '', genreCustom: s.genreCustom });
+  if (s.intro) sb.intro = s.intro; // 도입부를 못 잡았으면 직접 고른 인트로를 그대로 둔다
+  // 리듬·분위기·편곡·사운드는 곡마다 추정하는 값이라 새 곡 기준으로 덮어쓴다(못 찾으면 비움 — 이전 곡 값이 남지 않게)
+  Object.assign(sb, { feel: s.feel, mood: s.mood, energy: s.energy, arr: s.arr, mix: s.mix });
   // 보컬은 있어도 성별까지는 알 수 없어 채우지 않고 안내만 한다
   const voice = mix.detected.some((d) => d.key === 'voice' && d.score > 0.2);
+  // 불러온 값과 부딪치는 제외 항목은 따로 알리지 않고 아래 알림에 합친다(경고가 바로 덮여 사라지지 않게)
+  const freed = resolveConflicts(true);
   commit();
-  flash(`"${res.name}" 분석 결과를 불러왔습니다.${voice && !sb.vocal ? ' 보컬이 감지되었으니 10번에서 보컬 종류를 골라 주세요.' : ''}`, 'ok');
+  flash(`"${res.name}" 분석 결과를 불러왔습니다.${freed.length ? ` 제외 항목에서 해제: ${freed.join(' · ')}.` : ''}${voice && !sb.vocal ? ' 보컬이 감지되었으니 10번에서 보컬 종류를 골라 주세요.' : ''}`, 'ok');
 }
 
 // 고른 주 악기 + 반주 악기를 믹서로 들어보기(장르를 골랐으면 그 장르의 코드 진행으로)
@@ -643,8 +712,16 @@ $('#sb-gen').onclick = generateStyle;
 $('#sb-copy-style').onclick = () => copyOut('sb-style', 'Style of Music');
 $('#sb-clear-style').onclick = clearStyle;
 try {
-  $('#sb-style').value = localStorage.getItem('music.suno.style') || '';
+  // 예전 버전은 목록형 문자열 하나만 저장했다. 모양이 다르면(손상 등) 버리고 예전 값으로
+  const saved = JSON.parse(localStorage.getItem('music.suno.styleOut') || 'null');
+  const ok = saved && typeof saved.list === 'string' && typeof saved.prose === 'string';
+  styleOut = ok ? saved : { list: localStorage.getItem('music.suno.style') || '', prose: '' };
   styleSnapshot = localStorage.getItem('music.suno.styleSnap');
 } catch {}
+$('#sb-fmt').outerHTML = fmtTabsHtml('sb-fmt');
+bindFmtTabs($('#sb-fmt'), showStyle);
+// 저장된 선택에 제외 기본값을 채운 경우 등, 부딪치는 제외 항목을 열 때 조용히 정리한다
+if (resolveConflicts(true).length) saveSb();
 syncGenreTab();
 renderSb();
+showStyle();

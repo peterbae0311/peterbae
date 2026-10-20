@@ -4,7 +4,7 @@ const ANALYSIS_SCRIPTS = [
   'https://cdn.jsdelivr.net/npm/onnxruntime-web@1.19.2/dist/ort.min.js',
   'https://cdn.jsdelivr.net/npm/essentia.js@0.1.3/dist/essentia-wasm.web.js',
   'https://cdn.jsdelivr.net/npm/essentia.js@0.1.3/dist/essentia.js-core.umd.js',
-  'analyzer.js?v=20261018y',
+  'analyzer.js?v=20261020r',
 ];
 
 const up = {
@@ -60,7 +60,7 @@ async function handleFile(file) {
     const res = await Analyzer.analyze(file, showProgress);
     const mix = Analyzer.toMixer(res, MAX_ACTIVE);
     const semis = Analyzer.keyShift(res.key, res.scale);
-    last = { res, mix, semis };
+    last = { res, mix, semis, intro: Analyzer.introPick(res), feel: Analyzer.rhythmFeels(res), hints: Analyzer.styleHints(res, mix) };
     if (lastAudioUrl) URL.revokeObjectURL(lastAudioUrl);
     lastAudioUrl = URL.createObjectURL(file);
     renderResult();
@@ -94,7 +94,10 @@ const genreLabel = (g) => g.replace('---', ' · ');
 const esc = (t) => t.replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' })[c]);
 
 function renderResult() {
-  const { res, mix, semis } = last;
+  const { res, mix, semis, intro, feel, hints } = last;
+  // 추정한 선택값 칩(한글 이름, 말풍선에 출력 영어)
+  const optChips = (key, vals) => vals.map((v) => `<span class="chip" title="추정 · 출력: ${v}">${OPTION_KO[key][v] ?? v}</span>`).join('')
+    || '<span class="muted">추정할 근거가 없습니다</span>';
   const bpmNote = Math.round(res.bpmRaw) !== res.bpm ? `<small>(분석값 ${Math.round(res.bpmRaw)} → 범위에 맞춤)</small>` : '';
   const keyNote = semis === 0 ? '(기본 키 그대로)' : `(기본 키에서 ${semis > 0 ? '+' : ''}${semis}반음)`;
   const genres = res.genres.slice(0, 3).map(([g, v]) => `<span class="chip">${esc(genreLabel(g))} <em>${pct(v)}</em></span>`).join('');
@@ -116,12 +119,39 @@ function renderResult() {
       <div class="r-stats"><b>${res.bpm}</b> BPM ${bpmNote} · <b>${res.key} ${res.scale === 'minor' ? 'minor' : 'major'}</b> <small>${keyNote}</small></div>
       <button class="primary" id="r-apply" title="분석한 악기·BPM·코드 진행으로 되돌려 다시 재생">이 조합 다시 켜기</button>
     </div>
-    <div class="r-right">
+    <div class="r-mid">
       <div class="r-row"><span class="r-label">장르</span><div class="chips">${genres}</div></div>
+      <div class="r-row"><span class="r-label">리듬</span><div class="chips">${optChips('feel', feel)}</div></div>
+      <div class="r-row"><span class="r-label">분위기</span><div class="chips">${optChips('mood', hints.mood)}${optChips('energy', [hints.energy])}</div></div>
+      <div class="r-row"><span class="r-label">편곡</span><div class="chips">${optChips('arr', hints.arr)}</div></div>
+      <div class="r-row"><span class="r-label">사운드</span><div class="chips">${optChips('mix', hints.mix)}</div></div>
       <div class="r-row"><span class="r-label">인식된 악기</span><div class="chips">${detected}</div></div>
       <div class="r-row"><span class="r-label">켜진 악기</span><div class="chips">${picked}</div></div>
+      <div class="r-row"><span class="r-label">도입부 악기</span><div class="chips">${
+        intro?.drumFill ? `<span class="chip on" style="--c:${catById.drums.color}" title="앞 6초의 드럼 점수가 높아 드럼 필로 시작하는 곡으로 봤습니다">드럼 필</span>${
+          intro.bass ? `<span class="chip on" style="--c:${catById[byId[intro.bass].cat].color}" title="앞 6초에 베이스도 두드러집니다">${byId[intro.bass].ko}</span>` : ''}`
+        : intro ? `<span class="chip on" style="--c:${catById[byId[intro.id].cat].color}" title="앞 6초에서 가장 두드러진 악기">${byId[intro.id].ko}</span>`
+        : '<span class="muted">뚜렷한 악기가 없습니다</span>'}</div></div>
       ${unsupported.length ? `<p class="muted r-note">${unsupported.join(', ')}은(는) 믹서에 없는 악기라 제외했습니다.</p>` : ''}
+    </div>
+    <div class="r-style">
+      ${fmtTabsHtml('r-fmt')}
+      <div class="r-style-box">
+        <textarea id="r-style" rows="9" readonly aria-label="곡 분석으로 만든 Suno Style"></textarea>
+        <button type="button" class="sd-copy" id="r-copy-style" aria-label="Suno Style 복사" title="Suno Style 복사"><svg viewBox="0 0 24 24" width="14" height="14" aria-hidden="true"><rect x="9" y="9" width="11" height="11" rx="2" fill="none" stroke="currentColor" stroke-width="2"/><path d="M5 15V5a2 2 0 0 1 2-2h8" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg></button>
+      </div>
+      <small class="muted">분석으로 추정한 값입니다(1~9번). 보컬과 세부 조정은 Suno Style Builder 탭의 [곡 분석 불러오기]로 이어서 고를 수 있습니다.</small>
     </div>`;
+  const outs = songStyleOut(last);
+  $('#r-style').value = outs[styleFmt];
+  bindFmtTabs($('#r-fmt'), (f) => { $('#r-style').value = outs[f]; });
+  $('#r-copy-style').onclick = async (e) => {
+    const btn = e.currentTarget;
+    if (!(await copyText($('#r-style').value))) return;
+    btn.classList.add('done');
+    setTimeout(() => btn.classList.remove('done'), 1200);
+    flash('Suno Style을 복사했습니다.', 'ok');
+  };
   up.result.hidden = false;
   // 결과가 있으면 큰 파일 선택 칸은 숨기고 '다른 곡 선택' 버튼으로 대신한다(세로 공간 확보)
   up.panel.classList.add('has-result');

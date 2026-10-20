@@ -7,6 +7,7 @@ const Analyzer = (() => {
   const HEAD_URL = 'models/mtg_jamendo_instrument-discogs-effnet-1.onnx';
   const META_URLS = ['models/discogs-effnet-bsdynamic-1.json', 'models/mtg_jamendo_instrument-discogs-effnet-1.json'];
   const ANALYZE_SECONDS = 90; // 곡 가운데 구간만 분석 (전체를 돌리면 수 분 걸림)
+  const INTRO_SECONDS = 6; // 도입부 악기는 앞부분만 따로 본다(가운데 구간에는 인트로가 들어가지 않음). 길게 보면 곡 내내 깔리는 악기가 섞인다
 
   let essentiaP, modelsP;
 
@@ -35,7 +36,32 @@ const Analyzer = (() => {
       const d = buf.getChannelData(c);
       for (let i = 0; i < n; i++) out[i] += d[i] / buf.numberOfChannels;
     }
-    return { signal: out, duration: buf.duration };
+    return { signal: out, duration: buf.duration, width: stereoWidth(buf) };
+  }
+
+  // 좌우 차이(side)와 합(mid)의 에너지 비. 모노면 0, 좌우가 많이 다를수록 커진다
+  function stereoWidth(buf) {
+    if (buf.numberOfChannels < 2) return 0;
+    const l = buf.getChannelData(0), r = buf.getChannelData(1);
+    let mid = 0, side = 0;
+    for (let i = 0; i < l.length; i += 4) {
+      const m = l[i] + r[i], s = l[i] - r[i];
+      mid += m * m; side += s * s;
+    }
+    return mid ? Math.sqrt(side / mid) : 0;
+  }
+
+  // 0.5초 단위 음량(dB) — 페이드아웃·브레이크다운·점점 고조를 찾는 데 쓴다
+  const ENV_STEP = 0.5;
+  function loudnessEnvelope(sig, sr) {
+    const w = Math.floor(sr * ENV_STEP);
+    const env = [];
+    for (let i = 0; i + w <= sig.length; i += w) {
+      let e = 0;
+      for (let j = i; j < i + w; j++) e += sig[j] * sig[j];
+      env.push(10 * Math.log10(e / w + 1e-12));
+    }
+    return env;
   }
 
   const middle = (sig, sr, seconds) => {
@@ -129,6 +155,10 @@ const Analyzer = (() => {
     const patches = melPatches(essentia, middle(lo.signal, 16000, ANALYZE_SECONDS));
     const { instruments, genres } = await runModels(models, patches, onProgress);
 
+    onProgress?.(0.96, '도입부 분석 중');
+    await tick();
+    const intro = await runModels(models, melPatches(essentia, lo.signal.subarray(0, INTRO_SECONDS * 16000)));
+
     onProgress?.(1, '완료');
     return {
       name: file.name,
@@ -136,7 +166,8 @@ const Analyzer = (() => {
       bpmRaw: rhythm.bpm,
       bpm: normalizeBpm(rhythm.bpm),
       key: key.key, scale: key.scale, keyStrength: key.strength,
-      instruments, genres,
+      instruments, genres, introInstruments: intro.instruments,
+      envelope: loudnessEnvelope(hi.signal, 44100), width: hi.width,
     };
   }
 
@@ -245,6 +276,145 @@ const Analyzer = (() => {
     return { picks: ids, detected };
   }
 
+  /* ---------------- 장르 → 리듬 느낌(Style Builder 3번) ----------------
+   * 박 단위로 킥·스윙 비율을 재지는 않고, 장르마다 기본이 되는 리듬을 쓴다(toMixer의 드럼 스타일과 같은 방식).
+   * 값은 suno.js 3번 선택지의 en과 같아야 한다. */
+  const FEEL_RULES = [
+    ['four-on-the-floor', /---(.*House|.*Techno|.*Trance|Disco|Euro-Disco|Eurodance|Eurobeat|Italo-Disco|Italodance|Hi NRG|Nu-Disco|Hardstyle)$/],
+    ['half-time', /Trap|Dubstep|Phonk|Cloud Rap/],
+    ['swing feel', /Jazz---(Swing|Big Band|Bop|Hard Bop|Dixieland|Cool Jazz)$|Jump Blues/],
+    // 상위 장르(Rock·Blues·Latin) 전체를 잡으면 메탈·드림팝·R&B·탱고까지 걸려서 대표 하위 장르만 고른다
+    ['shuffle groove', /Blues---(Boogie Woogie|Chicago Blues|Electric Blues|Modern Electric Blues|Texas Blues|Jump Blues)$|Rock & Roll|Rockabilly|Blues Rock/],
+    ['laid-back groove', /Lo-Fi|Jazzy Hip-Hop|Trip Hop|Downtempo|Neo Soul|Boom Bap/],
+    ['syncopated groove', /Funk \/ Soul---(Funk|Boogie|Afrobeat|Contemporary R&B|New Jack Swing)$|Bossa|Samba|Reggae|Latin---(Salsa|Son|Son Montuno|Mambo|Cumbia|Merengue|Afro-Cuban|Batucada|Boogaloo)$|Breakbeat|Drum n Bass|Jungle|UK Garage/],
+    ['straight beat', /Rock---(Pop Rock|Indie Rock|Alternative Rock|Hard Rock|Classic Rock|Arena Rock|Garage Rock|Brit Pop|Power Pop|Pub Rock|Grunge|Pop Punk|Punk|Post-Punk|New Wave)$/],
+  ];
+  const FEEL_MIN = 0.15; // 상위 장르 확률 합이 이 이상인 리듬만
+  const DRIVING_BPM = 118; // 정박으로 꽉 차는 리듬이 이 빠르기 이상이면 '드라이빙'도 붙인다
+
+  function rhythmFeels(result) {
+    const genre = (re) => result.genres.slice(0, 15).reduce((s, [c, v]) => (re.test(c) ? s + v : s), 0);
+    const feels = FEEL_RULES.map(([en, re]) => [en, genre(re)]).filter(([, v]) => v >= FEEL_MIN)
+      .sort((a, b) => b[1] - a[1]).slice(0, 2).map(([en]) => en);
+    if (feels.length < 2 && result.bpm >= DRIVING_BPM && feels.some((f) => f === 'four-on-the-floor' || f === 'straight beat')) feels.push('driving beat');
+    return feels;
+  }
+
+  /* ---------------- 분위기·편곡·사운드(Style Builder 6·8·9번) ----------------
+   * 값은 suno.js 선택지의 en과 같아야 한다. 장르·키·BPM과 음량 흐름으로 추정하고, 기준값은 세 곡
+   * (상상속의 너·Electric Daydream·아틀란티스소녀)으로 맞췄다. 쓰지 않는 신호:
+   * - 절대 음량: 마스터링 시대에 따라 -24~-9dB로 크게 달라 '깔끔한 모던' 판단에 쓸 수 없다
+   * - 모델의 voice 점수: 노래가 있는 세 곡 모두 0.05 이하라 보컬 유무 판단에 쓸 수 없다 */
+  const genreSum = (result, re) => result.genres.slice(0, 15).reduce((s, [c, v]) => (re.test(c) ? s + v : s), 0);
+  const drumScore = (inst) => Math.max(...['drums', 'beat', 'drummachine'].map((k) => inst[k]?.mean ?? 0));
+
+  const MOOD_MIN = 0.15;
+  const MOOD_RULES = [
+    ['uplifting', (r) => genreSum(r, /Euro House|Eurodance|Europop|Trance|Gospel|Happy Hardcore/) + (r.scale === 'major' && r.bpm >= 105 ? 0.2 : 0)],
+    ['playful', (r) => genreSum(r, /J-pop|K-pop|Dance-pop|Bubblegum|Novelty|Ska|Children/)],
+    ['chill', (r) => genreSum(r, /Lo-Fi|Downtempo|Chillwave|Ambient|Bossa|Easy Listening|Lounge|Smooth Jazz/)],
+    ['dreamy', (r) => genreSum(r, /Dream Pop|Shoegaze|Ethereal|Chillwave|Ambient/)],
+    // 'Soul'만 쓰면 상위 장르 'Funk / Soul' 전체(펑크·디스코 포함)에 걸려서 하위 장르로 지정한다
+    ['emotional', (r) => genreSum(r, /---(Ballad|Emo|Soul|Neo Soul|Soul-Jazz|Contemporary R&B)$/)],
+    ['romantic', (r) => genreSum(r, /Bossa|Lovers Rock|Smooth Jazz|Rhythm & Blues/)],
+    ['melancholic', (r) => genreSum(r, /Slowcore|Sadcore|Darkwave/) + (r.scale === 'minor' && r.bpm < 100 ? 0.2 : 0)],
+    ['dark', (r) => genreSum(r, /Trap|Darkwave|Industrial|Dark Ambient|Doom|Horrorcore|Phonk|Goth/)],
+    ['epic', (r) => genreSum(r, /Soundtrack|Score|Symphonic|Epic|Neo-Classical|Post Rock|Power Metal/)],
+    ['retro', (r) => genreSum(r, /Synthwave|Vaporwave|Italo-Disco|Hi NRG|Euro-Disco/)],
+    ['nostalgic', (r) => genreSum(r, /City Pop|Vaporwave/)],
+  ];
+
+  // 음량 흐름: 앞뒤 무음을 잘라 낸 0.5초 단위 dB와 몸통 음량(10~90% 구간 중앙값)
+  function levels(env) {
+    let a = 0, b = env.length;
+    while (a < b && env[a] < -50) a++;
+    while (b > a && env[b - 1] < -50) b--;
+    const v = env.slice(a, b);
+    const body = v.slice(Math.floor(v.length * 0.1), Math.ceil(v.length * 0.9)).sort((x, y) => x - y);
+    return { v, body: body[Math.floor(body.length / 2)] ?? -60 };
+  }
+  const avg = (arr) => arr.reduce((s, x) => s + x, 0) / (arr.length || 1);
+  const per = (sec) => Math.round(sec / ENV_STEP);
+
+  // 페이드아웃: 끝 12초를 3초씩 나눠 매번 2dB 이상 작아지고 합쳐서 12dB 이상 줄어든다.
+  // 끝에서 갑자기 끊기거나 마지막 음이 울리다 사라지는 곡(세 곡 모두)은 앞쪽 구간이 줄지 않아 걸리지 않는다
+  function fadesOut({ v }) {
+    if (v.length < per(30)) return false;
+    const seg = [12, 9, 6, 3].map((t) => avg(v.slice(v.length - per(t), v.length - per(t - 3))));
+    return seg.every((x, i) => i === 0 || seg[i - 1] - x >= 2) && seg[0] - seg[3] >= 12;
+  }
+
+  // 브레이크다운: 곡의 45~92% 지점에서 6초 평균 음량이 몸통보다 2.5dB 이상 낮은 구간이 6초 넘게 이어진 뒤 다시 커진다
+  function hasBreakdown({ v, body }) {
+    const w = per(6);
+    const smooth = v.map((_, i) => avg(v.slice(Math.max(0, i - w / 2), i + w / 2)));
+    let run = 0;
+    for (let i = Math.floor(v.length * 0.45); i < Math.floor(v.length * 0.92); i++) {
+      if (smooth[i] <= body - 2.5) run++;
+      else if (smooth[i] >= body - 1) {
+        if (run >= w) return true;
+        run = 0;
+      }
+      // body-2.5 ~ body-1 사이는 음량이 서서히 돌아오는 경사라 세던 길이를 그대로 둔다(여기서 지우면 복귀를 확인하기 전에 사라짐)
+    }
+    return false;
+  }
+
+  function styleHints(result, mixer) {
+    const r = result;
+    const lv = levels(r.envelope);
+    const drums = drumScore(r.instruments);
+
+    const mood = MOOD_RULES.map(([en, f]) => [en, f(r)]).filter(([, v]) => v >= MOOD_MIN)
+      .sort((a, b) => b[1] - a[1]).slice(0, 2).map(([en]) => en);
+
+    // 에너지: 앞 1/3이 나머지보다 6dB 이상 작으면 점점 고조, 아니면 빠르기와 드럼으로
+    const third = Math.floor(lv.v.length / 3);
+    const energy = avg(lv.v.slice(0, third)) <= avg(lv.v.slice(third)) - 6 ? 'building energy'
+      : r.bpm >= 115 && drums >= 0.2 ? 'high energy'
+      : r.bpm < 90 || drums < 0.12 ? 'low energy' : 'medium energy';
+
+    const arr = [];
+    if (fadesOut(lv)) arr.push('fade-out');
+    if (hasBreakdown(lv)) arr.push(genreSum(r, /Dubstep|Trance|Big Room|Electro House|Future Bass|Drum n Bass|Hardstyle|Bass Music/) >= 0.2 ? 'build-up-drop' : 'breakdown');
+    if (genreSum(r, /^Pop---|K-pop|J-pop|Dance-pop|Contemporary R&B|Pop Rock|Soft Rock|Synth-pop|Eurodance|Hip-House/) >= 0.2) arr.push('verse-chorus');
+    const n = mixer.picks.length;
+    if (n >= 5) arr.push('layered');
+    else if (n && n <= 2) arr.push('minimal');
+
+    const mix = [];
+    if (genreSum(r, /Lo-Fi|Jazzy Hip-Hop|Chillwave|Vaporwave/) >= 0.15) mix.push('warm lo-fi mix');
+    if (genreSum(r, /Funk \/ Soul---|Boogie|Classic Rock|Psychedelic/) >= 0.2) mix.push('vintage analog warmth');
+    else if (genreSum(r, /^Electronic---|K-pop|J-pop|Dance-pop|Contemporary R&B|Trap|^Pop---/) >= 0.3) mix.push('polished modern production');
+    if (drums >= 0.2 && genreSum(r, /^Electronic---|^Hip Hop---|^Rock---|K-pop|Dance-pop/) >= 0.3) mix.push('punchy drums');
+    if (r.width >= 0.45) mix.push('wide stereo');
+    if (genreSum(r, /Ambient|Dream Pop|Shoegaze|Post Rock/) >= 0.2) mix.push('lush reverb');
+    if (genreSum(r, /Boom Bap|Lo-Fi|Garage Rock/) >= 0.2) mix.push('tape saturation');
+
+    return { mood, energy, arr: arr.slice(0, 3), mix: mix.slice(0, 3) };
+  }
+
+  // 앞부분 드럼 점수가 이 이상이면 드럼 필로 시작하는 곡으로 본다. 모델은 전자 드럼 위에 신스가 조금만 있어도
+  // 신시사이저를 더 높게 잡아서 점수 1위만으로는 드럼 인트로를 놓친다(상상속의 너: 드럼만 나오는 도입부)
+  const DRUM_FILL = 0.25;
+  // 드럼 필과 함께 베이스가 이 이상이면 베이스도 인트로에 넣는다(상상속의 너 0.29 / Electric Daydream 0.17)
+  const INTRO_BASS = 0.25;
+  const BASS_IDS = ['bass', 'synth-bass', 'upright-bass'];
+
+  // 도입부: { drumFill: true, bass?: 믹서 베이스 id } 또는 가장 두드러진 믹서 악기 { id }, 없으면 null.
+  // 드럼 스타일·베이스 종류는 곡 전체 장르로 정한다
+  function introPick(result) {
+    const inst = result.introInstruments;
+    if (!inst) return null;
+    const score = (keys) => Math.max(...keys.map((k) => inst[k]?.mean ?? 0));
+    const picks = toMixer({ instruments: inst, genres: result.genres }, Infinity).picks;
+    if (score(['drums', 'beat', 'drummachine']) >= DRUM_FILL) {
+      const bass = score(['bass', 'acousticbassguitar', 'doublebass']) >= INTRO_BASS && picks.find((p) => BASS_IDS.includes(p.id))?.id;
+      return bass ? { drumFill: true, bass } : { drumFill: true };
+    }
+    return picks[0] ? { id: picks[0].id } : null;
+  }
+
   // 분석된 키를 기본 키(A minor / C major)에서 몇 반음 옮길지
   const PC = { C: 0, 'C#': 1, Db: 1, D: 2, 'D#': 3, Eb: 3, E: 4, F: 5, 'F#': 6, Gb: 6, G: 7, 'G#': 8, Ab: 8, A: 9, 'A#': 10, Bb: 10, B: 11 };
   function keyShift(key, scale) {
@@ -255,5 +425,5 @@ const Analyzer = (() => {
     return s;
   }
 
-  return { analyze, toMixer, keyShift, warmup: () => Promise.all([loadEssentia(), loadModels()]) };
+  return { analyze, toMixer, introPick, rhythmFeels, styleHints, keyShift, warmup: () => Promise.all([loadEssentia(), loadModels()]) };
 })();

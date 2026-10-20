@@ -24,7 +24,7 @@
   <link rel="stylesheet" crossorigin
         href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/static/pretendard.css">
   <!-- 파일을 고치면 ?v= 값을 올려 브라우저 캐시에 남은 예전 파일을 쓰지 않게 한다 -->
-  <link rel="stylesheet" href="style.css?v=20261018y">
+  <link rel="stylesheet" href="style.css?v=20261020p">
 </head>
 <body>
   <header class="hero">
@@ -100,15 +100,15 @@
             <button class="ghost" id="sb-from-mixer">현재 믹서 불러오기</button>
             <button class="ghost" id="sb-from-song">곡 분석 불러오기</button>
             <button class="ghost" id="sb-preview">고른 악기 믹서로 듣기</button>
-            <button class="ghost danger" id="sb-reset">선택 모두 지우기</button>
+            <button class="ghost danger" id="sb-reset" title="모든 선택을 지우고 11번 제외 항목만 기본값(보컬 외 전체)으로 되돌립니다">선택 초기화</button>
           </div>
           <div class="sb">
             <div class="sb-form" id="sb-form"></div>
             <div class="sb-out">
               <div class="sb-field">
-                <div class="sb-field-head"><b>Style of Music</b><small id="sb-style-count"></small>
+                <div class="sb-field-head"><b>Style of Music</b><span id="sb-fmt"></span><small id="sb-style-count"></small>
                   <span class="sb-btns">
-                    <button class="primary" id="sb-gen" title="고른 항목을 '번호.항목 : 선택값' 형식으로 정리">생성</button>
+                    <button class="primary" id="sb-gen" title="고른 항목을 목록형('번호.항목 : 선택값')과 문장형으로 정리">생성</button>
                     <button class="ghost" id="sb-copy-style">복사</button>
                     <button class="ghost" id="sb-clear-style" title="이 칸의 내용만 지웁니다(선택값은 그대로)">출력 지우기</button>
                   </span>
@@ -190,8 +190,8 @@
   <script src="https://cdnjs.cloudflare.com/ajax/libs/tone/14.8.49/Tone.js"></script>
   <script src="instruments.js?v=20261018y"></script>
   <script src="app.js?v=20261018y"></script>
-  <script src="upload.js?v=20261018y"></script>
-  <script src="suno.js?v=20261018y"></script>
+  <script src="upload.js?v=20261020r"></script>
+  <script src="suno.js?v=20261020r"></script>
   <script src="songs.js?v=20261018y"></script>
 </body>
 </html>
