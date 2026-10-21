@@ -4,7 +4,7 @@ const ANALYSIS_SCRIPTS = [
   'https://cdn.jsdelivr.net/npm/onnxruntime-web@1.19.2/dist/ort.min.js',
   'https://cdn.jsdelivr.net/npm/essentia.js@0.1.3/dist/essentia-wasm.web.js',
   'https://cdn.jsdelivr.net/npm/essentia.js@0.1.3/dist/essentia.js-core.umd.js',
-  'analyzer.js?v=20261020r',
+  'analyzer.js?v=20261021a',
 ];
 
 const up = {
@@ -32,7 +32,8 @@ function showProgress(ratio, label) {
   $('span', up.progress).textContent = `${label}… ${Math.round(ratio * 100)}%`;
 }
 
-async function handleFile(file) {
+// partial: 곡 일부(90초 녹음)라 곡 전체 흐름을 보는 항목은 판단하지 않는다. source: 결과 칸에 보여 줄 출처(링크·녹음)
+async function handleFile(file, { partial = false, source = '' } = {}) {
   if (!file) return;
   if (busy) return flash('지금 곡을 분석하고 있습니다. 끝난 뒤에 다시 올려 주세요.', 'warn');
   if (!/^audio\//.test(file.type) && !/\.(mp3|wav|m4a|flac|ogg|aac)$/i.test(file.name)) {
@@ -58,6 +59,7 @@ async function handleFile(file) {
     showProgress(0.01, '분석 도구 불러오는 중');
     await loadLibs();
     const res = await Analyzer.analyze(file, showProgress);
+    Object.assign(res, { partial, source });
     const mix = Analyzer.toMixer(res, MAX_ACTIVE);
     const semis = Analyzer.keyShift(res.key, res.scale);
     last = { res, mix, semis, intro: Analyzer.introPick(res), feel: Analyzer.rhythmFeels(res), hints: Analyzer.styleHints(res, mix) };
@@ -112,7 +114,7 @@ function renderResult() {
   up.result.innerHTML = `
     <div class="r-left">
       <div class="r-name">
-        <div><b>${esc(res.name)}</b><small>${fmtTime(res.duration)} · 가운데 구간 분석</small></div>
+        <div><b>${esc(res.name)}</b><small>${fmtTime(res.duration)} · ${res.source ? `${esc(res.source)} · ` : ''}${res.partial ? '녹음한 부분 분석' : '가운데 구간 분석'}</small></div>
         <button class="ghost" id="r-pick">다른 곡 선택</button>
       </div>
       <audio controls src="${lastAudioUrl}" title="원곡을 재생하면 믹서는 멈춥니다"></audio>
@@ -140,7 +142,7 @@ function renderResult() {
         <textarea id="r-style" rows="9" readonly aria-label="곡 분석으로 만든 Suno Style"></textarea>
         <button type="button" class="sd-copy" id="r-copy-style" aria-label="Suno Style 복사" title="Suno Style 복사"><svg viewBox="0 0 24 24" width="14" height="14" aria-hidden="true"><rect x="9" y="9" width="11" height="11" rx="2" fill="none" stroke="currentColor" stroke-width="2"/><path d="M5 15V5a2 2 0 0 1 2-2h8" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg></button>
       </div>
-      <small class="muted">분석으로 추정한 값입니다(1~9번). 보컬과 세부 조정은 Suno Style Builder 탭의 [곡 분석 불러오기]로 이어서 고를 수 있습니다.</small>
+      <small class="muted">분석으로 추정한 값입니다(1~9번).${res.partial ? ' 곡 일부를 녹음해서 페이드아웃·브레이크다운·점점 고조는 판단하지 않았습니다.' : ''} 보컬과 세부 조정은 Suno Style Builder 탭의 [곡 분석 불러오기]로 이어서 고를 수 있습니다.</small>
     </div>`;
   const outs = songStyleOut(last);
   $('#r-style').value = outs[styleFmt];
@@ -173,3 +175,122 @@ $('#panel-upload').addEventListener('dragenter', () => {
   if (t === 'drop' || !up.panel.contains(e.relatedTarget)) up.panel.classList.remove('over');
 }));
 up.panel.addEventListener('drop', (e) => handleFile(e.dataTransfer.files[0]));
+
+/* ---------------- 링크로 분석 ----------------
+ * 음원 파일 주소는 받아서 파일과 똑같이 분석한다. 유튜브·스트리밍은 브라우저가 음원을 받을 수 없고
+ * 내려받기는 각 서비스 약관이 금지하므로, 재생 중인 소리 녹음으로 안내한다. */
+const STREAM_SITE = /(^|\.)(youtube\.com|youtu\.be|spotify\.com|soundcloud\.com|music\.apple\.com|melon\.com|genie\.co\.kr|vibe\.naver\.com)$/i;
+
+async function analyzeUrl(raw) {
+  let url;
+  try { url = new URL(raw.trim()); } catch { return flash('링크 형식이 올바르지 않습니다. https://로 시작하는 주소를 넣어 주세요.', 'warn'); }
+  if (STREAM_SITE.test(url.hostname)) {
+    flash('유튜브·스트리밍 링크는 음원을 직접 받을 수 없습니다. 그 곡을 다른 탭에서 처음부터 재생하면서 [90초 녹음]이나 [곡 끝까지 녹음]을 눌러 주세요.', 'warn');
+    return $('#rec-90').focus();
+  }
+  if (busy || rec) return flash('지금 다른 곡을 분석하거나 녹음하고 있습니다. 끝난 뒤에 다시 시도해 주세요.', 'warn');
+  initAudio().catch(() => {}); // 받는 동안 클릭(사용자 동작)이 만료되기 전에 오디오를 깨워 둔다
+  showProgress(0.01, '링크에서 받는 중');
+  let blob;
+  try {
+    const r = await fetch(url);
+    if (!r.ok) throw new Error(`HTTP ${r.status}`);
+    blob = await r.blob();
+  } catch (err) {
+    console.error(err);
+    up.progress.hidden = true;
+    return flash('이 링크에서 음원을 받지 못했습니다. 주소가 맞는지 확인하고, 사이트가 막아 둔 경우에는 파일로 내려받아 올리거나 재생하면서 녹음해 주세요.', 'error');
+  }
+  up.progress.hidden = true;
+  if (/^text\//.test(blob.type)) return flash('음원 파일이 아니라 웹페이지 링크입니다. mp3·wav 같은 음원 파일 주소를 넣어 주세요.', 'warn');
+  const name = decodeURIComponent(url.pathname.split('/').pop() || '') || url.hostname;
+  // 서버가 형식을 알려 주지 않으면(octet-stream 등) 디코딩 단계에서 실제 형식을 판단한다
+  await handleFile(new File([blob], name, { type: /^audio\//.test(blob.type) ? blob.type : 'audio/mpeg' }), { source: '링크' });
+}
+
+$('#url-form').onsubmit = (e) => { e.preventDefault(); analyzeUrl($('#url-input').value); };
+
+/* ---------------- 재생 중인 소리 녹음 ----------------
+ * 다른 탭에서 재생하는 곡의 소리를 녹음해서 분석한다(화면 공유의 '탭 오디오 공유'). 녹음은 분석에만 쓰고 저장·전송하지 않는다.
+ * 90초 녹음은 곡 일부라 곡 전체 흐름(페이드아웃·브레이크다운·점점 고조)은 판단하지 않는다. */
+const REC_SECONDS = 90;
+const REC_MAX = 360;      // '곡 끝까지'도 6분이면 멈춘다
+const REC_QUIET_DB = -50; // 이보다 작으면 소리가 없는 것으로 본다
+let rec = null;
+
+async function startRecording(full) {
+  if (busy || rec) return flash('지금 다른 곡을 분석하거나 녹음하고 있습니다. 끝난 뒤에 다시 시도해 주세요.', 'warn');
+  if (!navigator.mediaDevices?.getDisplayMedia || !window.MediaRecorder) {
+    return flash('이 브라우저는 소리 녹음을 지원하지 않습니다. 데스크톱 Chrome이나 Edge에서 이용해 주세요.', 'warn');
+  }
+  initAudio().catch(() => {});
+  let stream;
+  try {
+    // 크롬은 소리만 공유할 수 없어 화면도 함께 받지만, 녹음에는 소리만 쓴다
+    stream = await navigator.mediaDevices.getDisplayMedia({ video: true, audio: true, selfBrowserSurface: 'exclude', systemAudio: 'include' });
+  } catch {
+    return; // 공유 창에서 취소
+  }
+  const tracks = stream.getAudioTracks();
+  if (!tracks.length) {
+    stream.getTracks().forEach((t) => t.stop());
+    return flash('소리가 공유되지 않았습니다. 공유 창에서 곡이 재생되는 탭을 고르고 "탭 오디오도 공유"를 켜 주세요.', 'warn');
+  }
+  const audio = new MediaStream(tracks);
+  const ctx = new AudioContext();
+  const meter = ctx.createAnalyser();
+  meter.fftSize = 2048;
+  ctx.createMediaStreamSource(audio).connect(meter);
+  const recorder = new MediaRecorder(audio);
+  rec = { stream, recorder, ctx, meter, full, chunks: [], t0: performance.now(), heard: 0, quietSince: 0, cancel: false };
+  recorder.ondataavailable = (e) => { if (e.data.size) rec?.chunks.push(e.data); };
+  recorder.onstop = finishRecording;
+  tracks[0].onended = () => stopRecording(); // 브라우저의 [공유 중지]
+  recorder.start(1000);
+  rec.timer = setInterval(tickRecording, 250);
+  tickRecording();
+}
+
+function tickRecording() {
+  const sec = (performance.now() - rec.t0) / 1000;
+  const buf = new Float32Array(rec.meter.fftSize);
+  rec.meter.getFloatTimeDomainData(buf);
+  const db = 10 * Math.log10(buf.reduce((s, v) => s + v * v, 0) / buf.length + 1e-12);
+  if (db > REC_QUIET_DB) { rec.heard += 0.25; rec.quietSince = 0; } else if (!rec.quietSince) rec.quietSince = sec;
+  const limit = rec.full ? REC_MAX : REC_SECONDS;
+  // 끝까지 녹음: 소리가 30초 넘게 난 뒤 4초 동안 조용하면 곡이 끝난 것으로 본다
+  const ended = rec.full && rec.heard >= 30 && rec.quietSince && sec - rec.quietSince >= 4;
+  if (sec >= limit || ended) return stopRecording();
+  const box = $('#rec-status');
+  box.hidden = false;
+  $('.bar i', box).style.transform = `scaleX(${rec.full ? 0 : sec / limit})`;
+  $('.bar', box).hidden = rec.full; // 곡 길이를 모르면 진행 바 대신 경과 시간만
+  $('span', box).textContent = sec >= 5 && rec.heard < 1 ? `녹음 중 ${fmtTime(sec)} · 소리가 들리지 않습니다. 다른 탭에서 곡을 재생해 주세요`
+    : rec.full ? `녹음 중 ${fmtTime(sec)} · 곡이 끝나면 자동으로 멈춥니다` : `녹음 중 ${fmtTime(sec)} / ${fmtTime(limit)}`;
+}
+
+function stopRecording(cancel = false) {
+  if (!rec || rec.recorder.state === 'inactive') return;
+  rec.cancel = cancel;
+  clearInterval(rec.timer);
+  rec.recorder.stop(); // 마지막 조각을 넘긴 뒤 onstop → finishRecording
+  rec.stream.getTracks().forEach((t) => t.stop());
+  rec.ctx.close();
+}
+
+function finishRecording() {
+  const { chunks, recorder, full, cancel, heard } = rec;
+  rec = null;
+  $('#rec-status').hidden = true;
+  if (cancel) return;
+  if (heard < 10) return flash('녹음된 소리가 10초도 되지 않아 분석하지 않았습니다. 곡을 재생하면서 다시 녹음해 주세요.', 'warn');
+  const type = recorder.mimeType || 'audio/webm';
+  const now = new Date();
+  const name = `녹음 ${now.getHours()}:${String(now.getMinutes()).padStart(2, '0')}.webm`;
+  handleFile(new File(chunks, name, { type }), { partial: !full, source: full ? '녹음(곡 전체)' : '녹음(앞부분)' });
+}
+
+$('#rec-90').onclick = () => startRecording(false);
+$('#rec-full').onclick = () => startRecording(true);
+$('#rec-stop').onclick = () => stopRecording();
+$('#rec-cancel').onclick = () => stopRecording(true);

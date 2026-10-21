@@ -316,6 +316,26 @@ body.has-solo .card.active:not(.soloed) .solo { color: var(--text); }
 .has-result .drop { display: none; }
 #panel-upload.over { box-shadow: inset 0 0 0 2px var(--accent); border-radius: 0 0 var(--radius) var(--radius); }
 .drop.busy { opacity: 0.5; pointer-events: none; }
+/* 파일 대신: 링크로 분석 · 재생 중인 소리 녹음. 결과가 있을 때도 보여 다른 곡을 바로 고를 수 있게 */
+.src-alt { display: flex; flex-direction: column; gap: 8px; margin-top: 12px; }
+.has-result .src-alt { margin: 0 0 16px; }
+.url-row { display: flex; gap: 8px; }
+.url-row input {
+  flex: 1; min-width: 0; padding: 7px 10px; font-size: 13px; color: var(--text);
+  background: var(--field-bg); border: 1px solid var(--line); border-radius: 8px;
+}
+.url-row input:focus { outline: 2px solid var(--focus); outline-offset: 0; border-color: transparent; }
+.url-row .ghost, .rec-row .ghost { padding: 6px 12px; font-size: 12.5px; white-space: nowrap; }
+.rec-row { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
+.rec-label { font-size: 12.5px; color: var(--muted); }
+.rec-row small { flex-basis: 100%; font-size: 11.5px; color: var(--subtle); }
+.rec-status { display: flex; align-items: center; gap: 10px; font-size: 13px; color: var(--muted); }
+.rec-status[hidden] { display: none; }
+.rec-status .bar { flex: 1; height: 6px; background: var(--line); border-radius: 3px; overflow: hidden; }
+.rec-status .bar[hidden] { display: none; }
+.rec-status .bar i { display: block; height: 100%; background: var(--error-text, #ef4444); transform-origin: left; transform: scaleX(0); transition: transform 0.25s linear; }
+.rec-status > span { flex: 1; }
+.rec-status button { padding: 6px 12px; font-size: 12.5px; white-space: nowrap; }
 
 .progress { display: flex; align-items: center; gap: 12px; margin-top: 14px; font-size: 13px; color: var(--muted); }
 .progress .bar { flex: 1; height: 6px; background: var(--line); border-radius: 3px; overflow: hidden; }

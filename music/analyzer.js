@@ -364,19 +364,22 @@ const Analyzer = (() => {
     const r = result;
     const lv = levels(r.envelope);
     const drums = drumScore(r.instruments);
+    // 곡 일부(90초 녹음)면 곡 전체 흐름을 보는 항목(점점 고조·페이드아웃·브레이크다운)은 판단하지 않는다.
+    // 브레이크다운은 '곡의 45~92% 지점'을 보는데, 일부만 있으면 앞쪽 조용한 구간을 후반으로 착각한다
+    const whole = !r.partial;
 
     const mood = MOOD_RULES.map(([en, f]) => [en, f(r)]).filter(([, v]) => v >= MOOD_MIN)
       .sort((a, b) => b[1] - a[1]).slice(0, 2).map(([en]) => en);
 
     // 에너지: 앞 1/3이 나머지보다 6dB 이상 작으면 점점 고조, 아니면 빠르기와 드럼으로
     const third = Math.floor(lv.v.length / 3);
-    const energy = avg(lv.v.slice(0, third)) <= avg(lv.v.slice(third)) - 6 ? 'building energy'
+    const energy = whole && avg(lv.v.slice(0, third)) <= avg(lv.v.slice(third)) - 6 ? 'building energy'
       : r.bpm >= 115 && drums >= 0.2 ? 'high energy'
       : r.bpm < 90 || drums < 0.12 ? 'low energy' : 'medium energy';
 
     const arr = [];
-    if (fadesOut(lv)) arr.push('fade-out');
-    if (hasBreakdown(lv)) arr.push(genreSum(r, /Dubstep|Trance|Big Room|Electro House|Future Bass|Drum n Bass|Hardstyle|Bass Music/) >= 0.2 ? 'build-up-drop' : 'breakdown');
+    if (whole && fadesOut(lv)) arr.push('fade-out');
+    if (whole && hasBreakdown(lv)) arr.push(genreSum(r, /Dubstep|Trance|Big Room|Electro House|Future Bass|Drum n Bass|Hardstyle|Bass Music/) >= 0.2 ? 'build-up-drop' : 'breakdown');
     if (genreSum(r, /^Pop---|K-pop|J-pop|Dance-pop|Contemporary R&B|Pop Rock|Soft Rock|Synth-pop|Eurodance|Hip-House/) >= 0.2) arr.push('verse-chorus');
     const n = mixer.picks.length;
     if (n >= 5) arr.push('layered');
