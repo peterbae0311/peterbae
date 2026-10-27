@@ -375,6 +375,10 @@ body.has-solo .card.active:not(.soloed) .solo { color: var(--text); }
 .r-left audio { height: 34px; width: 100%; }
 .r-stats { font-size: 13px; color: var(--muted); }
 .r-stats b { font-size: 17px; color: var(--text); font-variant-numeric: tabular-nums; }
+/* BPM [½][×2]: 두 배·절반으로 잡힌 템포 고치기 */
+.bpm-fix { display: inline-flex; gap: 3px; margin: 0 2px; vertical-align: 2px; }
+.bpm-fix .ghost { padding: 1px 7px; font-size: 11.5px; line-height: 1.5; border-radius: 6px; }
+.bpm-fix .ghost:disabled { opacity: 0.35; cursor: default; }
 .r-left .primary { align-self: flex-start; }
 .r-row { display: flex; gap: 12px; align-items: flex-start; }
 .r-label { flex: none; width: 80px; font-size: 12px; color: var(--muted); padding-top: 5px; }
@@ -393,6 +397,15 @@ body.has-solo .card.active:not(.soloed) .solo { color: var(--text); }
 .sb-form { display: flex; flex-direction: column; }
 .sb-row { display: grid; grid-template-columns: 170px minmax(0, 1fr); gap: 12px; padding: 9px 0; border-top: 1px solid var(--line); }
 .sb-row:first-child { border-top: 0; padding-top: 0; }
+/* Concept: 자유 입력 칸(1번 위) */
+.sb-concept textarea {
+  width: 100%; resize: vertical; background: var(--field-bg); color: var(--text); border: 1px solid var(--line); border-radius: 8px;
+  padding: 9px 10px; font: 12.5px/1.55 ui-monospace, 'Cascadia Mono', Consolas, monospace;
+}
+.sb-concept textarea:focus { outline: 2px solid var(--focus); outline-offset: 0; border-color: transparent; }
+.sb-concept-foot { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+.sb-concept-foot small { font-size: 11.5px; color: var(--subtle); }
+.sb-concept-foot .ghost { padding: 4px 10px; font-size: 12px; white-space: nowrap; }
 .sb-label { display: flex; flex-direction: column; gap: 1px; padding-top: 4px; }
 .sb-label b { font-size: 13px; }
 .sb-label small { font-size: 11.5px; color: var(--muted); }

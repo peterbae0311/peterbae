@@ -4,7 +4,7 @@ const ANALYSIS_SCRIPTS = [
   'https://cdn.jsdelivr.net/npm/onnxruntime-web@1.19.2/dist/ort.min.js',
   'https://cdn.jsdelivr.net/npm/essentia.js@0.1.3/dist/essentia-wasm.web.js',
   'https://cdn.jsdelivr.net/npm/essentia.js@0.1.3/dist/essentia.js-core.umd.js',
-  'analyzer.js?v=20261021a',
+  'analyzer.js?v=20261027e',
 ];
 
 const up = {
@@ -59,10 +59,13 @@ async function handleFile(file, { partial = false, source = '' } = {}) {
     showProgress(0.01, '분석 도구 불러오는 중');
     await loadLibs();
     const res = await Analyzer.analyze(file, showProgress);
-    Object.assign(res, { partial, source });
+    Object.assign(res, { partial, source, bpmBase: res.bpm, bpmFix: '' });
+    // 느린 곡을 두 배 템포로 잡은 것 같으면 절반으로(결과 화면의 [½]·[×2]로 되돌릴 수 있음)
+    if (Analyzer.slowTempoFix(res)) Object.assign(res, { bpm: Math.round(res.bpm / 2), bpmFix: 'auto' });
     const mix = Analyzer.toMixer(res, MAX_ACTIVE);
     const semis = Analyzer.keyShift(res.key, res.scale);
-    last = { res, mix, semis, intro: Analyzer.introPick(res), feel: Analyzer.rhythmFeels(res), hints: Analyzer.styleHints(res, mix) };
+    last = { res, mix, semis, intro: Analyzer.introPick(res) };
+    deriveFromBpm();
     if (lastAudioUrl) URL.revokeObjectURL(lastAudioUrl);
     lastAudioUrl = URL.createObjectURL(file);
     renderResult();
@@ -100,7 +103,10 @@ function renderResult() {
   // 추정한 선택값 칩(한글 이름, 말풍선에 출력 영어)
   const optChips = (key, vals) => vals.map((v) => `<span class="chip" title="추정 · 출력: ${v}">${OPTION_KO[key][v] ?? v}</span>`).join('')
     || '<span class="muted">추정할 근거가 없습니다</span>';
-  const bpmNote = Math.round(res.bpmRaw) !== res.bpm ? `<small>(분석값 ${Math.round(res.bpmRaw)} → 범위에 맞춤)</small>` : '';
+  const bpmNote = res.bpmFix ? `<small>(분석값 ${res.bpmBase} → ${res.bpmFix === 'auto' ? '느린 곡으로 보고 ½ 자동 보정' : '직접 보정'})</small>`
+    : Math.round(res.bpmRaw) !== res.bpm ? `<small>(분석값 ${Math.round(res.bpmRaw)} → 범위에 맞춤)</small>` : '';
+  const canScale = (f) => res.bpm * f >= 60 && res.bpm * f <= 180; // 믹서 BPM 범위
+  const bpmBtns = `<span class="bpm-fix"><button class="ghost" id="r-half" title="두 배로 잡혔을 때(느린 곡): 절반으로" ${canScale(0.5) ? '' : 'disabled'}>½</button><button class="ghost" id="r-double" title="절반으로 잡혔을 때(빠른 곡): 두 배로" ${canScale(2) ? '' : 'disabled'}>×2</button></span>`;
   const keyNote = semis === 0 ? '(기본 키 그대로)' : `(기본 키에서 ${semis > 0 ? '+' : ''}${semis}반음)`;
   const genres = res.genres.slice(0, 3).map(([g, v]) => `<span class="chip">${esc(genreLabel(g))} <em>${pct(v)}</em></span>`).join('');
   const detected = mix.detected.map((d) => `<span class="chip ${d.unsupported ? 'off' : ''}" title="${d.unsupported ? '믹서에 없는 악기' : ''}">${d.ko} <em>${pct(d.score)}</em></span>`).join('')
@@ -118,7 +124,7 @@ function renderResult() {
         <button class="ghost" id="r-pick">다른 곡 선택</button>
       </div>
       <audio controls src="${lastAudioUrl}" title="원곡을 재생하면 믹서는 멈춥니다"></audio>
-      <div class="r-stats"><b>${res.bpm}</b> BPM ${bpmNote} · <b>${res.key} ${res.scale === 'minor' ? 'minor' : 'major'}</b> <small>${keyNote}</small></div>
+      <div class="r-stats"><b>${res.bpm}</b> BPM ${bpmBtns} ${bpmNote} · <b>${res.key} ${res.scale === 'minor' ? 'minor' : 'major'}</b> <small>${keyNote}</small></div>
       <button class="primary" id="r-apply" title="분석한 악기·BPM·코드 진행으로 되돌려 다시 재생">이 조합 다시 켜기</button>
     </div>
     <div class="r-mid">
@@ -159,8 +165,29 @@ function renderResult() {
   up.panel.classList.add('has-result');
   $('#r-pick').onclick = () => up.file.click();
   $('#r-apply').onclick = () => markPreset(null) || applyCombo(mix.picks.map((p) => p.id), res.bpm, semis);
+  $('#r-half').onclick = () => scaleBpm(0.5);
+  $('#r-double').onclick = () => scaleBpm(2);
   // 원곡과 믹서가 겹쳐 들리지 않게 한쪽만 재생
   $('audio', up.result).onplay = () => stopTransport();
+}
+
+// BPM에 따라 달라지는 추정(리듬의 '드라이빙', 에너지)을 다시 계산한다
+function deriveFromBpm() {
+  last.feel = Analyzer.rhythmFeels(last.res);
+  last.hints = Analyzer.styleHints(last.res, last.mix);
+}
+
+// 분석 BPM이 두 배·절반으로 잡혔을 때 고친다: 결과 화면·믹서 속도·Suno Style이 함께 바뀐다
+function scaleBpm(f) {
+  const { res } = last;
+  const bpm = Math.round(res.bpm * f);
+  if (bpm < 60 || bpm > 180) return flash('믹서가 지원하는 60~180 BPM을 벗어나 바꿀 수 없습니다.', 'warn');
+  res.bpm = bpm;
+  res.bpmFix = bpm === res.bpmBase ? '' : 'manual';
+  deriveFromBpm();
+  renderResult();
+  setBpm(bpm);
+  flash(`BPM을 ${bpm}으로 바꿨습니다.`, 'ok');
 }
 
 up.file.onchange = () => handleFile(up.file.files[0]);

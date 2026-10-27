@@ -487,10 +487,69 @@ function renderGroup(g) {
   return box;
 }
 
+/* ---------------- Concept (1번 위) ----------------
+ * 곡의 핵심 요구 사항을 자유롭게 적는 칸. 항상 보이고 언제든 고칠 수 있으며, [생성]하면 목록형·문장형 맨 앞쪽에 들어간다.
+ * '① …' 같은 한글 제목 줄은 사람이 보는 메모라서 ':' 뒤의 영어 문장만 쓴다(':'로 시작하는 줄이 없으면 모든 줄을 쓴다) */
+const CONCEPT_KEY = 'music.suno.concept';
+const CONCEPT_DEFAULT = `① 속이 뻥 뚫리는 클라이맥스
+: Short breakdown and rising snare build-up, then an explosive, euphoric, cathartic final chorus with a key change up and soaring high notes
+② 중독성 있는 가사와 멜로디
+: Extremely catchy, addictive sing-along chorus hook with repetitive lyrics and an earworm synth lead melody, plus a post-chorus vocal chop hook
+③ 청량한 여성 보컬
+: Crisp, airy, refreshing female vocals with a sparkling, clear tone, no male vocals
+④ 보컬 없이 신스 베이스로 경쾌한 인트로
+: Start immediately with a solo bouncy, groovy synth bass riff, punchy drums enter after 2 bars, instrumental intro with no vocals, no slow intro`;
+let concept = CONCEPT_DEFAULT;
+try { const v = localStorage.getItem(CONCEPT_KEY); if (v !== null) concept = v; } catch {}
+
+function conceptParts(text = concept) {
+  const lines = text.split('\n').map((l) => l.trim()).filter(Boolean);
+  const english = lines.filter((l) => /^[:：]/.test(l)).map((l) => l.slice(1).trim());
+  return (english.length ? english : lines).map((p) => p.replace(/[.\s]+$/, '')).filter(Boolean);
+}
+
+// renderSb가 행을 매번 새로 그려도 입력 중인 내용이 사라지지 않게 컨셉 행은 한 번만 만들어 재사용한다
+const conceptRow = document.createElement('div');
+conceptRow.className = 'sb-row sb-concept';
+conceptRow.innerHTML = `<div class="sb-label"><b>Concept</b><small>컨셉 · 스타일 맨 앞에 들어감</small></div>
+  <div class="sb-body">
+    <textarea id="sb-concept" rows="9" spellcheck="false" aria-label="곡 컨셉"></textarea>
+    <div class="sb-concept-foot">
+      <small>':' 뒤의 영어 문장만 스타일에 들어갑니다. 한글 제목 줄은 메모용이에요.</small>
+      <button type="button" class="ghost" id="sb-concept-reset">기본값으로</button>
+    </div>
+  </div>`;
+const conceptBox = $('#sb-concept', conceptRow);
+conceptBox.value = concept;
+// 세로 스크롤이 생기지 않게 내용 높이에 맞춘다(입력·폭 변경·탭이 처음 보일 때)
+const fitConcept = () => {
+  if (!conceptBox.offsetParent) return; // 숨겨진 동안에는 높이를 잴 수 없다
+  conceptBox.style.height = 'auto';
+  conceptBox.style.height = `${conceptBox.scrollHeight + conceptBox.offsetHeight - conceptBox.clientHeight}px`;
+};
+// 폭이 바뀔 때만 다시 맞춘다(높이를 바꾼 것으로 다시 불려 반복되지 않게). 숨겨졌다 보일 때도 폭이 0 → 실제 폭으로 바뀐다
+let conceptWidth = 0;
+new ResizeObserver(([e]) => {
+  if (e.contentRect.width === conceptWidth) return;
+  conceptWidth = e.contentRect.width;
+  fitConcept();
+}).observe(conceptBox);
+conceptBox.oninput = () => {
+  concept = conceptBox.value;
+  try { localStorage.setItem(CONCEPT_KEY, concept); } catch {}
+  fitConcept();
+  renderStyleCount();
+};
+$('#sb-concept-reset', conceptRow).onclick = () => {
+  conceptBox.value = CONCEPT_DEFAULT;
+  conceptBox.oninput();
+  flash('컨셉을 기본 내용으로 되돌렸습니다.', 'ok');
+};
+
 function renderSb() {
   const focusables = () => [...sbEl.form.querySelectorAll('button, select, input')];
   const focusIdx = focusables().indexOf(document.activeElement);
-  sbEl.form.replaceChildren(...SB_STEPS.map((step) => {
+  sbEl.form.replaceChildren(conceptRow, ...SB_STEPS.map((step) => {
     const row = document.createElement('div');
     row.className = 'sb-row';
     row.innerHTML = `<div class="sb-label"><b>${step.n}. ${step.title}</b><small>${step.ko}</small></div>`;
@@ -544,10 +603,12 @@ const PUNCHY_INTRO = /drum|riff|bass/; // 바로 몰아치는 인트로는 느�
 const joinAnd = (xs) => (xs.length <= 1 ? xs.join('') : `${xs.slice(0, -1).join(', ')} and ${xs.at(-1)}`);
 const sentence = (t) => `${t[0].toUpperCase()}${t.slice(1)}.`;
 
-function styleProse(s) {
+// conceptLines: Concept 칸의 문장들. 목록형과 같이 맨 앞에 두고, 이후 항목 순서대로 이어 쓴다
+function styleProse(s, conceptLines = []) {
   const head = [...s.mood, ENERGY_ADJ[s.energy]].filter(Boolean).join(', ');
   const genre = [s.genre && genreLine(s.genre), s.genreCustom].filter(Boolean).join(', ');
-  const out = [sentence([[head, genre].filter(Boolean).join(' '), `${s.bpm} BPM`, ...s.feel].filter(Boolean).join(', '))];
+  const out = conceptLines.map(sentence);
+  out.push(sentence([[head, genre].filter(Boolean).join(' '), `${s.bpm} BPM`, ...s.feel].filter(Boolean).join(', ')));
   if (s.intro) out.push(sentence(`begin with ${s.intro}${PUNCHY_INTRO.test(s.intro) ? ', no slow or atmospheric intro' : ''}`));
   const support = s.support.map((id) => SUNO_TERM[id]);
   if (s.main) out.push(sentence(`${SUNO_TERM[s.main]} drives the song${support.length ? `, supported by ${joinAnd(support)}` : ''}`));
@@ -585,7 +646,8 @@ function bindFmtTabs(box, onPick) {
   };
 }
 
-let styleSnapshot = null; // 마지막 [생성] 때의 선택값. 바뀌면 다시 생성하라고 알려 준다
+let styleSnapshot = null; // 마지막 [생성] 때의 선택값·컨셉. 바뀌면 다시 생성하라고 알려 준다
+const styleState = () => JSON.stringify({ sb, concept });
 let styleOut = { list: '', prose: '' };
 function showStyle() {
   $('#sb-style').value = styleOut[styleFmt] ?? '';
@@ -595,9 +657,12 @@ function showStyle() {
 
 function generateStyle() {
   const lines = styleLines(sb);
-  if (lines.length <= 1 && !sb.feel.length) return flash('항목을 하나 이상 골라 주세요.', 'warn');
-  styleOut = { list: lines.join('\n'), prose: styleProse(sb) };
-  styleSnapshot = JSON.stringify(sb);
+  const parts = conceptParts();
+  if (lines.length <= 1 && !sb.feel.length && !parts.length) return flash('항목을 하나 이상 고르거나 컨셉을 적어 주세요.', 'warn');
+  // 목록형은 'Concept : 문장. 문장.' 한 줄을 맨 위에
+  if (parts.length) lines.unshift(`Concept : ${parts.map((p) => `${p}.`).join(' ')}`);
+  styleOut = { list: lines.join('\n'), prose: styleProse(sb, parts) };
+  styleSnapshot = styleState();
   try { localStorage.setItem('music.suno.styleOut', JSON.stringify(styleOut)); localStorage.setItem('music.suno.styleSnap', styleSnapshot); } catch {}
   showStyle();
 }
@@ -611,7 +676,7 @@ function clearStyle() {
 
 function renderStyleCount() {
   const text = $('#sb-style').value;
-  const stale = text && styleSnapshot !== JSON.stringify(sb);
+  const stale = text && styleSnapshot !== styleState();
   const el = $('#sb-style-count');
   el.textContent = text ? `${text.length}자${stale ? ' · 선택이 바뀌었습니다. [생성]을 다시 누르세요' : ''}` : '';
   el.classList.toggle('warn', text.length > 1000 || !!stale);

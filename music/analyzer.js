@@ -428,5 +428,13 @@ const Analyzer = (() => {
     return s;
   }
 
-  return { analyze, toMixer, introPick, rhythmFeels, styleHints, keyShift, warmup: () => Promise.all([loadEssentia(), loadModels()]) };
+  /* ---------------- 느린 곡의 두 배 템포 보정 ----------------
+   * 박 간격으로 템포를 재면 느린 발라드의 촘촘한 8분음표를 한 박으로 보고 두 배(예: 68 → 136)로 잡기 쉽다.
+   * 느린 장르 비중이 크고 댄스 장르가 거의 없는데 120 BPM 이상이면 절반으로 본다.
+   * 느린 곡 표본 없이 정한 보수적인 기준이라(빠른 곡 4곡에서 오작동 없음만 확인) 결과 화면의 [½]·[×2]로 언제든 고칠 수 있다 */
+  const SLOW_GENRE = /Ballad|Easy Listening|Lounge|Chanson|Soft Rock|Ambient|Downtempo|Neo Soul|Smooth Jazz|Bossa|Folk|Acoustic/;
+  const DANCE_GENRE = /House|Techno|Trance|Disco|Eurodance|Dance-pop|Drum n Bass|Hip Hop|Trap|Electro|Hardstyle|Breakbeat|Funk|Hi NRG|Italo/;
+  const slowTempoFix = (result) => result.bpm >= 120 && genreSum(result, SLOW_GENRE) >= 0.3 && genreSum(result, DANCE_GENRE) < 0.15;
+
+  return { analyze, toMixer, introPick, rhythmFeels, styleHints, slowTempoFix, keyShift, warmup: () => Promise.all([loadEssentia(), loadModels()]) };
 })();
