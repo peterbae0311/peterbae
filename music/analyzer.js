@@ -378,7 +378,6 @@ const Analyzer = (() => {
       : r.bpm < 90 || drums < 0.12 ? 'low energy' : 'medium energy';
 
     const arr = [];
-    if (whole && fadesOut(lv)) arr.push('fade-out');
     if (whole && hasBreakdown(lv)) arr.push(genreSum(r, /Dubstep|Trance|Big Room|Electro House|Future Bass|Drum n Bass|Hardstyle|Bass Music/) >= 0.2 ? 'build-up-drop' : 'breakdown');
     if (genreSum(r, /^Pop---|K-pop|J-pop|Dance-pop|Contemporary R&B|Pop Rock|Soft Rock|Synth-pop|Eurodance|Hip-House/) >= 0.2) arr.push('verse-chorus');
     const n = mixer.picks.length;
@@ -394,7 +393,10 @@ const Analyzer = (() => {
     if (genreSum(r, /Ambient|Dream Pop|Shoegaze|Post Rock/) >= 0.2) mix.push('lush reverb');
     if (genreSum(r, /Boom Bap|Lo-Fi|Garage Rock/) >= 0.2) mix.push('tape saturation');
 
-    return { mood, energy, arr: arr.slice(0, 3), mix: mix.slice(0, 3) };
+    // 끝맺음(Style Builder 1번 아웃트로): 끝 12초가 단계적으로 작아지면 페이드아웃
+    const outro = whole && fadesOut(lv) ? 'fade-out' : '';
+
+    return { mood, energy, arr: arr.slice(0, 3), mix: mix.slice(0, 3), outro };
   }
 
   // 앞부분 드럼 점수가 이 이상이면 드럼 필로 시작하는 곡으로 본다. 모델은 전자 드럼 위에 신스가 조금만 있어도

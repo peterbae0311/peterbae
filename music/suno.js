@@ -58,11 +58,7 @@ const GENRE_TRAITS = {
 };
 const genreLine = (name) => `${GENRE_EN[name]} (${GENRE_TRAITS[name]})`;
 
-// 키 이름 → 음 번호(0~11). 분석 키를 7번 키 목록 표기로 맞출 때 쓴다
 // 코드 진행은 스타일에 넣지 않는다: 곡과 무관한 장르 기본 진행이 Suno의 화성을 엉뚱하게 끌고 갈 수 있다
-const SHARP_NAMES = ['C', 'C#', 'D', 'D#', 'E', 'F', 'F#', 'G', 'G#', 'A', 'A#', 'B'];
-const FLAT_NAMES = ['C', 'Db', 'D', 'Eb', 'E', 'F', 'Gb', 'G', 'Ab', 'A', 'Bb', 'B'];
-const pcOf = (name) => (SHARP_NAMES.includes(name) ? SHARP_NAMES : FLAT_NAMES).indexOf(name);
 
 const GENRE_DESC = {
   '재즈 발라드': '느린 템포에 피아노·색소폰이 감성적으로 노래하는 재즈입니다.',
@@ -90,14 +86,11 @@ const GENRE_DESC = {
   '펑크': '끊어 치는 기타와 탄력 있는 베이스의 그루브 음악입니다.',
   '록': '일렉 기타와 라이브 드럼 중심의 밴드 음악입니다.',
 };
-// 조성별 관용 표기: 장조는 b(Db·Ab), 단조는 #(C#·G#) 쪽이 흔하다
-const MAJOR_KEYS = ['C', 'Db', 'D', 'Eb', 'E', 'F', 'F#', 'G', 'Ab', 'A', 'Bb', 'B'];
-const MINOR_KEYS = ['C', 'C#', 'D', 'Eb', 'E', 'F', 'F#', 'G', 'G#', 'A', 'Bb', 'B'];
 
 // 항목 정의. groups 안의 각 그룹이 하나의 선택값(single/multi/select/number)을 가진다.
 const SB_STEPS = [
-  { n: 1, title: 'Intro', ko: '인트로', groups: [
-    { key: 'intro', type: 'single', options: [
+  { n: 1, title: 'Intro/Outro', ko: '인트로/아웃트로', groups: [
+    { key: 'intro', type: 'single', label: '인트로', options: [
       // fits: 3번과 같이 대표 장르부터(일반적인 장르 관행 기준)
       { ...o('인트로 없음', '', '인트로 없이 곧바로 본 곡(벌스나 메인 테마)으로 시작합니다.', ''),
         fits: { 힙합: ['붐뱁 힙합', '멜로딕 힙합'], 팝: ['신스 팝', '인디 팝'], '일렉트로닉·밴드': ['펑크'] } },
@@ -117,6 +110,20 @@ const SB_STEPS = [
         fits: { 발라드: ['시네마틱 발라드', '록 발라드'], '일렉트로닉·밴드': ['하우스·EDM'] } },
       { ...o('바이닐 노이즈', 'vinyl crackle', '레코드판 잡음으로 복고 분위기를 깔고 시작합니다.', 'vinyl crackle intro'),
         fits: { 힙합: ['로파이 힙합', '재즈 힙합', '칠 힙합'], 재즈: ['재즈 발라드'] } },
+    ] },
+    // 끝맺는 방식. 값은 OUTRO_EN으로 스타일 문장이 된다
+    { key: 'outro', type: 'single', label: '아웃트로', options: [
+      o('선택 안 함', '', 'Suno가 알아서 끝맺습니다.', ''),
+      { ...o('깔끔한 엔딩', 'clean', '마지막 화음과 드럼 한 방으로 딱 끊어 끝냅니다. 곡이 흐지부지 끝나지 않게 할 때 좋습니다.', 'clean, decisive ending on a final hit'),
+        fits: { 팝: ['신스 팝', '어쿠스틱 팝'], '일렉트로닉·밴드': ['록', '하우스·EDM', '펑크'] } },
+      { ...o('페이드아웃', 'fade-out', '곡 끝에서 소리가 점점 작아지며 사라지게 끝냅니다.', 'gradual fade-out ending'),
+        fits: { 팝: ['시티 팝', '드림 팝'], 힙합: ['로파이 힙합', '칠 힙합'], '일렉트로닉·밴드': ['펑크'] } },
+      { ...o('후렴 반복', 'chorus', '마지막에 후렴 훅을 몇 번 더 반복하며 신나게 끝냅니다.', 'outro repeating the chorus hook'),
+        fits: { 팝: ['신스 팝', '인디 팝'], '일렉트로닉·밴드': ['하우스·EDM'], 힙합: ['멜로딕 힙합'] } },
+      { ...o('악기 아웃트로', 'instrumental', '노래가 끝난 뒤 메인 악기 멜로디로 짧게 마무리합니다.', 'instrumental outro with the main hook'),
+        fits: { '일렉트로닉·밴드': ['록', '펑크'], 재즈: ['컨템포러리 재즈'], 팝: ['시티 팝'] } },
+      { ...o('잔잔한 마무리', 'soft', '악기를 덜어 내고 피아노나 기타로 조용히 끝냅니다.', 'soft, gentle outro'),
+        fits: { 발라드: ['팝 발라드', '어쿠스틱 발라드', '시네마틱 발라드'], 재즈: ['재즈 발라드'] } },
     ] },
   ] },
   { n: 2, title: 'Main Instrument', ko: '주 악기', groups: [{ key: 'main', type: 'instrument' }] },
@@ -183,8 +190,13 @@ const SB_STEPS = [
     ] },
   ] },
   { n: 7, title: 'Melody & Harmony', ko: '멜로디·화성', groups: [
-    { key: 'key', type: 'select', options: [o('키 지정 안 함', ''), ...MAJOR_KEYS.flatMap((k, i) => [o(`${k} major`, `${k} major`), o(`${MINOR_KEYS[i]} minor`, `${MINOR_KEYS[i]} minor`)])],
-      tip: '곡의 조성(키). major(장조)는 밝고 경쾌하게, minor(단조)는 어둡고 감성적으로 들립니다. 지정하지 않으면 Suno가 알아서 정합니다.' },
+    // 분위기를 정하는 건 장조/단조뿐이고 키 이름(C·A…)은 노래 높이만 바꿔서 세 가지로만 고른다.
+    // 직접 고르기 전에는 6번 분위기에 맞춰 자동으로 골라진다(autoKey)
+    { key: 'key', type: 'single', options: [
+      o('선택 안 함', '', 'Suno가 장르와 분위기를 보고 알아서 정합니다. 잘 모르겠으면 이걸 고르세요.', ''),
+      o('밝게 (Major)', 'major', '장조. 밝고 경쾌하고 희망찬 느낌입니다. 희망찬·경쾌한·로맨틱·편안한 분위기와 어울립니다.', 'major key'),
+      o('감성 (Minor)', 'minor', '단조. 감성적이고 애틋하거나 쓸쓸한 느낌입니다. 우울한·감성적·어두운·웅장한·몽환적 분위기와 어울립니다. 신나지만 살짝 애틋한 댄스곡에도 많이 씁니다.', 'minor key'),
+    ] },
     { key: 'harmony', type: 'multi', max: 2, options: [
       // fits: 3번과 같이 대표 장르부터(일반적인 장르 관행 기준)
       { ...o('중독성 훅', 'catchy hook', '한 번 들으면 귀에 맴도는 짧고 반복되는 멜로디를 강조합니다. K-pop의 핵심 요소이기도 합니다.'),
@@ -213,8 +225,7 @@ const SB_STEPS = [
         fits: { '일렉트로닉·밴드': ['하우스·EDM', '트랩'], 팝: ['신스 팝'] } },
       { ...o('브레이크다운', 'breakdown', '마지막 후렴 앞에서 악기를 덜어 내 잠시 숨을 고르는 구간을 넣습니다.', 'breakdown'),
         fits: { '일렉트로닉·밴드': ['하우스·EDM', '펑크'], 팝: ['시티 팝'], 발라드: ['록 발라드'] } },
-      { ...o('페이드아웃 엔딩', 'fade-out', '곡 끝에서 소리가 점점 작아지며 사라지게 끝냅니다.', 'fade-out ending'),
-        fits: { 팝: ['시티 팝', '드림 팝'], 힙합: ['로파이 힙합', '칠 힙합'], '일렉트로닉·밴드': ['펑크'] } },
+      // 페이드아웃 엔딩은 1번 아웃트로로 옮겼다
     ] },
   ] },
   { n: 9, title: 'Sound & Mixing', ko: '사운드·믹싱', groups: [
@@ -288,8 +299,8 @@ const SB_KEY = 'music.suno.v1';
 // 11번 제외 항목은 보컬만 빼고 모두 켜 둔다(보컬은 10번에서 연주곡을 고를 때만 자동으로 들어감)
 const EXCL_DEFAULT = () => SB_STEPS.find((st) => st.n === 11).groups[0].options.map((x) => x.en).filter((en) => en !== 'vocals');
 const SB_DEFAULT = () => ({
-  intro: '', main: '', bpm: 120, feel: [], genre: '', genreCustom: '', support: [], mood: [], energy: '',
-  key: '', harmony: [], arr: [], mix: [], vocal: '', tone: [], lang: '', excl: EXCL_DEFAULT(),
+  intro: '', outro: '', main: '', bpm: 120, feel: [], genre: '', genreCustom: '', support: [], mood: [], energy: '',
+  key: '', keyManual: false, harmony: [], arr: [], mix: [], vocal: '', tone: [], lang: '', excl: EXCL_DEFAULT(),
 });
 let sb = SB_DEFAULT();
 try {
@@ -303,10 +314,25 @@ try {
     localStorage.setItem('music.suno.exclDefault', '1');
   }
 } catch {}
-if (sb.key) {
-  const [r, m] = sb.key.split(' ');
-  const pc = pcOf(r);
-  sb.key = pc >= 0 ? `${(m === 'minor' ? MINOR_KEYS : MAJOR_KEYS)[pc]} ${m}` : '';
+// 예전에는 페이드아웃이 8번 편곡에 있었다 → 1번 아웃트로로 옮긴다
+if (sb.arr.includes('fade-out')) {
+  sb.arr = sb.arr.filter((a) => a !== 'fade-out');
+  sb.outro ||= 'fade-out';
+}
+
+// 예전에는 'E major'처럼 키 이름까지 골랐다 → 장조/단조만 남기고, 직접 고른 값으로 본다
+if (sb.key && sb.key !== 'major' && sb.key !== 'minor') {
+  sb.key = sb.key.endsWith('minor') ? 'minor' : 'major';
+  sb.keyManual = true;
+}
+
+// 7번 자동 선택: 6번 분위기가 한쪽으로만 모이면 그쪽, 섞였거나 없으면 '선택 안 함'
+const BRIGHT_MOODS = ['uplifting', 'playful', 'romantic', 'chill'];
+const DARK_MOODS = ['melancholic', 'emotional', 'dark', 'epic', 'dreamy'];
+function autoKey(mood) {
+  const bright = mood.some((m) => BRIGHT_MOODS.includes(m));
+  const dark = mood.some((m) => DARK_MOODS.includes(m));
+  return bright === dark ? '' : bright ? 'major' : 'minor';
 }
 const saveSb = () => { try { localStorage.setItem(SB_KEY, JSON.stringify(sb)); } catch {} };
 
@@ -389,11 +415,14 @@ const withFits = (tip, x) => tip + (x.fits
 function renderGroup(g) {
   const box = document.createElement('div');
   box.className = 'sb-group';
+  // 한 항목에 그룹이 여럿이면(예: 1번 인트로·아웃트로) 앞에 작은 이름을 붙여 구분한다
+  if (g.label) box.append(Object.assign(document.createElement('span'), { className: 'sb-glabel', textContent: g.label }));
   const off = g.needsVocal && !hasVocal();
   if (g.type === 'single') {
     // 다시 누르면 해제. 값이 ''인 선택지(예: 인트로 없음)는 '아무것도 안 고름'과 같은 상태
     g.options.forEach((x) => box.append(chip(x.ko, sb[g.key] === x.en, () => {
       sb[g.key] = sb[g.key] === x.en ? '' : x.en;
+      if (g.key === 'key') sb.keyManual = true; // 직접 고르면 6번 분위기에 따른 자동 선택을 끈다
       commit();
     }, off, withFits(x.tip, x), x.shown ?? x.en)));
     // 곡 분석에서 가져와 선택지에 없는 값(예: 인트로 'electronic drums')은 따로 보여 주고 누르면 지운다
@@ -488,10 +517,13 @@ function renderGroup(g) {
 }
 
 /* ---------------- Concept (1번 위) ----------------
- * 곡의 핵심 요구 사항을 자유롭게 적는 칸. 항상 보이고 언제든 고칠 수 있으며, [생성]하면 목록형·문장형 맨 앞쪽에 들어간다.
+ * 곡의 핵심 요구 사항. 처음에는 비어 있고, 컨셉 도우미에서 고른 항목으로 자동 작성된다.
+ * 직접 고치면 자동 작성이 멈추고(conceptManual), [선택 항목으로 다시 만들기]로 되돌린다. [생성]하면 목록형·문장형 맨 앞쪽에 들어간다.
  * '① …' 같은 한글 제목 줄은 사람이 보는 메모라서 ':' 뒤의 영어 문장만 쓴다(':'로 시작하는 줄이 없으면 모든 줄을 쓴다) */
 const CONCEPT_KEY = 'music.suno.concept';
-const CONCEPT_DEFAULT = `① 속이 뻥 뚫리는 클라이맥스
+const CONCEPT_MANUAL_KEY = 'music.suno.conceptManual';
+// 예전 버전의 기본 내용 — 저장된 값이 이것과 같으면 직접 고친 것이 아니라서 자동 작성으로 바꾼다
+const CONCEPT_LEGACY_DEFAULT = `① 속이 뻥 뚫리는 클라이맥스
 : Short breakdown and rising snare build-up, then an explosive, euphoric, cathartic final chorus with a key change up and soaring high notes
 ② 중독성 있는 가사와 멜로디
 : Extremely catchy, addictive sing-along chorus hook with repetitive lyrics and an earworm synth lead melody, plus a post-chorus vocal chop hook
@@ -499,8 +531,14 @@ const CONCEPT_DEFAULT = `① 속이 뻥 뚫리는 클라이맥스
 : Crisp, airy, refreshing female vocals with a sparkling, clear tone, no male vocals
 ④ 보컬 없이 신스 베이스로 경쾌한 인트로
 : Start immediately with a solo bouncy, groovy synth bass riff, punchy drums enter after 2 bars, instrumental intro with no vocals, no slow intro`;
-let concept = CONCEPT_DEFAULT;
-try { const v = localStorage.getItem(CONCEPT_KEY); if (v !== null) concept = v; } catch {}
+let concept = '';
+let conceptManual = false;
+try {
+  const v = localStorage.getItem(CONCEPT_KEY);
+  conceptManual = localStorage.getItem(CONCEPT_MANUAL_KEY) === '1'
+    || (v !== null && v.trim() !== '' && v.replace(/\n+/g, '\n') !== CONCEPT_LEGACY_DEFAULT.replace(/\n+/g, '\n') && localStorage.getItem(CONCEPT_MANUAL_KEY) === null);
+  if (conceptManual && v !== null) concept = v;
+} catch {}
 
 function conceptParts(text = concept) {
   const lines = text.split('\n').map((l) => l.trim()).filter(Boolean);
@@ -515,8 +553,11 @@ conceptRow.innerHTML = `<div class="sb-label"><b>Concept</b><small>컨셉 · 스
   <div class="sb-body">
     <textarea id="sb-concept" rows="9" spellcheck="false" aria-label="곡 컨셉"></textarea>
     <div class="sb-concept-foot">
-      <small>':' 뒤의 영어 문장만 스타일에 들어갑니다. 한글 제목 줄은 메모용이에요.</small>
-      <button type="button" class="ghost" id="sb-concept-reset">기본값으로</button>
+      <small id="sb-concept-note"></small>
+      <span class="sb-btns">
+        <button type="button" class="ghost" id="sb-concept-reset">선택 항목으로 다시 만들기</button>
+        <button type="button" class="ghost danger" id="sb-concept-clear" title="컨셉 도우미의 답과 Concept 내용만 지웁니다(1~11번 선택은 그대로)">컨셉 초기화</button>
+      </span>
     </div>
   </div>`;
 const conceptBox = $('#sb-concept', conceptRow);
@@ -534,22 +575,163 @@ new ResizeObserver(([e]) => {
   conceptWidth = e.contentRect.width;
   fitConcept();
 }).observe(conceptBox);
-conceptBox.oninput = () => {
-  concept = conceptBox.value;
-  try { localStorage.setItem(CONCEPT_KEY, concept); } catch {}
+conceptBox.placeholder = '위의 컨셉 도우미에서 항목을 고르면 여기에 자동으로 작성됩니다.';
+function setConcept(text, manual) {
+  concept = text;
+  conceptManual = manual;
+  if (conceptBox.value !== text) conceptBox.value = text;
+  try { localStorage.setItem(CONCEPT_KEY, concept); localStorage.setItem(CONCEPT_MANUAL_KEY, manual ? '1' : '0'); } catch {}
+  $('#sb-concept-note', conceptRow).textContent = manual
+    ? '직접 고친 내용이라 도우미 선택이 바뀌어도 그대로 둡니다. \':\' 뒤의 영어 문장만 스타일에 들어갑니다.'
+    : '도우미에서 고른 항목으로 자동 작성됩니다. 직접 고치면 자동 작성이 멈춥니다. \':\' 뒤의 영어 문장만 스타일에 들어갑니다.';
   fitConcept();
   renderStyleCount();
-};
+}
+conceptBox.oninput = () => setConcept(conceptBox.value, true);
+// 도우미 선택이 바뀌면(직접 고치지 않았을 때만) Concept을 다시 쓴다
+const syncConcept = () => { if (!conceptManual) setConcept(helperConcept(), false); };
 $('#sb-concept-reset', conceptRow).onclick = () => {
-  conceptBox.value = CONCEPT_DEFAULT;
-  conceptBox.oninput();
-  flash('컨셉을 기본 내용으로 되돌렸습니다.', 'ok');
+  setConcept(helperConcept(), false);
+  flash('도우미에서 고른 항목으로 Concept을 다시 만들었습니다.', 'ok');
 };
+
+/* ---------------- 컨셉 도우미 (Concept 위) ----------------
+ * 음악을 몰라도 "누가·언제·어떤 기분으로 들을 곡인가"에 답하면 Concept 초안과 6번 분위기 추천을 만든다.
+ * 서버·LLM 없이 동작해야 해서 자유 입력 대신 선택지로 묻고, 선택지마다 영어 문장과 분위기(6번 값)를 붙여 둔다.
+ * 훅 문구만 직접 적는다(영어 권장 — 그대로 가사·제목 후보가 된다) */
+const helperOpt = (ko, en, mood = []) => ({ ko, en, mood });
+const HELPER_QS = [
+  { key: 'scene', title: '① 듣는 상황', hint: '누가·언제·어디서 들을까요? (2개까지)', max: 2, options: [
+    helperOpt('드라이브', 'perfect for a carefree drive'), helperOpt('카페·휴식', 'cozy café background'), helperOpt('출근길', 'a bright morning-commute pick-me-up'),
+    helperOpt('운동', 'workout-ready drive', ['uplifting']), helperOpt('공부·집중', 'steady and focus-friendly', ['chill']), helperOpt('파티·댄스', 'made for the dance floor', ['playful']),
+    helperOpt('밤 산책', 'a late-night walk under city lights', ['dreamy']), helperOpt('비 오는 날', 'a rainy-day listen', ['melancholic']),
+  ] },
+  { key: 'story', title: '② 한 줄 이야기', hint: '이 곡이 하는 말은? (1개)', max: 1, options: [
+    helperOpt('설렘·새 사랑', 'a story of falling in love, giddy excitement', ['romantic', 'uplifting']),
+    helperOpt('짝사랑', 'a story of a secret crush, shy and hopeful', ['romantic', 'dreamy']),
+    helperOpt('이별·그리움', 'a story of missing someone who is gone', ['melancholic', 'emotional']),
+    helperOpt('추억·회상', 'a story of looking back on golden memories', ['nostalgic', 'emotional']),
+    helperOpt('위로·힐링', 'a gentle story of comfort and healing', ['chill', 'emotional']),
+    helperOpt('자신감·도전', 'a story of courage and moving forward', ['uplifting', 'epic']),
+    helperOpt('자유·일탈', 'a story of breaking free with carefree joy', ['playful', 'uplifting']),
+  ] },
+  { key: 'feel', title: '③ 느낌 단어', hint: '분위기·에너지·색깔 (3개까지)', max: 3, options: [
+    helperOpt('청량한', 'crisp and refreshing'), helperOpt('따뜻한', 'warm and cozy', ['chill']), helperOpt('반짝이는', 'sparkling and bright', ['uplifting']),
+    helperOpt('경쾌한', 'bouncy and playful', ['playful']), helperOpt('시원하게 뻥 뚫리는', 'wide-open and liberating', ['uplifting']), helperOpt('잔잔한', 'calm and gentle', ['chill']),
+    helperOpt('몽환적인', 'dreamy and hazy', ['dreamy']), helperOpt('웅장한', 'grand and cinematic', ['epic']), helperOpt('쓸쓸한', 'lonely and wistful', ['melancholic']),
+    helperOpt('황금빛', 'warm golden-hour glow'),
+  ] },
+  { key: 'must', title: '⑤ 꼭 지킬 것', hint: '이게 빠지면 이 곡이 아니다 싶은 것', max: 8, options: [
+    helperOpt('속이 뻥 뚫리는 클라이맥스', 'Snare build-up into an explosive, cathartic final chorus with a key change and soaring high notes'),
+    helperOpt('중독성 있는 가사와 멜로디', 'Catchy, addictive sing-along chorus hook with repetitive lyrics and an earworm synth melody'),
+    helperOpt('청량한 여성 보컬', 'Crisp, airy, refreshing female vocals with a sparkling, clear tone, no male vocals'),
+    helperOpt('부드러운 남성 보컬', 'Smooth, warm male vocals with an open, powerful chorus'),
+    helperOpt('보컬 없이 신스 베이스로 경쾌한 인트로', 'Instrumental intro: solo bouncy synth bass riff, drums enter after 2 bars, no slow intro'),
+    helperOpt('어쿠스틱 기타 중심', 'Bright acoustic guitar strumming leads the song with a warm, organic feel'),
+    helperOpt('피아노 감성', 'Emotional piano carries the melody, intimate and heartfelt'),
+  ] },
+];
+const HELPER_KEY = 'music.suno.helper';
+let helper = { scene: [], story: [], feel: [], must: [], hook: '' };
+try { Object.assign(helper, JSON.parse(localStorage.getItem(HELPER_KEY) || '{}')); } catch {}
+const saveHelper = () => { try { localStorage.setItem(HELPER_KEY, JSON.stringify(helper)); } catch {} };
+const helperPicked = (q) => q.options.filter((x) => helper[q.key].includes(x.ko));
+
+// 답 → Concept 초안(한글 제목 줄 + ':' 영어 줄)
+function helperConcept() {
+  const [scene, story, feel, must] = HELPER_QS.map(helperPicked);
+  const items = []; // [한글 제목, 영어 문장] — 고른 것만, 번호는 ①부터 이어서
+  if (scene.length) items.push([`듣는 상황: ${scene.map((x) => x.ko).join(', ')}`, sentence(joinAnd(scene.map((x) => x.en)))]);
+  if (story.length) items.push([`이야기: ${story[0].ko}`, sentence(story[0].en)]);
+  if (feel.length) items.push([`느낌: ${feel.map((x) => x.ko).join(' · ')}`, sentence(feel.map((x) => x.en).join(', '))]);
+  const hook = helper.hook.trim();
+  if (hook) items.push([`훅: "${hook}"`, `Build the chorus around the catchy hook "${hook}", repeated so listeners can sing along`]);
+  must.forEach((x) => items.push([x.ko, x.en]));
+  return items.map(([ko, en], i) => `${'①②③④⑤⑥⑦⑧⑨⑩⑪⑫⑬⑭⑮'[i]} ${ko}\n: ${en}`).join('\n');
+}
+
+// 답 → 6번 분위기 추천(많이 나온 순으로 최대 3개)
+function helperMoods() {
+  const count = {};
+  HELPER_QS.flatMap(helperPicked).forEach((x) => x.mood.forEach((m) => { count[m] = (count[m] || 0) + 1; }));
+  return Object.entries(count).sort((a, b) => b[1] - a[1]).slice(0, 3).map(([m]) => m);
+}
+
+const helperRow = document.createElement('div');
+helperRow.className = 'sb-row sb-helper';
+function renderHelper() {
+  const body = document.createElement('div');
+  body.className = 'sb-body';
+  HELPER_QS.slice(0, 3).forEach((q) => body.append(helperGroup(q)));
+  // ④ 훅: 직접 입력
+  const hookBox = document.createElement('div');
+  hookBox.className = 'sb-group';
+  hookBox.innerHTML = `<span class="sb-glabel">④ 훅</span>`;
+  const hookIn = Object.assign(document.createElement('input'), {
+    type: 'text', value: helper.hook, maxLength: 60, className: 'sb-hook',
+    placeholder: '사람들이 따라 부를 한 마디 (영어 권장, 예: When the leaves turn)',
+  });
+  hookIn.oninput = () => { helper.hook = hookIn.value; saveHelper(); renderHelperPreview(); syncConcept(); };
+  hookBox.append(hookIn);
+  body.append(hookBox, helperGroup(HELPER_QS[3]));
+  const ref = document.createElement('small');
+  ref.className = 'sb-helper-note';
+  ref.innerHTML = '⑥ 참고 곡: 비슷한 곡이 있으면 <b>곡으로 조합 만들기</b>에서 분석한 뒤 위의 [곡 분석 불러오기]로 장르·템포·악기를 가져오세요.';
+  const preview = document.createElement('div');
+  preview.className = 'sb-helper-preview';
+  const apply = Object.assign(document.createElement('button'), { className: 'primary', textContent: '추천 분위기 6번에 적용' });
+  apply.onclick = applyHelper;
+  const foot = document.createElement('div');
+  foot.className = 'sb-concept-foot';
+  foot.append(preview, apply);
+  body.append(ref, foot);
+  helperRow.replaceChildren(
+    Object.assign(document.createElement('div'), { className: 'sb-label', innerHTML: '<b>컨셉 도우미</b><small>고른 항목으로 아래 Concept이 작성돼요</small>' }),
+    body,
+  );
+  renderHelperPreview();
+}
+function helperGroup(q) {
+  const box = document.createElement('div');
+  box.className = 'sb-group';
+  box.title = q.hint;
+  box.append(Object.assign(document.createElement('span'), { className: 'sb-glabel', textContent: q.title }));
+  q.options.forEach((x) => box.append(chip(x.ko, helper[q.key].includes(x.ko), () => {
+    const arr = helper[q.key];
+    if (arr.includes(x.ko)) helper[q.key] = arr.filter((v) => v !== x.ko);
+    else if (q.max === 1) helper[q.key] = [x.ko];
+    else if (arr.length >= q.max) return flash(`${q.title}은(는) ${q.max}개까지 고를 수 있습니다.`, 'warn');
+    else helper[q.key] = [...arr, x.ko];
+    saveHelper();
+    renderHelper();
+    syncConcept();
+  }, false, x.mood.length ? `${q.hint}<br>추천 분위기: ${x.mood.map((m) => OPTION_KO.mood[m]).join(', ')}` : q.hint, x.en)));
+  return box;
+}
+function renderHelperPreview() {
+  const moods = helperMoods();
+  const key = autoKey(moods);
+  const hook = helper.hook.trim();
+  $('.sb-helper-preview', helperRow).innerHTML = [
+    `추천 분위기(6번): <b>${moods.length ? moods.map((m) => OPTION_KO.mood[m]).join(', ') : '없음'}</b>`,
+    `7번: <b>${key === 'major' ? '밝게 (Major)' : key === 'minor' ? '감성 (Minor)' : '선택 안 함'}</b>`,
+    hook ? `제목·후렴 첫 줄 후보: <b>${hook.replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' })[c])}</b>` : '',
+  ].filter(Boolean).join(' · ');
+}
+// 6번 분위기는 직접 고른 값을 덮어쓰지 않게 버튼으로만 적용한다(Concept은 선택에 따라 자동으로 바뀜)
+function applyHelper() {
+  const moods = helperMoods();
+  if (!moods.length) return flash('추천할 분위기가 없습니다. ①~③에서 항목을 골라 주세요.', 'warn');
+  sb.mood = moods;
+  sb.keyManual = false; // 7번은 새 분위기에 맞춰 자동으로
+  commit();
+  flash(`6번 분위기를 ${moods.map((m) => OPTION_KO.mood[m]).join(', ')}(으)로 바꿨습니다.`, 'ok');
+}
 
 function renderSb() {
   const focusables = () => [...sbEl.form.querySelectorAll('button, select, input')];
   const focusIdx = focusables().indexOf(document.activeElement);
-  sbEl.form.replaceChildren(conceptRow, ...SB_STEPS.map((step) => {
+  sbEl.form.replaceChildren(helperRow, conceptRow, ...SB_STEPS.map((step) => {
     const row = document.createElement('div');
     row.className = 'sb-row';
     row.innerHTML = `<div class="sb-label"><b>${step.n}. ${step.title}</b><small>${step.ko}</small></div>`;
@@ -567,16 +749,18 @@ function renderSb() {
 // 8번은 값이 내부 코드라 스타일 문장에 쓸 영어 표현으로 바꾼다
 const ARR_EN = {
   minimal: 'minimal arrangement', layered: 'layered arrangement', 'verse-chorus': 'verse-chorus structure',
-  'build-up-drop': 'build-up and drop', breakdown: 'breakdown', 'fade-out': 'fade-out ending',
+  'build-up-drop': 'build-up and drop', breakdown: 'breakdown',
 };
+// 1번 아웃트로: 값 → 스타일 문장(선택지의 '출력'과 같다)
+const OUTRO_EN = Object.fromEntries(SB_STEPS[0].groups.find((g) => g.key === 'outro').options.filter((x) => x.en).map((x) => [x.en, x.shown]));
 
 // 항목마다 고른 값을 영어로 모은다. 비어 있으면 그 줄은 생략
 function stepValues(n, s = sb) {
   switch (n) {
-    case 1: return [s.intro && `${s.intro} intro`];
+    case 1: return [s.intro && `${s.intro} intro`, s.outro && OUTRO_EN[s.outro]];
     case 2: return [s.main && SUNO_TERM[s.main]];
     case 3: return [`${s.bpm} bpm`, ...s.feel];
-    case 4: return [s.genre && genreLine(s.genre), s.genreCustom];
+    case 4: return [s.genre && (s.genreShort ? GENRE_EN[s.genre] : genreLine(s.genre)), s.genreCustom];
     case 5: return s.support.map((id) => SUNO_TERM[id]);
     case 6: return [...s.mood, s.energy];
     case 7: return [s.key && `${s.key} key`, ...s.harmony];
@@ -604,9 +788,11 @@ const joinAnd = (xs) => (xs.length <= 1 ? xs.join('') : `${xs.slice(0, -1).join(
 const sentence = (t) => `${t[0].toUpperCase()}${t.slice(1)}.`;
 
 // conceptLines: Concept 칸의 문장들. 목록형과 같이 맨 앞에 두고, 이후 항목 순서대로 이어 쓴다
-function styleProse(s, conceptLines = []) {
+// withExcl: Style Builder는 제외 항목을 Exclude Styles 칸으로 따로 내보내서 문장형에서 뺀다
+// (스타일 칸에 'no ○○'로 쓰면 오히려 그 소리로 끌려갈 수 있다)
+function styleProse(s, conceptLines = [], { withExcl = true } = {}) {
   const head = [...s.mood, ENERGY_ADJ[s.energy]].filter(Boolean).join(', ');
-  const genre = [s.genre && genreLine(s.genre), s.genreCustom].filter(Boolean).join(', ');
+  const genre = [s.genre && (s.genreShort ? GENRE_EN[s.genre] : genreLine(s.genre)), s.genreCustom].filter(Boolean).join(', ');
   const out = conceptLines.map(sentence);
   out.push(sentence([[head, genre].filter(Boolean).join(' '), `${s.bpm} BPM`, ...s.feel].filter(Boolean).join(', ')));
   if (s.intro) out.push(sentence(`begin with ${s.intro}${PUNCHY_INTRO.test(s.intro) ? ', no slow or atmospheric intro' : ''}`));
@@ -619,9 +805,8 @@ function styleProse(s, conceptLines = []) {
   if (s.mix.length) out.push(sentence(s.mix.join(', ')));
   const vocal = stepValues(10, s).filter(Boolean);
   if (vocal.length) out.push(sentence(vocal.join(', ')));
-  // 끝맺음을 정하지 않으면 흐지부지 사라지기 쉬워, 페이드아웃을 고르지 않았으면 깔끔한 엔딩을 붙인다
-  if (!s.arr.includes('fade-out') && out.length > 1) out.push('Clean, decisive ending.');
-  const excl = excludeWords(s);
+  if (s.outro) out.push(sentence(OUTRO_EN[s.outro])); // '선택 안 함'이면 끝맺음은 Suno에 맡긴다
+  const excl = withExcl ? excludeWords(s) : [];
   if (excl.length) out.push(sentence(excl.map((x) => `no ${x}`).join(', ')));
   return out.join(' ');
 }
@@ -648,27 +833,66 @@ function bindFmtTabs(box, onPick) {
 
 let styleSnapshot = null; // 마지막 [생성] 때의 선택값·컨셉. 바뀌면 다시 생성하라고 알려 준다
 const styleState = () => JSON.stringify({ sb, concept });
-let styleOut = { list: '', prose: '' };
+let styleOut = { list: '', prose: '', excl: '' };
 function showStyle() {
   $('#sb-style').value = styleOut[styleFmt] ?? '';
+  $('#sb-excl').value = styleOut.excl ?? '';
   $('#sb-fmt').querySelectorAll('[data-fmt]').forEach((x) => x.setAttribute('aria-selected', String(x.dataset.fmt === styleFmt)));
   renderStyleCount();
 }
 
+/* ---------------- 1,000자 맞추기 ----------------
+ * Suno 스타일 칸은 1,000자까지라, 넘으면 덜 중요한 것부터 하나씩 빼서 다시 만든다.
+ * Concept·장르 이름·주 악기·BPM·분위기·키·보컬·인트로/아웃트로는 끝까지 남긴다 */
+const STYLE_LIMIT = 1000;
+const STYLE_CUTS = [
+  ['4번 장르 설명(괄호)', (s) => ({ ...s, genreShort: true })],
+  ['9번 사운드', (s) => ({ ...s, mix: [] })],
+  ['7번 멜로디·화성 세부', (s) => ({ ...s, harmony: [] })],
+  ['5번 반주 악기 일부', (s) => ({ ...s, support: s.support.slice(0, 2) })],
+  ['8번 편곡', (s) => ({ ...s, arr: [] })],
+  ['3번 리듬 세부', (s) => ({ ...s, feel: s.feel.slice(0, 1) })],
+];
+// make(s, conceptParts) → 출력 문자열. 위 순서로 빼도 넘으면 Concept 문장을 앞에서부터 하나씩 뺀다
+// (컨셉 도우미 초안은 듣는 상황·이야기처럼 덜 구체적인 것이 앞에 온다). 그래도 넘으면 마지막으로 잘라 낸다
+function fitStyle(make, s, parts) {
+  let cur = s;
+  let text = make(cur, parts);
+  const cut = [];
+  for (const [name, f] of STYLE_CUTS) {
+    if (text.length <= STYLE_LIMIT) break;
+    cur = f(cur);
+    const next = make(cur, parts);
+    if (next !== text) cut.push(name);
+    text = next;
+  }
+  let dropped = 0;
+  while (text.length > STYLE_LIMIT && dropped < parts.length) text = make(cur, parts.slice(++dropped));
+  if (dropped) cut.push(`Concept 앞 ${dropped}문장`);
+  if (text.length > STYLE_LIMIT) {
+    text = text.slice(0, STYLE_LIMIT);
+    cut.push('끝부분');
+  }
+  return { text, cut };
+}
+
 function generateStyle() {
-  const lines = styleLines(sb);
+  // 11번(제외)은 Exclude Styles 칸으로 따로 내보내므로 스타일 목록에서 뺀다
+  const steps = SB_STEPS.filter((st) => st.n !== 11);
   const parts = conceptParts();
-  if (lines.length <= 1 && !sb.feel.length && !parts.length) return flash('항목을 하나 이상 고르거나 컨셉을 적어 주세요.', 'warn');
+  if (styleLines(sb, steps).length <= 1 && !sb.feel.length && !parts.length) return flash('항목을 하나 이상 고르거나 컨셉을 적어 주세요.', 'warn');
   // 목록형은 'Concept : 문장. 문장.' 한 줄을 맨 위에
-  if (parts.length) lines.unshift(`Concept : ${parts.map((p) => `${p}.`).join(' ')}`);
-  styleOut = { list: lines.join('\n'), prose: styleProse(sb, parts) };
+  const conceptLine = (ps) => (ps.length ? [`Concept : ${ps.map((p) => `${p}.`).join(' ')}`] : []);
+  const list = fitStyle((s, ps) => [...conceptLine(ps), ...styleLines(s, steps)].join('\n'), sb, parts);
+  const prose = fitStyle((s, ps) => styleProse(s, ps, { withExcl: false }), sb, parts);
+  styleOut = { list: list.text, prose: prose.text, cut: { list: list.cut, prose: prose.cut }, excl: excludeWords(sb).join(', ') };
   styleSnapshot = styleState();
   try { localStorage.setItem('music.suno.styleOut', JSON.stringify(styleOut)); localStorage.setItem('music.suno.styleSnap', styleSnapshot); } catch {}
   showStyle();
 }
 
 function clearStyle() {
-  styleOut = { list: '', prose: '' };
+  styleOut = { list: '', prose: '', excl: '' };
   styleSnapshot = null;
   try { ['music.suno.styleOut', 'music.suno.style', 'music.suno.styleSnap'].forEach((k) => localStorage.removeItem(k)); } catch {}
   showStyle();
@@ -678,12 +902,14 @@ function renderStyleCount() {
   const text = $('#sb-style').value;
   const stale = text && styleSnapshot !== styleState();
   const el = $('#sb-style-count');
-  el.textContent = text ? `${text.length}자${stale ? ' · 선택이 바뀌었습니다. [생성]을 다시 누르세요' : ''}` : '';
-  el.classList.toggle('warn', text.length > 1000 || !!stale);
+  const cut = styleOut.cut?.[styleFmt] ?? [];
+  el.textContent = text ? `${text.length}/${STYLE_LIMIT}자${cut.length ? ` · 1,000자에 맞추려고 뺀 것: ${cut.join(', ')}` : ''}${stale ? ' · 선택이 바뀌었습니다. [생성]을 다시 누르세요' : ''}` : '';
+  el.classList.toggle('warn', text.length > STYLE_LIMIT || !!stale);
 }
 
 function commit() {
   if (!hasVocal()) { sb.tone = []; sb.lang = ''; }
+  if (!sb.keyManual) sb.key = autoKey(sb.mood);
   resolveConflicts();
   syncGenreTab();
   saveSb();
@@ -705,9 +931,6 @@ function instrumentsFrom(ids, main) {
 // 주 악기는 인식 점수가 가장 높은 악기(picks는 점수순), 인트로는 앞부분에서 가장 두드러진 악기
 function songSb({ res, mix, intro, feel = [], hints = {} }) {
   const ids = mix.picks.map((p) => p.id);
-  // 분석은 #/b 어느 쪽으로든 줄 수 있어 키 목록의 표기로 맞춘다(예: 장조 C# → Db, 단조 Db → C#)
-  const minor = res.scale === 'minor';
-  const pc = pcOf(res.key);
   return {
     ...SB_DEFAULT(),
     excl: [], // 제외는 분석과 무관한 기본값이라 결과 칸에는 넣지 않는다(예: 힙합 곡에 no rap이 붙지 않게)
@@ -717,7 +940,10 @@ function songSb({ res, mix, intro, feel = [], hints = {} }) {
     bpm: res.bpm,
     feel,
     mood: hints.mood ?? [], energy: hints.energy ?? '', arr: hints.arr ?? [], mix: hints.mix ?? [],
-    key: pc >= 0 ? `${(minor ? MINOR_KEYS : MAJOR_KEYS)[pc]} ${minor ? 'minor' : 'major'}` : '',
+    outro: hints.outro ?? '',
+    // 실제 곡의 장조/단조가 분위기 추정보다 정확해서 분석 결과를 쓴다(키 이름은 분위기에 영향이 없어 뺀다)
+    key: res.key ? (res.scale === 'minor' ? 'minor' : 'major') : '',
+    keyManual: !!res.key,
     genreCustom: res.genres.slice(0, 2).map(([g]) => g.split('---').pop().toLowerCase()).join(', '),
   };
 }
@@ -742,10 +968,11 @@ function fromSong() {
   if (!last) return flash('먼저 "곡으로 조합 만들기" 탭에서 곡을 분석해 주세요.', 'warn');
   const { res, mix } = last;
   const s = songSb(last);
-  Object.assign(sb, { main: s.main, support: s.support, bpm: s.bpm, key: s.key, genre: '', genreCustom: s.genreCustom });
+  Object.assign(sb, { main: s.main, support: s.support, bpm: s.bpm, key: s.key, keyManual: s.keyManual, genre: '', genreCustom: s.genreCustom });
   if (s.intro) sb.intro = s.intro; // 도입부를 못 잡았으면 직접 고른 인트로를 그대로 둔다
   // 리듬·분위기·편곡·사운드는 곡마다 추정하는 값이라 새 곡 기준으로 덮어쓴다(못 찾으면 비움 — 이전 곡 값이 남지 않게)
   Object.assign(sb, { feel: s.feel, mood: s.mood, energy: s.energy, arr: s.arr, mix: s.mix });
+  if (s.outro) sb.outro = s.outro; // 페이드아웃을 찾았을 때만 — 못 찾으면 직접 고른 아웃트로를 그대로 둔다
   // 보컬은 있어도 성별까지는 알 수 없어 채우지 않고 안내만 한다
   const voice = mix.detected.some((d) => d.key === 'voice' && d.score > 0.2);
   // 불러온 값과 부딪치는 제외 항목은 따로 알리지 않고 아래 알림에 합친다(경고가 바로 덮여 사라지지 않게)
@@ -772,21 +999,42 @@ async function copyOut(id, label) {
 $('#sb-from-mixer').onclick = fromMixer;
 $('#sb-from-song').onclick = fromSong;
 $('#sb-preview').onclick = previewSb;
-$('#sb-reset').onclick = () => { sb = SB_DEFAULT(); commit(); };
+// 컨셉 도우미 답 + Concept 내용(직접 고친 것 포함)을 처음 상태로
+function clearConcept() {
+  helper = { scene: [], story: [], feel: [], must: [], hook: '' };
+  saveHelper();
+  renderHelper();
+  setConcept('', false);
+}
+$('#sb-concept-clear', conceptRow).onclick = () => {
+  clearConcept();
+  flash('컨셉 도우미의 답과 Concept 내용을 지웠습니다.', 'ok');
+};
+// 1~11번 선택까지 모두 처음 상태로
+$('#sb-reset').onclick = () => {
+  sb = SB_DEFAULT();
+  clearConcept();
+  commit();
+  flash('컨셉 도우미·Concept·모든 선택을 초기화했습니다.', 'ok');
+};
 $('#sb-gen').onclick = generateStyle;
 $('#sb-copy-style').onclick = () => copyOut('sb-style', 'Style of Music');
+$('#sb-copy-excl').onclick = () => copyOut('sb-excl', 'Exclude Styles');
 $('#sb-clear-style').onclick = clearStyle;
 try {
   // 예전 버전은 목록형 문자열 하나만 저장했다. 모양이 다르면(손상 등) 버리고 예전 값으로
   const saved = JSON.parse(localStorage.getItem('music.suno.styleOut') || 'null');
   const ok = saved && typeof saved.list === 'string' && typeof saved.prose === 'string';
-  styleOut = ok ? saved : { list: localStorage.getItem('music.suno.style') || '', prose: '' };
+  // excl은 나중에 생긴 칸이라 예전 저장값에는 없다
+  styleOut = ok ? { excl: '', ...saved } : { list: localStorage.getItem('music.suno.style') || '', prose: '', excl: '' };
   styleSnapshot = localStorage.getItem('music.suno.styleSnap');
 } catch {}
 $('#sb-fmt').outerHTML = fmtTabsHtml('sb-fmt');
 bindFmtTabs($('#sb-fmt'), showStyle);
 // 저장된 선택에 제외 기본값을 채운 경우 등, 부딪치는 제외 항목을 열 때 조용히 정리한다
 if (resolveConflicts(true).length) saveSb();
+renderHelper();
+setConcept(conceptManual ? concept : helperConcept(), conceptManual);
 syncGenreTab();
 renderSb();
 showStyle();

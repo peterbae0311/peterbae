@@ -4,7 +4,7 @@ const ANALYSIS_SCRIPTS = [
   'https://cdn.jsdelivr.net/npm/onnxruntime-web@1.19.2/dist/ort.min.js',
   'https://cdn.jsdelivr.net/npm/essentia.js@0.1.3/dist/essentia-wasm.web.js',
   'https://cdn.jsdelivr.net/npm/essentia.js@0.1.3/dist/essentia.js-core.umd.js',
-  'analyzer.js?v=20261027e',
+  'analyzer.js?v=20261029c',
 ];
 
 const up = {
@@ -131,7 +131,7 @@ function renderResult() {
       <div class="r-row"><span class="r-label">장르</span><div class="chips">${genres}</div></div>
       <div class="r-row"><span class="r-label">리듬</span><div class="chips">${optChips('feel', feel)}</div></div>
       <div class="r-row"><span class="r-label">분위기</span><div class="chips">${optChips('mood', hints.mood)}${optChips('energy', [hints.energy])}</div></div>
-      <div class="r-row"><span class="r-label">편곡</span><div class="chips">${optChips('arr', hints.arr)}</div></div>
+      <div class="r-row"><span class="r-label">편곡</span><div class="chips">${optChips('arr', hints.arr)}${hints.outro ? optChips('outro', [hints.outro]) : ''}</div></div>
       <div class="r-row"><span class="r-label">사운드</span><div class="chips">${optChips('mix', hints.mix)}</div></div>
       <div class="r-row"><span class="r-label">인식된 악기</span><div class="chips">${detected}</div></div>
       <div class="r-row"><span class="r-label">켜진 악기</span><div class="chips">${picked}</div></div>

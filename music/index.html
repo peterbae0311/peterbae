@@ -24,7 +24,7 @@
   <link rel="stylesheet" crossorigin
         href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/static/pretendard.css">
   <!-- 파일을 고치면 ?v= 값을 올려 브라우저 캐시에 남은 예전 파일을 쓰지 않게 한다 -->
-  <link rel="stylesheet" href="style.css?v=20261027e">
+  <link rel="stylesheet" href="style.css?v=20261029e">
 </head>
 <body>
   <header class="hero">
@@ -117,7 +117,7 @@
             <button class="ghost" id="sb-from-mixer">현재 믹서 불러오기</button>
             <button class="ghost" id="sb-from-song">곡 분석 불러오기</button>
             <button class="ghost" id="sb-preview">고른 악기 믹서로 듣기</button>
-            <button class="ghost danger" id="sb-reset" title="모든 선택을 지우고 11번 제외 항목만 기본값(보컬 외 전체)으로 되돌립니다">선택 초기화</button>
+            <button class="ghost danger" id="sb-reset" title="컨셉 도우미·Concept 내용과 1~10번 선택을 모두 지우고, 11번 제외 항목만 기본값(보컬 외 전체)으로 되돌립니다">선택 초기화</button>
           </div>
           <div class="sb">
             <div class="sb-form" id="sb-form"></div>
@@ -131,7 +131,14 @@
                   </span>
                 </div>
                 <small class="sb-where">Suno Custom 모드 → 스타일 입력란 · 항목을 고른 뒤 [생성]을 누르세요</small>
-                <textarea id="sb-style" rows="24" readonly></textarea>
+                <textarea id="sb-style" rows="16" readonly></textarea>
+              </div>
+              <div class="sb-field">
+                <div class="sb-field-head"><b>Exclude Styles</b>
+                  <span class="sb-btns"><button class="ghost" id="sb-copy-excl">복사</button></span>
+                </div>
+                <small class="sb-where">Suno Custom 모드 → 고급 옵션의 제외 스타일(Exclude Styles) 칸. 스타일 칸에 'no ○○'로 쓰면 오히려 그 소리로 끌려갈 수 있어 따로 둡니다</small>
+                <textarea id="sb-excl" rows="2" readonly></textarea>
               </div>
             </div>
           </div>
@@ -207,8 +214,8 @@
   <script src="https://cdnjs.cloudflare.com/ajax/libs/tone/14.8.49/Tone.js"></script>
   <script src="instruments.js?v=20261018y"></script>
   <script src="app.js?v=20261018y"></script>
-  <script src="upload.js?v=20261027e"></script>
-  <script src="suno.js?v=20261027d"></script>
+  <script src="upload.js?v=20261029c"></script>
+  <script src="suno.js?v=20261029l"></script>
   <script src="songs.js?v=20261018y"></script>
 </body>
 </html>
