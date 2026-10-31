@@ -597,8 +597,7 @@ $('#sb-concept-reset', conceptRow).onclick = () => {
 
 /* ---------------- 컨셉 도우미 (Concept 위) ----------------
  * 음악을 몰라도 "누가·언제·어떤 기분으로 들을 곡인가"에 답하면 Concept 초안과 6번 분위기 추천을 만든다.
- * 서버·LLM 없이 동작해야 해서 자유 입력 대신 선택지로 묻고, 선택지마다 영어 문장과 분위기(6번 값)를 붙여 둔다.
- * 훅 문구만 직접 적는다(영어 권장 — 그대로 가사·제목 후보가 된다) */
+ * 서버·LLM 없이 동작해야 해서 자유 입력 대신 선택지로 묻고, 선택지마다 영어 문장과 분위기(6번 값)를 붙여 둔다 */
 const helperOpt = (ko, en, mood = []) => ({ ko, en, mood });
 const HELPER_QS = [
   { key: 'scene', title: '① 듣는 상황', hint: '누가·언제·어디서 들을까요? (2개까지)', max: 2, options: [
@@ -621,7 +620,7 @@ const HELPER_QS = [
     helperOpt('몽환적인', 'dreamy and hazy', ['dreamy']), helperOpt('웅장한', 'grand and cinematic', ['epic']), helperOpt('쓸쓸한', 'lonely and wistful', ['melancholic']),
     helperOpt('황금빛', 'warm golden-hour glow'),
   ] },
-  { key: 'must', title: '⑤ 꼭 지킬 것', hint: '이게 빠지면 이 곡이 아니다 싶은 것', max: 8, options: [
+  { key: 'must', title: '④ 꼭 지킬 것', hint: '이게 빠지면 이 곡이 아니다 싶은 것', max: 8, options: [
     helperOpt('속이 뻥 뚫리는 클라이맥스', 'Snare build-up into an explosive, cathartic final chorus with a key change and soaring high notes'),
     helperOpt('중독성 있는 가사와 멜로디', 'Catchy, addictive sing-along chorus hook with repetitive lyrics and an earworm synth melody'),
     helperOpt('청량한 여성 보컬', 'Crisp, airy, refreshing female vocals with a sparkling, clear tone, no male vocals'),
@@ -632,7 +631,9 @@ const HELPER_QS = [
   ] },
 ];
 const HELPER_KEY = 'music.suno.helper';
-let helper = { scene: [], story: [], feel: [], must: [], hook: '' };
+// extra: ⑤ 직접 추가 원문, extraEn: 번역한 영어 줄들, extraSrc: 번역할 때의 원문(바뀌면 다시 번역해야 함)
+const HELPER_EMPTY = () => ({ scene: [], story: [], feel: [], must: [], extra: '', extraEn: [], extraSrc: '' });
+let helper = HELPER_EMPTY();
 try { Object.assign(helper, JSON.parse(localStorage.getItem(HELPER_KEY) || '{}')); } catch {}
 const saveHelper = () => { try { localStorage.setItem(HELPER_KEY, JSON.stringify(helper)); } catch {} };
 const helperPicked = (q) => q.options.filter((x) => helper[q.key].includes(x.ko));
@@ -644,9 +645,11 @@ function helperConcept() {
   if (scene.length) items.push([`듣는 상황: ${scene.map((x) => x.ko).join(', ')}`, sentence(joinAnd(scene.map((x) => x.en)))]);
   if (story.length) items.push([`이야기: ${story[0].ko}`, sentence(story[0].en)]);
   if (feel.length) items.push([`느낌: ${feel.map((x) => x.ko).join(' · ')}`, sentence(feel.map((x) => x.en).join(', '))]);
-  const hook = helper.hook.trim();
-  if (hook) items.push([`훅: "${hook}"`, `Build the chorus around the catchy hook "${hook}", repeated so listeners can sing along`]);
   must.forEach((x) => items.push([x.ko, x.en]));
+  // ⑤ 직접 추가: 영어로 적었으면 그대로, 한글이면 번역이 끝난(원문이 그대로인) 경우에만 넣는다
+  const extra = extraLines();
+  if (extra.length && !HANGUL.test(helper.extra)) items.push(['직접 추가', extra.join('. ')]);
+  else if (extra.length && extraTranslated()) items.push([`직접 추가: ${extra.join(' / ')}`, helper.extraEn.join('. ')]);
   return items.map(([ko, en], i) => `${'①②③④⑤⑥⑦⑧⑨⑩⑪⑫⑬⑭⑮'[i]} ${ko}\n: ${en}`).join('\n');
 }
 
@@ -663,17 +666,7 @@ function renderHelper() {
   const body = document.createElement('div');
   body.className = 'sb-body';
   HELPER_QS.slice(0, 3).forEach((q) => body.append(helperGroup(q)));
-  // ④ 훅: 직접 입력
-  const hookBox = document.createElement('div');
-  hookBox.className = 'sb-group';
-  hookBox.innerHTML = `<span class="sb-glabel">④ 훅</span>`;
-  const hookIn = Object.assign(document.createElement('input'), {
-    type: 'text', value: helper.hook, maxLength: 60, className: 'sb-hook',
-    placeholder: '사람들이 따라 부를 한 마디 (영어 권장, 예: When the leaves turn)',
-  });
-  hookIn.oninput = () => { helper.hook = hookIn.value; saveHelper(); renderHelperPreview(); syncConcept(); };
-  hookBox.append(hookIn);
-  body.append(hookBox, helperGroup(HELPER_QS[3]));
+  body.append(helperGroup(HELPER_QS[3]), extraBox());
   const ref = document.createElement('small');
   ref.className = 'sb-helper-note';
   ref.innerHTML = '⑥ 참고 곡: 비슷한 곡이 있으면 <b>곡으로 조합 만들기</b>에서 분석한 뒤 위의 [곡 분석 불러오기]로 장르·템포·악기를 가져오세요.';
@@ -691,6 +684,70 @@ function renderHelper() {
   );
   renderHelperPreview();
 }
+/* ⑤ 직접 추가: 곡마다 덧붙이는 자유 지시. 영어는 그대로, 한글은 [영어로 번역](허브 /api/music/translate → Morfac)으로 바꿔 넣는다.
+ * 원문을 고치면 번역이 낡은 것이 되어 Concept에서 빠지고 다시 번역하라고 알린다 */
+const HANGUL = /[가-힣ㄱ-ㅎㅏ-ㅣ]/;
+const extraLines = () => helper.extra.split('\n').map((l) => l.trim()).filter(Boolean);
+const extraTranslated = () => helper.extraSrc === helper.extra && helper.extraEn.length > 0;
+
+function extraBox() {
+  const box = document.createElement('div');
+  box.className = 'sb-group sb-extra';
+  box.append(Object.assign(document.createElement('span'), { className: 'sb-glabel', textContent: '⑤ 직접 추가' }));
+  const col = document.createElement('div');
+  col.className = 'sb-extra-col';
+  const area = Object.assign(document.createElement('textarea'), {
+    rows: 3, value: helper.extra, spellcheck: false,
+    placeholder: '덧붙이고 싶은 지시를 한 줄씩 적으세요. 한글은 [영어로 번역], 영어는 그대로 들어가요 (예: 후렴에 박수 소리를 넣어줘)',
+  });
+  const row = document.createElement('div');
+  row.className = 'sb-extra-row';
+  const btn = Object.assign(document.createElement('button'), { type: 'button', className: 'ghost', textContent: '영어로 번역' });
+  const status = document.createElement('small');
+  const update = () => {
+    const ko = HANGUL.test(helper.extra);
+    btn.hidden = !ko;
+    status.textContent = !extraLines().length ? ''
+      : !ko ? '영어 문장이라 그대로 Concept에 들어갑니다.'
+      : extraTranslated() ? `번역: ${helper.extraEn.join(' / ')}`
+      : '한글이 있어요. [영어로 번역]을 눌러야 Concept에 들어갑니다.';
+    status.classList.toggle('warn', ko && !extraTranslated());
+  };
+  area.oninput = () => { helper.extra = area.value; saveHelper(); update(); syncConcept(); };
+  btn.onclick = () => translateExtra(btn, update);
+  row.append(btn, status);
+  col.append(area, row);
+  box.append(col);
+  update();
+  return box;
+}
+
+async function translateExtra(btn, done) {
+  const src = helper.extra;
+  btn.disabled = true;
+  btn.textContent = '번역 중…';
+  try {
+    const r = await fetch('/api/music/translate', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ text: src }),
+    });
+    const data = await r.json().catch(() => null);
+    // 404·405·501: 번역 라우트가 없는 서버(로컬 정적 서버, nginx 설정 전)
+    if (!r.ok || !Array.isArray(data?.lines)) throw new Error(data?.error || ([404, 405, 501].includes(r.status) ? 'NO_SERVER' : `HTTP ${r.status}`));
+    Object.assign(helper, { extraEn: data.lines, extraSrc: src });
+    saveHelper();
+    syncConcept();
+    flash('영어로 번역해 Concept에 넣었습니다.', 'ok');
+  } catch (e) {
+    flash(e.message === 'NO_SERVER'
+      ? '번역 서버를 찾지 못했습니다. 번역은 허브가 있는 배포 사이트에서만 됩니다(로컬에서는 영어로 직접 적어 주세요).'
+      : `번역하지 못했습니다: ${e.message}`, 'error');
+  } finally {
+    btn.disabled = false;
+    btn.textContent = '영어로 번역';
+    done();
+  }
+}
+
 function helperGroup(q) {
   const box = document.createElement('div');
   box.className = 'sb-group';
@@ -711,11 +768,9 @@ function helperGroup(q) {
 function renderHelperPreview() {
   const moods = helperMoods();
   const key = autoKey(moods);
-  const hook = helper.hook.trim();
   $('.sb-helper-preview', helperRow).innerHTML = [
     `추천 분위기(6번): <b>${moods.length ? moods.map((m) => OPTION_KO.mood[m]).join(', ') : '없음'}</b>`,
     `7번: <b>${key === 'major' ? '밝게 (Major)' : key === 'minor' ? '감성 (Minor)' : '선택 안 함'}</b>`,
-    hook ? `제목·후렴 첫 줄 후보: <b>${hook.replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' })[c])}</b>` : '',
   ].filter(Boolean).join(' · ');
 }
 // 6번 분위기는 직접 고른 값을 덮어쓰지 않게 버튼으로만 적용한다(Concept은 선택에 따라 자동으로 바뀜)
@@ -1001,7 +1056,7 @@ $('#sb-from-song').onclick = fromSong;
 $('#sb-preview').onclick = previewSb;
 // 컨셉 도우미 답 + Concept 내용(직접 고친 것 포함)을 처음 상태로
 function clearConcept() {
-  helper = { scene: [], story: [], feel: [], must: [], hook: '' };
+  helper = HELPER_EMPTY();
   saveHelper();
   renderHelper();
   setConcept('', false);
