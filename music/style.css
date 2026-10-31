@@ -506,6 +506,50 @@ body.no-board #board { display: none; } /* Suno Style Builder·Suno 작곡 탭 *
 .song-head { display: flex; align-items: flex-start; justify-content: space-between; gap: 16px; flex-wrap: wrap; margin-bottom: 12px; }
 .pdesc-static { margin: 0; font-size: 13px; color: var(--muted); max-width: 760px; }
 .pdesc-static b { color: var(--text); font-weight: 600; }
+
+/* ---------- 제목·가사 ---------- */
+#panel-lyrics > .pdesc-static { margin-bottom: 14px; }
+.ly-top { display: grid; grid-template-columns: minmax(0, 1fr) minmax(320px, 460px); gap: 20px; align-items: start; }
+.ly-head { display: flex; align-items: center; gap: 8px; margin-bottom: 4px; }
+.ly-head b { font-size: 13.5px; white-space: nowrap; }
+.ly-head small { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.ly-head .ghost { margin-left: auto; padding: 4px 10px; font-size: 12px; white-space: nowrap; flex: none; }
+.ly-style textarea, .ly-opts input, .ly-opts select, .ly-titles input, .ly-line input {
+  font-family: inherit; font-size: 13px; color: var(--text); background: var(--field-bg);
+  border: 1px solid var(--line); border-radius: 8px; padding: 6px 9px;
+}
+.ly-style textarea { width: 100%; resize: vertical; line-height: 1.5; font-size: 12.5px; }
+.ly-opts { display: flex; flex-direction: column; gap: 10px; }
+.ly-row { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+.ly-opts label { display: flex; align-items: center; gap: 6px; font-size: 12.5px; color: var(--muted); }
+.ly-opts #ly-bpm { width: 72px; }
+.ly-theme { flex-direction: column; align-items: stretch !important; gap: 4px !important; }
+.ly-theme input { width: 100%; }
+.ly-ver { display: inline-flex; align-items: center; gap: 4px; font-size: 12.5px; color: var(--muted); }
+.ly-ver .ghost { padding: 2px 8px; font-size: 11px; }
+#ly-result { margin-top: 18px; border-top: 1px solid var(--line); padding-top: 14px; display: flex; flex-direction: column; gap: 10px; }
+.ly-titles { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.ly-titles b { font-size: 13.5px; }
+.ly-chips { display: inline-flex; gap: 5px; flex-wrap: wrap; }
+.ly-titles input { flex: 1; min-width: 200px; font-size: 14px; font-weight: 600; }
+.ly-structure { font-size: 12px; }
+.ly-body { display: flex; flex-direction: column; gap: 12px; }
+.ly-sec h4 { margin: 0 0 5px; font-size: 12.5px; color: var(--accent); font-weight: 600; }
+.ly-line { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) 34px; gap: 6px; margin-bottom: 4px; }
+.ly-line input { min-width: 0; }
+.ly-line .ly-en { font-weight: 500; }
+.ly-line.dirty .ly-ko { border-color: var(--accent); }
+.ly-re { padding: 0; font-size: 14px; }
+.ly-re:disabled { opacity: 0.35; }
+.ly-foot { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; justify-content: flex-end; }
+.ly-foot #ly-length { margin-right: auto; font-size: 12.5px; }
+.ly-foot button { padding: 6px 12px; font-size: 12.5px; }
+@media (max-width: 900px) {
+  .ly-top { grid-template-columns: 1fr; }
+  .ly-line { grid-template-columns: 1fr 34px; }
+  .ly-line .ly-ko { grid-column: 1; }
+  .ly-line .ly-re { grid-row: 1 / span 2; grid-column: 2; }
+}
 .song-tools { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
 .song-table-wrap { position: relative; overflow-x: auto; border: 1px solid var(--line); border-radius: 10px; }
 .song-table { width: 100%; border-collapse: collapse; font-size: 13px; }

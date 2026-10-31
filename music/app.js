@@ -258,7 +258,7 @@ function buildPanelTabs() {
       document.getElementById(t.getAttribute('aria-controls')).hidden = !on;
     });
     // Suno Style Builder·Suno 작곡 탭에서는 하단 악기 목록을 숨김
-    document.body.classList.toggle('no-board', id === 'tab-suno' || id === 'tab-songs');
+    document.body.classList.toggle('no-board', id === 'tab-suno' || id === 'tab-lyrics' || id === 'tab-songs');
     try { localStorage.setItem('music.panelTab.v2', id); } catch {}
   };
   tabs.forEach((t, i) => {

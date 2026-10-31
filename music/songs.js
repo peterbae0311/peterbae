@@ -187,14 +187,15 @@ function renderFileState(name, size) {
   box.append(rm);
 }
 
-function openSong(s = null) {
+// draft: 새 곡을 미리 채워 열 때의 값(제목·가사 탭의 [Suno 작곡에 저장])
+function openSong(s = null, draft = {}) {
   editing = s;
   pendingFile = undefined;
   songEl.form.reset();
   $('#song-dialog-title').textContent = s ? '곡 수정' : '곡 추가';
   $('#song-delete').hidden = !s;
   $('#song-error').textContent = '';
-  const v = s ?? { createdOn: today() };
+  const v = s ?? { createdOn: today(), ...draft };
   for (const k of SONG_FIELDS) f(k).value = v[k] ?? '';
   if (!RATINGS.includes(f('rating').value)) f('rating').value = '작곡 전'; // 새 곡·평가 항목이 없던 예전 곡
   for (const [k, d] of Object.entries(SUNO_DEFAULTS)) if (v[k] == null || v[k] === '') f(k).value = d;
