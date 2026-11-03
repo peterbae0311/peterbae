@@ -124,7 +124,7 @@ async function generateLyrics() {
     if (lyState.versions.length > LY_MAX_VERSIONS) lyState.versions.shift();
     lyState.cur = lyState.versions.length - 1;
     saveLy();
-    renderResult();
+    renderLyrics();
     ly.status.textContent = `완료 · ${Math.round((performance.now() - t0) / 1000)}초`;
   } catch (e) {
     ly.status.textContent = '';
@@ -183,7 +183,7 @@ function parseLyrics(text, sections) {
 }
 
 /* ---------------- 결과 화면 ---------------- */
-function renderResult() {
+function renderLyrics() {
   const v = curVer();
   ly.result.hidden = !v;
   ly.verBox.hidden = lyState.versions.length < 2;
@@ -196,7 +196,7 @@ function renderResult() {
     const c = Object.assign(document.createElement('button'), { className: 'sb-chip', type: 'button' });
     c.append(Object.assign(document.createElement('span'), { className: 'lbl', textContent: t }));
     c.setAttribute('aria-pressed', String(v.title === t));
-    c.onclick = () => { v.title = t; ly.title.value = t; saveLy(); renderResult(); };
+    c.onclick = () => { v.title = t; ly.title.value = t; saveLy(); renderLyrics(); };
     return c;
   }));
   ly.title.value = v.title;
@@ -295,8 +295,8 @@ ly.bpm.onchange = () => { lyState.bpm = Math.max(60, Math.min(180, Math.round(+l
 ly.theme.oninput = () => { lyState.theme = ly.theme.value; saveLy(); };
 ly.stylePull.onclick = () => pullStyle();
 ly.gen.onclick = generateLyrics;
-$('#ly-prev').onclick = () => { lyState.cur--; saveLy(); renderResult(); };
-$('#ly-next').onclick = () => { lyState.cur++; saveLy(); renderResult(); };
+$('#ly-prev').onclick = () => { lyState.cur--; saveLy(); renderLyrics(); };
+$('#ly-next').onclick = () => { lyState.cur++; saveLy(); renderLyrics(); };
 ly.title.oninput = () => { const v = curVer(); if (v) { v.title = ly.title.value; saveLy(); } };
 $('#ly-copy-en').onclick = () => copyLyrics('en');
 $('#ly-copy-ko').onclick = () => copyLyrics('ko');
@@ -305,4 +305,4 @@ $('#ly-save').onclick = saveToSongs;
 $('#tab-lyrics').addEventListener('click', () => { if (!ly.style.value.trim()) pullStyle(true); });
 if (!ly.style.value.trim()) pullStyle(true);
 renderPlan();
-renderResult();
+renderLyrics();

@@ -107,7 +107,7 @@ function renderSongs() {
     if (s.fileName) {
       const b = Object.assign(document.createElement('button'), { className: 'ghost song-play', textContent: playingId === s.id ? '■ 정지' : '▶ 재생' });
       b.setAttribute('aria-label', `${s.titleKo} ${playingId === s.id ? '정지' : '재생'}`);
-      b.onclick = (e) => { e.stopPropagation(); togglePlay(s); };
+      b.onclick = (e) => { e.stopPropagation(); toggleSongPlay(s); };
       play.append(b);
     } else play.append(Object.assign(document.createElement('span'), { className: 'muted', textContent: '—' }));
     const link = document.createElement('td');
@@ -132,7 +132,7 @@ function renderSongs() {
   }));
 }
 
-async function togglePlay(s) {
+async function toggleSongPlay(s) {
   const p = songEl.player;
   if (playingId === s.id) {
     p.pause();
