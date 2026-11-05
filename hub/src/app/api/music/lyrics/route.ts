@@ -1,9 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createServerSupabaseClient } from '@/lib/supabaseServer';
-import { morfacFetch, morfacKey } from '@/lib/morfac';
+import { musicChat } from '@/lib/musicLlm';
 
 /**
- * music(악기 믹서) 제목·가사 탭의 가사 생성 프록시(Morfac, 스트리밍).
+ * music(악기 믹서) 제목·가사 탭의 가사 생성 프록시(스트리밍). Morfac이 안 되면 Groq·OpenRouter 무료 모델로 넘어간다.
  * 클라이언트가 곡 길이·BPM으로 정한 "겹치지 않는 섹션과 줄 수"(+ 목표 길이·전체 구성·엔딩)를 보내면, 그 구조로 만든
  * 빈칸 JSON 템플릿을 모델이 채워 영어 가사와 줄별 한글 뜻, 제목 후보 3개를 만든다. 후렴·프리코러스처럼 반복되는 섹션은 한 번만 쓰게 해서(반복 배치는 클라이언트가 함)
  * 출력량을 줄였다. 실측 12~15초지만 모델 상태에 따라 길어질 수 있어, 글자가 나오는 대로 흘려보내
@@ -88,9 +88,6 @@ export async function POST(request: NextRequest) {
   if (!style) return NextResponse.json({ error: '스타일이 없습니다. Suno Style Builder에서 먼저 [생성]을 눌러 주세요.' }, { status: 400 });
   if (!sections.length) return NextResponse.json({ error: '곡 구조가 없습니다.' }, { status: 400 });
 
-  const apiKey = await morfacKey();
-  if (!apiKey) return NextResponse.json({ error: 'Key 관리에 MORFAC_API_KEY 값이 등록되어 있지 않습니다.' }, { status: 500 });
-
   const userPrompt = [
     `Style: ${style}`,
     theme ? `Theme: ${theme}` : '',
@@ -100,25 +97,17 @@ export async function POST(request: NextRequest) {
     `Template:\n${template(sections)}`,
   ].filter(Boolean).join('\n');
 
-  let upstream: Response;
-  try {
-    upstream = await morfacFetch(apiKey, [
-      { role: 'system', content: SYSTEM_PROMPT },
-      { role: 'user', content: userPrompt },
-    ], { maxTokens: 3500, temperature: 0.85, stream: true, timeoutMs: TIMEOUT_MS });
-  } catch {
-    return NextResponse.json({ error: '가사 생성 서버(Morfac)에 연결하지 못했습니다. 잠시 후 다시 시도해 주세요.' }, { status: 502 });
-  }
-  if (!upstream.ok || !upstream.body) {
-    const data = await upstream.json().catch(() => null);
-    return NextResponse.json(
-      { error: `가사 생성 서버 오류(${upstream.status})${data?.detail ? `: ${data.detail}` : ''}` },
-      { status: 502 },
-    );
+  // Morfac → Groq → OpenRouter 순서로, 처음 응답하는 공급자를 쓴다(musicLlm.ts)
+  const llm = await musicChat([
+    { role: 'system', content: SYSTEM_PROMPT },
+    { role: 'user', content: userPrompt },
+  ], { maxTokens: 3500, temperature: 0.85, stream: true, timeoutMs: TIMEOUT_MS });
+  if (!llm.ok) {
+    return NextResponse.json({ error: `가사 생성 서버에 모두 연결하지 못했습니다(${llm.error}). 잠시 후 다시 시도해 주세요.` }, { status: 502 });
   }
 
   // SSE(data: {...}) → 글자만 이어 붙인 일반 텍스트로 바꿔 흘려보낸다
-  const reader = upstream.body.getReader();
+  const reader = llm.res.body!.getReader();
   const decoder = new TextDecoder();
   const encoder = new TextEncoder();
   const stream = new ReadableStream<Uint8Array>({
@@ -149,6 +138,9 @@ export async function POST(request: NextRequest) {
     },
   });
   return new Response(stream, {
-    headers: { 'Content-Type': 'text/plain; charset=utf-8', 'Cache-Control': 'no-cache', 'X-Accel-Buffering': 'no' },
+    headers: {
+      'Content-Type': 'text/plain; charset=utf-8', 'Cache-Control': 'no-cache', 'X-Accel-Buffering': 'no',
+      'X-Music-LLM': llm.provider, // 화면에 어느 공급자가 썼는지 보여 준다
+    },
   });
 }

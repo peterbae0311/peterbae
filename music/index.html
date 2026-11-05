@@ -24,7 +24,7 @@
   <link rel="stylesheet" crossorigin
         href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/static/pretendard.css">
   <!-- 파일을 고치면 ?v= 값을 올려 브라우저 캐시에 남은 예전 파일을 쓰지 않게 한다 -->
-  <link rel="stylesheet" href="style.css?v=20261031g">
+  <link rel="stylesheet" href="style.css?v=20261105a">
 </head>
 <body>
   <header class="hero">
@@ -146,7 +146,10 @@
         </div>
       </div>
       <div class="ppanel" role="tabpanel" id="panel-lyrics" aria-labelledby="tab-lyrics" hidden>
-        <p class="pdesc-static">Suno Style Builder에서 만든 스타일에 맞춰 <b>영어 제목·가사</b>를 만듭니다. 한글 뜻을 고치고 <b>[↻]</b>를 누르면 그 줄만 다시 영어로 바꿉니다. 마음에 들면 [Suno 작곡에 저장]으로 보관하고 Suno에서 생성하세요. 가사 생성·번역은 허브가 있는 배포 사이트에서만 됩니다.</p>
+        <p class="pdesc-static">Suno Style Builder에서 만든 스타일에 맞춰 <b>영어 제목·가사</b>를 만듭니다. 한글 뜻을 고치고 <b>[↻]</b>를 누르면 그 줄만 다시 영어로 바꿉니다. 이미 써 둔 가사가 있으면 <b>[직접 입력]</b>에 붙여 넣으세요. 마음에 들면 [Suno 작곡에 저장]으로 보관하고 Suno에서 생성하세요. 가사 생성·번역은 허브가 있는 배포 사이트에서만 됩니다.</p>
+        <span class="fmt-tabs ly-mode" role="tablist" aria-label="가사 만드는 방법" id="ly-mode">
+          <button type="button" role="tab" data-mode="ai" aria-selected="true">AI 생성</button><button type="button" role="tab" data-mode="manual" aria-selected="false">직접 입력</button>
+        </span>
         <div class="ly-top">
           <div class="ly-style">
             <div class="ly-head"><b>스타일</b><small id="ly-style-src" class="muted"></small>
@@ -159,9 +162,9 @@
               <label>BPM <input id="ly-bpm" type="number" min="60" max="180" step="1"></label>
               <span id="ly-plan" class="muted"></span>
             </div>
-            <label class="ly-theme">주제·메모 (선택, 한글 가능)
+            <label class="ly-theme ly-ai-only">주제·메모 (선택, 한글 가능)
               <input id="ly-theme" maxlength="300" placeholder="예: 가을 드라이브에서 다시 사랑에 빠지는 설렘" autocomplete="off"></label>
-            <div class="ly-row">
+            <div class="ly-row ly-ai-only">
               <button class="primary" id="ly-gen">가사 생성</button>
               <span class="ly-ver" id="ly-ver-box" hidden>
                 <button class="ghost" id="ly-prev" aria-label="이전 버전">◀</button><span id="ly-ver"></span><button class="ghost" id="ly-next" aria-label="다음 버전">▶</button>
@@ -177,12 +180,24 @@
           </div>
           <div id="ly-structure" class="ly-structure muted"></div>
           <div id="ly-body" class="ly-body"></div>
-          <div class="ly-foot">
-            <span id="ly-length" class="muted"></span>
-            <button class="ghost" id="ly-copy-en">Suno용 가사 복사</button>
-            <button class="ghost" id="ly-copy-ko">한글 뜻 복사</button>
-            <button class="primary" id="ly-save">Suno 작곡에 저장</button>
+        </div>
+        <div id="ly-manual" class="ly-manual" hidden>
+          <div class="ly-titles">
+            <b>제목</b>
+            <input id="ly-m-title" maxlength="120" aria-label="곡 제목(직접 입력)" placeholder="예: Stay a While" autocomplete="off">
           </div>
+          <div class="ly-m-cols">
+            <label><b>영어 가사</b> <small class="muted">Suno 가사 칸에 그대로 들어갑니다. [Verse 1] 같은 태그도 함께 쓸 수 있어요.</small>
+              <textarea id="ly-m-en" rows="18" spellcheck="false" placeholder="[Verse 1]&#10;Rain is tapping on the glass&#10;..."></textarea></label>
+            <label><b>한글 가사</b> <small class="muted">보관용 한글 뜻입니다.</small>
+              <textarea id="ly-m-ko" rows="18" placeholder="[Verse 1]&#10;빗방울이 유리창을 두드려&#10;..."></textarea></label>
+          </div>
+        </div>
+        <div class="ly-foot" id="ly-foot" hidden>
+          <span id="ly-length" class="muted"></span>
+          <button class="ghost" id="ly-copy-en">Suno용 가사 복사</button>
+          <button class="ghost" id="ly-copy-ko">한글 뜻 복사</button>
+          <button class="primary" id="ly-save">Suno 작곡에 저장</button>
         </div>
       </div>
 
@@ -259,6 +274,6 @@
   <script src="upload.js?v=20261029c"></script>
   <script src="suno.js?v=20261031e"></script>
   <script src="songs.js?v=20261103a"></script>
-  <script src="lyrics.js?v=20261103a"></script>
+  <script src="lyrics.js?v=20261105e"></script>
 </body>
 </html>

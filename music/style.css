@@ -541,11 +541,24 @@ body.no-board #board { display: none; } /* Suno Style Builder·Suno 작곡 탭 *
 .ly-line.dirty .ly-ko { border-color: var(--accent); }
 .ly-re { padding: 0; font-size: 14px; }
 .ly-re:disabled { opacity: 0.35; }
-.ly-foot { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; justify-content: flex-end; }
+.ly-mode { margin-bottom: 14px; }
+.ly-mode button { padding: 5px 14px; font-size: 13px; }
+#panel-lyrics.manual .ly-ai-only { display: none; }
+.ly-manual { margin-top: 18px; border-top: 1px solid var(--line); padding-top: 14px; display: flex; flex-direction: column; gap: 10px; }
+.ly-m-cols { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 12px; }
+.ly-m-cols label { display: flex; flex-direction: column; gap: 5px; font-size: 13.5px; }
+.ly-m-cols small { font-size: 11.5px; }
+.ly-m-cols textarea {
+  width: 100%; min-height: 320px; resize: vertical; font-family: inherit; font-size: 13px; line-height: 1.6;
+  color: var(--text); background: var(--field-bg); border: 1px solid var(--line); border-radius: 8px; padding: 8px 10px;
+}
+.ly-manual .ly-titles input { font-family: inherit; color: var(--text); background: var(--field-bg); border: 1px solid var(--line); border-radius: 8px; padding: 6px 9px; }
+.ly-foot { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; justify-content: flex-end; margin-top: 10px; }
 .ly-foot #ly-length { margin-right: auto; font-size: 12.5px; }
 .ly-foot button { padding: 6px 12px; font-size: 12.5px; }
 @media (max-width: 900px) {
   .ly-top { grid-template-columns: 1fr; }
+  .ly-m-cols { grid-template-columns: 1fr; }
   .ly-line { grid-template-columns: 1fr 34px; }
   .ly-line .ly-ko { grid-column: 1; }
   .ly-line .ly-re { grid-row: 1 / span 2; grid-column: 2; }

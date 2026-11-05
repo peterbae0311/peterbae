@@ -1,16 +1,16 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createServerSupabaseClient } from '@/lib/supabaseServer';
-import { morfacFetch, morfacKey } from '@/lib/morfac';
+import { musicChat } from '@/lib/musicLlm';
 
 /**
  * music(악기 믹서) 한글 → 영어 번역 프록시(Morfac). 두 가지 쓰임:
  *  - mode 'style'(기본): 컨셉 도우미 "직접 추가" 칸 — 한글 곡 지시를 Suno 스타일용 짧은 영어 문장으로(줄 단위 1:1)
  *  - mode 'lyric': 제목·가사 탭에서 고친 한글 뜻 한 줄을 부를 수 있는 영어 가사 한 줄로(원래 영어 줄의 길이·운 유지)
- * music은 정적 사이트라 API 키를 둘 수 없어 hub가 대신 호출한다 — 키는 Key 관리의 MORFAC_API_KEY.
+ * music은 정적 사이트라 API 키를 둘 수 없어 hub가 대신 호출한다 — Morfac 우선, 안 되면 Groq·OpenRouter(musicLlm.ts).
  * 경로가 /api/music/... 이라 nginx auth_request가 music 앱 권한으로 판별한다(verify 라우트의 extractAppKey).
  */
 const MAX_CHARS = 500;
-const TIMEOUT_MS = 30_000; // nginx proxy_read_timeout 기본 60초보다 짧게
+const TIMEOUT_MS = 15_000; // 공급자당. 3곳을 다 거쳐도 nginx proxy_read_timeout 기본 60초 안에
 
 const STYLE_PROMPT =
   'You translate Korean notes about how a song should sound into short English directions for a Suno AI music style prompt. '
@@ -44,26 +44,15 @@ export async function POST(request: NextRequest) {
     ].join('\n')
     : raw;
 
-  const apiKey = await morfacKey();
-  if (!apiKey) return NextResponse.json({ error: 'Key 관리에 MORFAC_API_KEY 값이 등록되어 있지 않습니다.' }, { status: 500 });
-
-  let upstream: Response;
-  try {
-    upstream = await morfacFetch(apiKey, [
-      { role: 'system', content: lyric ? LYRIC_PROMPT : STYLE_PROMPT },
-      { role: 'user', content: user_ },
-    ], { maxTokens: 300, temperature: lyric ? 0.5 : 0.2, timeoutMs: TIMEOUT_MS });
-  } catch {
-    return NextResponse.json({ error: '번역 서버(Morfac)에 연결하지 못했습니다. 잠시 후 다시 시도해 주세요.' }, { status: 502 });
+  // 공급자마다 제한 시간을 나눠 써서 전체가 nginx 60초 안에 끝나게 한다
+  const llm = await musicChat([
+    { role: 'system', content: lyric ? LYRIC_PROMPT : STYLE_PROMPT },
+    { role: 'user', content: user_ },
+  ], { maxTokens: 600, temperature: lyric ? 0.5 : 0.2, timeoutMs: TIMEOUT_MS, connectMs: TIMEOUT_MS });
+  if (!llm.ok) {
+    return NextResponse.json({ error: `번역 서버에 모두 연결하지 못했습니다(${llm.error}). 잠시 후 다시 시도해 주세요.` }, { status: 502 });
   }
-
-  const data = await upstream.json().catch(() => null);
-  if (!upstream.ok) {
-    return NextResponse.json(
-      { error: `번역 서버 오류(${upstream.status})${data?.detail ? `: ${data.detail}` : ''}` },
-      { status: 502 },
-    );
-  }
+  const data = await llm.res.json().catch(() => null);
   const translated: string = data?.choices?.[0]?.message?.content?.trim() ?? '';
   if (!translated) return NextResponse.json({ error: '번역 결과가 비어 있습니다.' }, { status: 502 });
 

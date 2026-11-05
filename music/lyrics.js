@@ -1,7 +1,8 @@
 /* 제목·가사: Suno Style Builder의 스타일에 맞춰 영어 제목·가사(줄별 한글 뜻 포함)를 만든다.
  * 곡 길이·BPM으로 섹션과 마디 수를 정하고(planSong), 겹치지 않는 섹션만 hub /api/music/lyrics(Morfac)에 요청한다.
  * 후렴·프리코러스처럼 반복되는 섹션은 한 번만 쓰고 배치할 때 되풀이한다 — 그래서 후렴을 고치면 모든 후렴이 같이 바뀐다.
- * 생성한 버전은 이 브라우저에 저장하고 ◀ ▶로 비교한다. 확정하면 Suno 작곡(보관함) 추가 창을 채워 연다. */
+ * 생성한 버전은 이 브라우저에 저장하고 ◀ ▶로 비교한다. 확정하면 Suno 작곡(보관함) 추가 창을 채워 연다.
+ * [직접 입력] 모드: 이미 써 둔 제목·영어 가사·한글 가사를 그대로 붙여 넣는다. 아래 세 버튼(복사·저장)은 두 모드가 함께 쓴다. */
 
 const LY_KEY = 'music.lyrics.v1';
 const LY_MAX_VERSIONS = 10;
@@ -11,11 +12,15 @@ const ly = {
   gen: $('#ly-gen'), status: $('#ly-status'), verBox: $('#ly-ver-box'), ver: $('#ly-ver'),
   result: $('#ly-result'), titleChips: $('#ly-title-chips'), title: $('#ly-title'),
   structure: $('#ly-structure'), body: $('#ly-body'), length: $('#ly-length'),
+  panel: $('#panel-lyrics'), mode: $('#ly-mode'), manual: $('#ly-manual'), foot: $('#ly-foot'),
+  mTitle: $('#ly-m-title'), mEn: $('#ly-m-en'), mKo: $('#ly-m-ko'),
 };
 
-// 저장 상태: 입력값 + 버전 목록 + 보고 있는 버전
-let lyState = { style: '', len: 175, bpm: 0, theme: '', versions: [], cur: -1 };
+// 저장 상태: 입력값 + 버전 목록 + 보고 있는 버전 + 모드(ai | manual)와 직접 입력한 내용
+let lyState = { style: '', len: 175, bpm: 0, theme: '', versions: [], cur: -1, mode: 'ai', manual: { title: '', en: '', ko: '' } };
 try { Object.assign(lyState, JSON.parse(localStorage.getItem(LY_KEY) || '{}')); } catch {}
+lyState.manual = { title: '', en: '', ko: '', ...lyState.manual };
+const isManual = () => lyState.mode === 'manual';
 const saveLy = () => { try { localStorage.setItem(LY_KEY, JSON.stringify(lyState)); } catch {} };
 const curVer = () => lyState.versions[lyState.cur] ?? null;
 
@@ -36,6 +41,12 @@ const SHRINK = [
   (p) => { const i = idxOf(p, 'Bridge'); if (i >= 0 && p[i].bars > 4) p[i].bars = 4; },
   (p) => { const i = idxOf(p, 'Pre-Chorus', 1); if (i >= 0) p.splice(i, 1); },
   (p) => { const i = idxOf(p, 'Final Chorus'); if (i >= 0 && p[i].bars > 8) p[i].bars = 8; },
+  // 느린 곡(예: 70 BPM은 1마디 3.4초)은 위 단계로는 60마디에서 멈춰 목표보다 30초쯤 길어진다 → 더 줄이는 단계
+  (p) => { const i = idxOf(p, 'Chorus', 1); if (i >= 0 && p[i].bars > 8) p[i].bars = 8; },
+  (p) => { const i = idxOf(p, 'Verse 2'); if (i >= 0 && p[i].bars > 4) p[i].bars = 4; },
+  (p) => { const i = idxOf(p, 'Intro'); if (i >= 0 && p[i].bars > 2) p[i].bars = 2; },
+  (p) => { const i = idxOf(p, 'Bridge'); if (i >= 0) p.splice(i, 1); },
+  (p) => { const i = idxOf(p, 'Verse 2'); if (i >= 0) p.splice(i, 1); },
 ];
 const GROW = [
   (p) => { const i = idxOf(p, 'Verse 2'); if (i >= 0 && p[i].bars < 16) p[i].bars = 16; },
@@ -70,16 +81,31 @@ const fmtLen = (sec) => `${Math.floor(sec / 60)}:${String(Math.round(sec % 60)).
 function fillLengths() {
   for (let s = 120; s <= 240; s += 5) ly.len.append(new Option(fmtLen(s), String(s), false, s === lyState.len));
 }
-// 스타일: Style Builder 출력(문장형이 가사 쓰기에 더 자연스러워 우선)
+// 스타일 문장에 적힌 곡 길이(초). "about 2:55" → 175, "2:50–3:00" → 가운데 175, "3 minutes" → 180.
+// 목록(2:00~4:00, 5초 단위)에 맞춰 반올림한다. 길이가 없으면 null
+function lengthFromStyle(text) {
+  const t = (m, s) => +m * 60 + +s;
+  const range = text.match(/(\d):([0-5]\d)\s*(?:[-–~]|to)\s*(\d):([0-5]\d)/);
+  const one = text.match(/(\d):([0-5]\d)/);
+  const mins = text.match(/(\d(?:\.\d)?)[\s-]*(?:minutes?|mins?)\b/i);
+  const sec = range ? (t(range[1], range[2]) + t(range[3], range[4])) / 2 : one ? t(one[1], one[2]) : mins ? +mins[1] * 60 : null;
+  return sec ? Math.min(240, Math.max(120, Math.round(sec / 5) * 5)) : null;
+}
+
+// 스타일: Style Builder 출력(문장형이 가사 쓰기에 더 자연스러워 우선). BPM은 Style Builder 값을, 곡 길이는 스타일에
+// 적힌 길이(예: "Short song about 2:55")를 함께 가져온다 — 길이가 안 적혀 있으면 지금 고른 길이를 그대로 둔다
 function pullStyle(quiet = false) {
   const text = (styleOut.prose || styleOut.list || '').trim();
   if (!text) return quiet || flash('Suno Style Builder에서 먼저 [생성]을 눌러 스타일을 만들어 주세요.', 'warn');
   ly.style.value = text;
   lyState.style = text;
-  if (!lyState.bpm) ly.bpm.value = lyState.bpm = sb.bpm;
-  ly.styleSrc.textContent = `Style Builder ${styleFmt === 'prose' ? '문장형' : '목록형'} · ${text.length}자`;
+  ly.bpm.value = lyState.bpm = sb.bpm;
+  const sec = lengthFromStyle(text);
+  if (sec) { lyState.len = sec; ly.len.value = String(sec); }
+  ly.styleSrc.textContent = `Style Builder ${styleFmt === 'prose' ? '문장형' : '목록형'} · ${text.length}자 · ${sb.bpm} BPM${sec ? ` · ${fmtLen(sec)}` : ''}`;
   saveLy();
   renderPlan();
+  if (!quiet) flash(`스타일과 BPM ${sb.bpm}${sec ? `, 곡 길이 ${fmtLen(sec)}` : ''}을 가져왔습니다.${sec ? '' : ' 스타일에 곡 길이가 없어 곡 길이는 그대로 두었습니다.'}`, 'ok');
 }
 function renderPlan() {
   const bpm = +ly.bpm.value || 120;
@@ -115,7 +141,10 @@ async function generateLyrics() {
     // 가사에 영어가 아닌 글자가 섞이면 한 번 더 만든다(제목은 걸러 내기만 한다)
     let v;
     for (let attempt = 1; attempt <= 2; attempt++) {
-      v = parseLyrics(await requestLyrics(payload, t0, attempt), sections);
+      const got = await requestLyrics(payload, t0, attempt);
+      // 형식이 깨진 응답(무료 모델에서 가끔)도 한 번은 자동으로 다시 만든다
+      try { v = parseLyrics(got.text, sections); } catch (e) { if (attempt === 2) throw e; continue; }
+      v.provider = got.provider;
       if (!Object.values(v.lyrics).flat().some((l) => NON_EN.test(l.en))) break;
       if (attempt === 2) flash('영어가 아닌 글자가 섞인 줄이 있습니다. 해당 줄을 고치거나 다시 생성해 주세요.', 'warn');
     }
@@ -125,7 +154,8 @@ async function generateLyrics() {
     lyState.cur = lyState.versions.length - 1;
     saveLy();
     renderLyrics();
-    ly.status.textContent = `완료 · ${Math.round((performance.now() - t0) / 1000)}초`;
+    ly.status.textContent = `완료 · ${Math.round((performance.now() - t0) / 1000)}초${v.provider ? ` · ${v.provider}` : ''}`;
+    if (v.provider && v.provider !== 'Morfac') flash(`Morfac을 쓸 수 없어 ${v.provider} 무료 모델로 가사를 만들었습니다.`, 'warn');
   } catch (e) {
     ly.status.textContent = '';
     flash(e.message === 'NO_SERVER'
@@ -136,9 +166,9 @@ async function generateLyrics() {
   }
 }
 
-// 허브 호출 1회: 스트리밍으로 받은 모델 출력 전체(텍스트)를 돌려준다
+// 허브 호출 1회: 스트리밍으로 받은 모델 출력 전체(텍스트)와 실제로 쓴 공급자(Morfac·Groq·OpenRouter)를 돌려준다
 async function requestLyrics(payload, t0, attempt) {
-  const label = attempt > 1 ? '영어가 아닌 줄이 있어 다시 쓰는 중…' : '가사를 쓰는 중…';
+  const label = attempt > 1 ? '결과가 올바르지 않아 다시 쓰는 중…' : '가사를 쓰는 중…';
   ly.status.textContent = label;
   const r = await fetch('/api/music/lyrics', {
     method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload),
@@ -159,16 +189,30 @@ async function requestLyrics(payload, t0, attempt) {
     ly.status.textContent = `${label} ${text.length}자 · ${Math.round((performance.now() - t0) / 1000)}초`;
   }
   if (text.includes('[[STREAM_ERROR]]')) throw new Error('생성 도중 연결이 끊겼습니다. 다시 시도해 주세요.');
-  return text;
+  return { text, provider: r.headers.get('X-Music-LLM') || '' };
 }
 
 // 모델 출력(JSON) → { titles, title, lyrics: { 섹션: [{ en, ko, koSrc }] } }. 요청한 섹션이 빠지면 실패로 본다.
 // 같은 섹션을 두 번 쓰는 경우가 있어 처음 나온 것을 쓰고, 영어가 아닌 제목은 버린다
-function parseLyrics(text, sections) {
+// 첫 번째로 완결된 JSON 객체만 잘라 낸다(문자열 안의 괄호·따옴표는 건너뜀). 모델이 JSON 뒤에 설명이나
+// 두 번째 JSON을 덧붙여도 앞의 답만 쓴다
+function firstJson(text) {
   const a = text.indexOf('{');
-  const b = text.lastIndexOf('}');
+  if (a < 0) return '';
+  let depth = 0, inStr = false, esc = false;
+  for (let i = a; i < text.length; i++) {
+    const c = text[i];
+    if (inStr) { if (esc) esc = false; else if (c === '\\') esc = true; else if (c === '"') inStr = false; continue; }
+    if (c === '"') inStr = true;
+    else if (c === '{') depth++;
+    else if (c === '}' && --depth === 0) return text.slice(a, i + 1);
+  }
+  return text.slice(a);
+}
+
+function parseLyrics(text, sections) {
   let j;
-  try { j = JSON.parse(text.slice(a, b + 1)); } catch { throw new Error('응답 형식이 올바르지 않습니다. [가사 생성]을 다시 눌러 주세요.'); }
+  try { j = JSON.parse(firstJson(text)); } catch { throw new Error('응답 형식이 올바르지 않습니다. [가사 생성]을 다시 눌러 주세요.'); }
   const norm = (n) => String(n).toLowerCase().replace(/[^a-z0-9]/g, '');
   const got = new Map();
   for (const s of j.sections ?? []) if (!got.has(norm(s.name))) got.set(norm(s.name), s.lines ?? []);
@@ -183,10 +227,27 @@ function parseLyrics(text, sections) {
 }
 
 /* ---------------- 결과 화면 ---------------- */
+// 모드 전환: AI 생성 결과와 직접 입력 칸 중 하나만 보이고, 아래 버튼 줄은 함께 쓴다
+function renderMode() {
+  const manual = isManual();
+  ly.panel.classList.toggle('manual', manual);
+  ly.mode.querySelectorAll('[data-mode]').forEach((b) => b.setAttribute('aria-selected', String(b.dataset.mode === lyState.mode)));
+  ly.manual.hidden = !manual;
+  renderLyrics();
+  if (manual) renderManualFoot();
+}
+function renderManualFoot() {
+  const count = (t) => t.split('\n').filter((l) => l.trim() && !/^\s*\[.*\]\s*$/.test(l)).length; // 태그 줄([Verse 1] 등)은 빼고 센다
+  ly.foot.hidden = false;
+  ly.length.textContent = `영어 ${count(lyState.manual.en)}줄 · 한글 ${count(lyState.manual.ko)}줄`;
+}
+
 function renderLyrics() {
   const v = curVer();
-  ly.result.hidden = !v;
+  ly.result.hidden = !v || isManual();
   ly.verBox.hidden = lyState.versions.length < 2;
+  if (isManual()) return;
+  ly.foot.hidden = !v;
   if (!v) return;
   ly.ver.textContent = `${lyState.cur + 1}/${lyState.versions.length}`;
   $('#ly-prev').disabled = lyState.cur <= 0;
@@ -266,11 +327,30 @@ function lyricsText(v, lang) {
 }
 
 async function copyLyrics(lang) {
-  const v = curVer();
-  if (v && await copyText(lyricsText(v, lang))) flash(lang === 'ko' ? '한글 뜻을 복사했습니다.' : 'Suno용 가사를 복사했습니다.', 'ok');
+  let text;
+  if (isManual()) {
+    text = lyState.manual[lang].trim();
+    if (!text) return flash(lang === 'ko' ? '한글 가사를 입력해 주세요.' : '영어 가사를 입력해 주세요.', 'warn');
+  } else {
+    const v = curVer();
+    if (!v) return;
+    text = lyricsText(v, lang);
+  }
+  if (await copyText(text)) flash(lang === 'ko' ? '한글 뜻을 복사했습니다.' : 'Suno용 가사를 복사했습니다.', 'ok');
 }
 
 function saveToSongs() {
+  if (isManual()) {
+    const { title, en, ko } = lyState.manual;
+    if (!title.trim()) return flash('제목을 입력해 주세요.', 'warn');
+    if (!en.trim()) return flash('영어 가사를 입력해 주세요.', 'warn');
+    // 직접 쓴 가사는 길이를 알 수 없어 재생시간은 비워 둔다(Suno에서 만든 뒤 채우면 됨)
+    openSong(null, {
+      titleEn: title.trim(), titleKo: title.trim(), lyricsEn: en.trim(), lyricsKo: ko.trim(),
+      style: ly.style.value.trim(), bpm: ly.bpm.value ? String(ly.bpm.value) : '',
+    });
+    return flash('보관함 추가 창을 열었습니다. 제목(KO)·활용 유형을 확인하고 저장하세요.', 'ok');
+  }
   const v = curVer();
   if (!v) return;
   const title = ly.title.value.trim();
@@ -301,8 +381,21 @@ ly.title.oninput = () => { const v = curVer(); if (v) { v.title = ly.title.value
 $('#ly-copy-en').onclick = () => copyLyrics('en');
 $('#ly-copy-ko').onclick = () => copyLyrics('ko');
 $('#ly-save').onclick = saveToSongs;
+ly.mode.onclick = (e) => {
+  const b = e.target.closest('[data-mode]');
+  if (!b || b.dataset.mode === lyState.mode) return;
+  lyState.mode = b.dataset.mode;
+  saveLy();
+  renderMode();
+};
+ly.mTitle.value = lyState.manual.title;
+ly.mEn.value = lyState.manual.en;
+ly.mKo.value = lyState.manual.ko;
+[['mTitle', 'title'], ['mEn', 'en'], ['mKo', 'ko']].forEach(([el, key]) => {
+  ly[el].oninput = () => { lyState.manual[key] = ly[el].value; saveLy(); if (key !== 'title') renderManualFoot(); };
+});
 // 탭을 처음 열 때 스타일이 비어 있으면 Style Builder 결과를 가져온다
 $('#tab-lyrics').addEventListener('click', () => { if (!ly.style.value.trim()) pullStyle(true); });
 if (!ly.style.value.trim()) pullStyle(true);
 renderPlan();
-renderLyrics();
+renderMode();
