@@ -313,12 +313,20 @@ body.has-solo .card.active:not(.soloed) .solo { color: var(--text); }
 .drop span { font-size: 13px; color: var(--muted); }
 .drop small { font-size: 12px; color: var(--subtle); }
 .drop:hover, .over .drop { border-color: var(--accent); background: var(--accent-faint); }
-.has-result .drop { display: none; }
+/* 분석 결과가 있으면 파일 선택 칸을 한 줄로 줄인다(탭을 눌렀을 때 파일 선택이 사라지지 않게) */
+.has-result .drop { flex-direction: row; justify-content: center; gap: 10px; padding: 10px 14px; }
+.has-result .drop b { font-size: 13.5px; }
+.has-result .drop b::before { content: '다른 '; }
+.has-result .drop small { display: none; }
 #panel-upload.over { box-shadow: inset 0 0 0 2px var(--accent); border-radius: 0 0 var(--radius) var(--radius); }
 .drop.busy { opacity: 0.5; pointer-events: none; }
 /* 파일 대신: 링크로 분석 · 재생 중인 소리 녹음. 결과가 있을 때도 보여 다른 곡을 바로 고를 수 있게 */
-.src-alt { display: flex; flex-direction: column; gap: 8px; margin-top: 12px; }
-.has-result .src-alt { margin: 0 0 16px; }
+/* 분석할 곡 가져오기: [파일][링크][녹음] 탭 중 하나만 보인다 */
+.src-tabs button { padding: 5px 14px; font-size: 13px; }
+.src-pane { display: flex; flex-direction: column; gap: 8px; }
+.src-pane[hidden] { display: none; }
+.src-note { font-size: 11.5px; }
+
 .url-row { display: flex; gap: 8px; }
 .url-row input {
   flex: 1; min-width: 0; padding: 7px 10px; font-size: 13px; color: var(--text);
@@ -328,7 +336,7 @@ body.has-solo .card.active:not(.soloed) .solo { color: var(--text); }
 .url-row .ghost, .rec-row .ghost { padding: 6px 12px; font-size: 12.5px; white-space: nowrap; }
 .rec-row { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
 .rec-label { font-size: 12.5px; color: var(--muted); }
-.rec-row small { flex-basis: 100%; font-size: 11.5px; color: var(--subtle); }
+.rec-row small { flex-basis: 100%; font-size: 12.5px; color: var(--muted); line-height: 1.5; }
 .rec-status { display: flex; align-items: center; gap: 10px; font-size: 13px; color: var(--muted); }
 .rec-status[hidden] { display: none; }
 .rec-status .bar { flex: 1; height: 6px; background: var(--line); border-radius: 3px; overflow: hidden; }
@@ -342,31 +350,17 @@ body.has-solo .card.active:not(.soloed) .solo { color: var(--text); }
 .progress .bar i { display: block; height: 100%; background: var(--accent); transform-origin: left; transform: scaleX(0); transition: transform 0.2s; }
 
 /* 선택 곡 | 장르·악기 | Suno Style */
-.result { display: grid; grid-template-columns: minmax(260px, 320px) minmax(0, 1fr) minmax(0, 1fr); gap: 28px; align-items: start; }
+.result { display: grid; grid-template-columns: minmax(260px, 320px) minmax(0, 760px); gap: 28px; align-items: start; }
 .has-result .result { margin-top: 0; }
 .has-result .progress { margin-top: 0; margin-bottom: 14px; }
 .progress + .result, .drop + .progress + .result { margin-top: 14px; }
 .r-left { display: flex; flex-direction: column; gap: 8px; min-width: 0; }
 .r-mid { display: flex; flex-direction: column; gap: 8px; min-width: 0; padding-top: 2px; }
-.r-style { display: flex; flex-direction: column; gap: 6px; min-width: 0; padding-top: 2px; }
-/* 목록형/문장형 탭(Style Builder 출력 칸과 곡 분석 결과 칸이 같이 씀) */
+/* 목록형/문장형 탭(Style Builder 출력 칸) */
 .fmt-tabs { display: inline-flex; gap: 2px; padding: 2px; border: 1px solid var(--line); border-radius: 8px; align-self: flex-start; }
 .fmt-tabs button { padding: 3px 10px; font-size: 12px; border: 0; border-radius: 6px; background: none; color: var(--muted); }
 .fmt-tabs button:hover { color: var(--text); }
 .fmt-tabs button[aria-selected="true"] { background: var(--accent-faint); color: var(--accent); font-weight: 600; }
-/* 복사 아이콘은 입력칸 오른쪽 위 모서리에 얹는다(글자와 겹치지 않게 오른쪽 여백 확보) */
-.r-style-box { position: relative; }
-.r-style textarea {
-  display: block; width: 100%; height: 272px; resize: vertical; /* 목록형 1~9번이 넓은 화면에서 줄바꿈 포함 13줄까지 다 보이는 높이 */ background: var(--field-bg); color: var(--text); border: 1px solid var(--line); border-radius: 8px;
-  padding: 9px 36px 9px 10px; font: 12.5px/1.55 ui-monospace, 'Cascadia Mono', Consolas, monospace;
-}
-.r-style .sd-copy { position: absolute; top: 6px; right: 6px; background: var(--field-bg); }
-.r-style small { font-size: 11.5px; line-height: 1.5; }
-/* 중간 폭: 선택 곡 | 장르·악기 두 칸, Suno Style은 아래 줄 전체 */
-@media (min-width: 721px) and (max-width: 1100px) {
-  .result { grid-template-columns: minmax(260px, 320px) minmax(0, 1fr); }
-  .r-style { grid-column: 1 / -1; }
-}
 .r-name { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; }
 .r-name > div { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
 .r-name b { font-size: 15px; overflow-wrap: anywhere; }
@@ -509,12 +503,12 @@ body.no-board #board { display: none; } /* Suno Style Builder·Suno 작곡 탭 *
 
 /* ---------- 제목·가사 ---------- */
 #panel-lyrics > .pdesc-static { margin-bottom: 14px; }
-.ly-top { display: grid; grid-template-columns: minmax(0, 1fr) minmax(320px, 460px); gap: 20px; align-items: start; }
+.ly-top { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 20px; align-items: start; }
 .ly-head { display: flex; align-items: center; gap: 8px; margin-bottom: 4px; }
 .ly-head b { font-size: 13.5px; white-space: nowrap; }
 .ly-head small { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .ly-head .ghost { margin-left: auto; padding: 4px 10px; font-size: 12px; white-space: nowrap; flex: none; }
-.ly-style textarea, .ly-opts input, .ly-opts select, .ly-titles input, .ly-line input {
+.ly-style textarea, .ly-opts input, .ly-opts select, .ly-opts textarea, .ly-titles input {
   font-family: inherit; font-size: 13px; color: var(--text); background: var(--field-bg);
   border: 1px solid var(--line); border-radius: 8px; padding: 6px 9px;
 }
@@ -524,7 +518,7 @@ body.no-board #board { display: none; } /* Suno Style Builder·Suno 작곡 탭 *
 .ly-opts label { display: flex; align-items: center; gap: 6px; font-size: 12.5px; color: var(--muted); }
 .ly-opts #ly-bpm { width: 72px; }
 .ly-theme { flex-direction: column; align-items: stretch !important; gap: 4px !important; }
-.ly-theme input { width: 100%; }
+.ly-theme textarea { width: 100%; resize: vertical; line-height: 1.5; min-height: calc(2 * 1.5em + 14px); }
 .ly-ver { display: inline-flex; align-items: center; gap: 4px; font-size: 12.5px; color: var(--muted); }
 .ly-ver .ghost { padding: 2px 8px; font-size: 11px; }
 #ly-result { margin-top: 18px; border-top: 1px solid var(--line); padding-top: 14px; display: flex; flex-direction: column; gap: 10px; }
@@ -533,14 +527,6 @@ body.no-board #board { display: none; } /* Suno Style Builder·Suno 작곡 탭 *
 .ly-chips { display: inline-flex; gap: 5px; flex-wrap: wrap; }
 .ly-titles input { flex: 1; min-width: 200px; font-size: 14px; font-weight: 600; }
 .ly-structure { font-size: 12px; }
-.ly-body { display: flex; flex-direction: column; gap: 12px; }
-.ly-sec h4 { margin: 0 0 5px; font-size: 12.5px; color: var(--accent); font-weight: 600; }
-.ly-line { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) 34px; gap: 6px; margin-bottom: 4px; }
-.ly-line input { min-width: 0; }
-.ly-line .ly-en { font-weight: 500; }
-.ly-line.dirty .ly-ko { border-color: var(--accent); }
-.ly-re { padding: 0; font-size: 14px; }
-.ly-re:disabled { opacity: 0.35; }
 .ly-mode { margin-bottom: 14px; }
 .ly-mode button { padding: 5px 14px; font-size: 13px; }
 #panel-lyrics.manual .ly-ai-only { display: none; }
@@ -559,9 +545,6 @@ body.no-board #board { display: none; } /* Suno Style Builder·Suno 작곡 탭 *
 @media (max-width: 900px) {
   .ly-top { grid-template-columns: 1fr; }
   .ly-m-cols { grid-template-columns: 1fr; }
-  .ly-line { grid-template-columns: 1fr 34px; }
-  .ly-line .ly-ko { grid-column: 1; }
-  .ly-line .ly-re { grid-row: 1 / span 2; grid-column: 2; }
 }
 .song-tools { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
 .song-table-wrap { position: relative; overflow-x: auto; border: 1px solid var(--line); border-radius: 10px; }
@@ -644,4 +627,90 @@ body.no-board #board { display: none; } /* Suno Style Builder·Suno 작곡 탭 *
   .sd-suno { grid-template-columns: minmax(0, 1fr); }
   .sd-suno > label:nth-of-type(3n) .sd-help .desc { left: 0; right: auto; }
   .sd-head, .sd-foot { padding-left: 16px; padding-right: 16px; }
+}
+
+/* 추천 조합·곡으로 조합 만들기 상단 줄: 왼쪽 장르 탭, 오른쪽 [초기화] */
+.prow { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; margin-bottom: 10px; }
+.prow .gtabs { flex: 0 1 auto; margin-bottom: 0; }
+.prow-end { justify-content: flex-end; margin-bottom: 8px; }
+.preset-reset { flex: none; padding: 5px 12px; font-size: 12.5px; }
+
+/* Style Builder: 컨셉 도우미·Concept 접기(처음엔 접힘) */
+.sb-fold { background: none; border: 0; padding: 4px 0 0; margin: 0; text-align: left; cursor: pointer; color: inherit; font: inherit; align-self: start; }
+.sb-fold b { display: flex; align-items: center; gap: 7px; }
+.sb-fold:hover b { color: var(--accent); }
+.sb-fold .chev { width: 7px; height: 7px; margin: 0; transform: rotate(45deg) translateY(-2px); }
+.sb-row.folded .sb-fold .chev { transform: rotate(-45deg); }
+.sb-row.folded > .sb-body { display: none; }
+/* 접혀 있을 때는 이름만, 펼쳤을 때만 설명·요약을 보인다 */
+.sb-row.folded .sb-fold small { display: none; }
+.sb-fold-sum { color: var(--accent); }
+
+/* 곡 정보(제목·가수) + 웹에서 원곡 정보 찾기 */
+.song-info { display: flex; align-items: center; gap: 8px 12px; flex-wrap: wrap; padding: 10px 12px; border: 1px solid var(--line); border-radius: 10px; }
+.song-info > b { font-size: 13px; }
+.song-info label { display: flex; align-items: center; gap: 6px; font-size: 12.5px; color: var(--muted); flex: 1 1 200px; min-width: 0; }
+.song-info input { flex: 1; min-width: 0; padding: 6px 9px; font-size: 13px; font-family: inherit; color: var(--text); background: var(--field-bg); border: 1px solid var(--line); border-radius: 8px; }
+.song-info .ghost { padding: 6px 12px; font-size: 12.5px; white-space: nowrap; }
+.song-info small { flex-basis: 100%; font-size: 11.5px; }
+.song-info small:empty { display: none; }
+.web-result { margin-top: 10px; padding: 12px 14px; border-radius: 10px; background: var(--accent-faint); font-size: 13px; display: flex; flex-direction: column; gap: 8px; }
+.web-result h4 { margin: 0; font-size: 13.5px; }
+.web-result p { margin: 0; line-height: 1.55; }
+.web-result .chips { display: flex; flex-wrap: wrap; gap: 5px; align-items: center; }
+.web-result .w-label { font-size: 12px; color: var(--muted); min-width: 52px; }
+.web-result ol { margin: 0; padding-left: 18px; font-size: 12px; }
+.web-result ol a { color: var(--accent); word-break: break-all; }
+.web-result .w-foot { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+.web-result .w-foot button { padding: 6px 12px; font-size: 12.5px; }
+
+/* 곡으로 조합 만들기 단계 제목: ① 곡 분석 ② 원곡 정보 확인 ③ 반영 여부 선택 */
+.step-h { display: flex; align-items: baseline; gap: 8px; flex-wrap: wrap; margin: 0 0 10px; font-size: 14px; }
+.step-h small { font-size: 12px; font-weight: 400; color: var(--muted); }
+.step-n { display: inline-grid; place-items: center; width: 20px; height: 20px; border-radius: 50%; background: var(--accent); color: #fff; font-size: 12px; font-weight: 700; flex: none; align-self: center; }
+.song-step { margin-top: 22px; padding-top: 16px; border-top: 1px solid var(--line); }
+.web-result .step-h { margin: 0; }
+.w-step { margin-top: 4px; padding-top: 10px; border-top: 1px dashed var(--line); display: flex; flex-direction: column; gap: 8px; }
+.w-state { font-size: 12.5px; color: var(--accent); }
+/* 링크 탭: 음원을 받을 수 없는 링크 → 재생하며 녹음 */
+.stream-box { display: flex; flex-direction: column; gap: 8px; margin-top: 4px; padding: 10px 12px; border: 1px dashed var(--hover-line); border-radius: 10px; }
+.stream-box[hidden] { display: none; }
+.stream-head { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; font-size: 13px; }
+.stream-head .ghost { padding: 5px 12px; font-size: 12.5px; text-decoration: none; display: inline-block; }
+
+/* Style Builder 4번: 곡 분석에서 자동으로 추가한 세부 장르(✦) + 삭제(×) */
+.sb-chip-wrap { display: inline-flex; align-items: center; gap: 2px; }
+.sb-chip.is-custom { border-style: dashed; }
+.sb-chip-del { border: 0; background: none; color: var(--muted); font-size: 14px; line-height: 1; padding: 2px 4px; cursor: pointer; border-radius: 6px; }
+.sb-chip-del:hover { color: var(--error-text, #ef4444); background: var(--accent-faint); }
+
+/* 추천 조합: 곡 분석에서 자동으로 추가한 장르 카드(✦) + 삭제(×) */
+.preset.is-custom { position: relative; border-style: dashed; }
+.preset-del { position: absolute; top: 4px; right: 6px; font-size: 14px; line-height: 1; padding: 2px 5px; border-radius: 6px; color: var(--muted); cursor: pointer; }
+.preset-del:hover { color: var(--error-text, #ef4444); background: var(--accent-faint); }
+.ly-gen-row { margin-top: 8px; }
+#ly-plan { font-size: 12px; }
+
+/* ---- 2026-11-07 점검 반영 ---- */
+/* U2: 결과가 나오면 가져오기 칸을 접고 [다른 곡 분석]으로 다시 연다 */
+.src-again { display: none; }
+#panel-upload.has-result:not(.src-open) .src-again { display: inline-flex; }
+#panel-upload.has-result:not(.src-open) .src-tabs,
+#panel-upload.has-result:not(.src-open) .src-pane { display: none; }
+/* U3: 녹음 안내를 번호 목록으로 */
+.stream-head { display: block; font-size: 13.5px; }
+.stream-steps { margin: 0; padding-left: 20px; display: flex; flex-direction: column; gap: 6px; font-size: 13px; line-height: 1.5; }
+.stream-steps .stream-open { display: inline-block; padding: 4px 12px; margin-right: 6px; font-size: 12.5px; text-decoration: none; border-radius: 8px; }
+.stream-note { margin: 0; font-size: 12.5px; color: var(--muted); }
+.stream-unsupported { margin: 0; font-size: 13px; color: var(--error-text, #ef4444); }
+.stream-unsupported[hidden] { display: none; }
+/* U7: ② 선택 표시 */
+.skip-chip { font-size: 11.5px; font-weight: 500; color: var(--accent); background: var(--accent-faint); border-radius: 999px; padding: 2px 8px; }
+/* U5: BPM 맞추기 */
+.ly-bpm-sync { padding: 3px 10px; font-size: 12px; color: var(--accent); }
+.ly-bpm-sync[hidden] { display: none; }
+/* U6: 도움말 글씨를 조금 크게·진하게 */
+.src-note, .step-h small, .song-info small, .ly-m-cols small, .sb-helper-note { font-size: 12.5px; color: var(--muted); line-height: 1.5; }
+@media (max-width: 720px) {
+  .src-tabs button, .ly-mode button, .preset-reset, .src-again, .pdesc { min-height: 44px; }
 }

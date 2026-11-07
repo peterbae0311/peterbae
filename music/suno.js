@@ -56,7 +56,61 @@ const GENRE_TRAITS = {
   '펑크': 'syncopated rhythm guitar, tight bass groove, punchy horns',
   '록': 'distorted electric guitars, live drums, driving energy',
 };
-const genreLine = (name) => `${GENRE_EN[name]} (${GENRE_TRAITS[name]})`;
+/* ---------------- 곡 분석 장르 → 4번 세부 장르 ----------------
+ * 분석 장르(Discogs '상위---하위', 예: Electronic---Euro House)가 4번의 기존 세부 장르와 같은 음악이면 그 칩을 고르고,
+ * 없으면 새 세부 장르를 만들어 어울리는 장르 탭에 추가한다(이 브라우저에 저장, 칩 옆 ×로 삭제). */
+const GENRE_MATCH = [
+  ['하우스·EDM', /^(House|Deep House|Tech House|Electro House|Progressive House|Big Room|Future House|Bass House)$/i],
+  ['신스 팝', /^Synth-?pop$/i], ['드림 팝', /^Dream Pop$/i], ['시티 팝', /^City Pop$/i], ['인디 팝', /^Indie Pop$/i],
+  ['로파이 힙합', /^Lo-?Fi$/i], ['재즈 힙합', /^Jazzy Hip-?Hop$/i], ['붐뱁 힙합', /^Boom Bap$/i], ['트랩', /^Trap$/i],
+  ['펑크', /^(Funk|P\.Funk)$/i], ['록', /^(Rock|Hard Rock|Classic Rock|Alternative Rock|Indie Rock|Pop Rock|Arena Rock)$/i],
+  ['스윙 재즈', /^(Swing|Big Band)$/i], ['보사노바 재즈', /^Bossa ?nova$/i], ['컨템포러리 재즈', /^(Contemporary Jazz|Smooth Jazz|Fusion)$/i],
+  ['팝 발라드', /^Ballad$/i],
+];
+// 새 장르를 넣을 탭: Discogs 상위 장르 기준(R&B·소울은 팝 쪽)
+const GENRE_TAB_BY_TOP = {
+  Electronic: '일렉트로닉·밴드', Rock: '일렉트로닉·밴드', Reggae: '일렉트로닉·밴드', Blues: '일렉트로닉·밴드', 'Funk / Soul': '일렉트로닉·밴드',
+  'Hip Hop': '힙합', Jazz: '재즈', Latin: '재즈', Classical: '발라드', 'Stage & Screen': '발라드',
+};
+const GENRE_KO = {
+  'Euro House': '유로 하우스', 'Nu-Disco': '뉴 디스코', Disco: '디스코', 'Euro-Disco': '유로 디스코', Eurodance: '유로댄스', 'Italo-Disco': '이탈로 디스코',
+  'Tropical House': '트로피컬 하우스', Techno: '테크노', Trance: '트랜스', 'Drum n Bass': '드럼 앤 베이스', Dubstep: '덥스텝', 'Future Bass': '퓨처 베이스',
+  Downtempo: '다운템포', Ambient: '앰비언트', Chillwave: '칠웨이브', Synthwave: '신스웨이브', 'Electro': '일렉트로', Breakbeat: '브레이크비트', 'UK Garage': 'UK 개러지',
+  'Neo Soul': '네오 소울', Soul: '소울', 'Contemporary R&B': '컨템포러리 R&B', 'Rhythm & Blues': '리듬 앤 블루스', Boogie: '부기', 'New Jack Swing': '뉴 잭 스윙',
+  'K-pop': 'K-팝', 'J-pop': 'J-팝', 'Dance-pop': '댄스 팝', 'Europop': '유로팝', 'Bubblegum': '버블검 팝', Vocal: '보컬 팝',
+  'Pop Rap': '팝 랩', 'Conscious': '컨셔스 힙합', 'Instrumental': '인스트루멘털 힙합', 'Trip Hop': '트립합', Grime: '그라임', 'Cloud Rap': '클라우드 랩',
+  Folk: '포크', 'Folk Rock': '포크 록', Country: '컨트리', Blues: '블루스', 'Blues Rock': '블루스 록', Reggae: '레게', Gospel: '가스펠',
+  'Punk': '펑크 록', 'Pop Punk': '팝 펑크', Grunge: '그런지', Shoegaze: '슈게이즈', 'Post Rock': '포스트 록', Metal: '메탈', 'Heavy Metal': '헤비메탈',
+  'Soul-Jazz': '소울 재즈', 'Jazz-Funk': '재즈 펑크', 'Latin Jazz': '라틴 재즈', Salsa: '살사', Samba: '삼바', Reggaeton: '레게톤',
+  Score: '영화 음악', Soundtrack: '사운드트랙', Neoclassical: '네오클래식', 'Modern Classical': '모던 클래식',
+};
+// 자동으로 추가한 세부 장르 목록(customGenres·customGenre·addCustomGenre)은 app.js에 있다 — 추천 조합 탭과 함께 쓴다
+const genreEn = (name) => GENRE_EN[name] ?? customGenre(name)?.en ?? name;
+const genreLine = (name) => (GENRE_TRAITS[name] ? `${GENRE_EN[name]} (${GENRE_TRAITS[name]})` : genreEn(name));
+
+// 분석 장르 한 개('Electronic---Euro House') → { name, en, cat, existing, src }
+function genreFromLabel(label) {
+  const [top, leaf = top] = label.split('---');
+  const hit = GENRE_MATCH.find(([, re]) => re.test(leaf));
+  if (hit) return { name: hit[0], en: GENRE_EN[hit[0]], existing: true, src: label };
+  // R&B·소울 계열은 상위 장르(Funk / Soul)가 아니라 팝 탭에 넣는다
+  const cat = top === 'Funk / Soul' && /R&B|Soul|Rhythm & Blues/i.test(leaf) ? '팝' : GENRE_TAB_BY_TOP[top] ?? '팝';
+  return { name: GENRE_KO[leaf] ?? leaf, en: leaf.toLowerCase(), cat, existing: false, src: label };
+}
+// 분석 결과 → 4번 장르(가장 확률 높은 장르) + 두 번째 장르(분석 칩으로 덧붙임)
+function analysisGenre(res) {
+  const [g1, g2] = res.genres.slice(0, 2).map(([label]) => genreFromLabel(label));
+  const second = g2 && g2.name !== g1?.name ? g2.en : '';
+  return { main: g1, second };
+}
+// 분석 결과로 새 세부 장르를 만든다: 장르 이름 + 추천 조합으로 재생할 악기·BPM·키(분석값). 이미 있으면 false
+function genreFromAnalysis(an) {
+  const g = analysisGenre(an.res).main;
+  // 켜진 악기가 없으면 추천 조합 카드를 만들 수 없어 장르도 만들지 않는다(칩만 생기는 반쪽 장르 방지)
+  if (!g || g.existing || !an.mix.picks.length) return null;
+  return { name: g.name, en: g.en, cat: g.cat, src: g.src, from: an.res.name,
+    bpm: an.res.bpm, ids: an.mix.picks.map((p) => p.id), prog: [...DEFAULT_PROG], semis: an.semis ?? 0 };
+}
 
 // 코드 진행은 스타일에 넣지 않는다: 곡과 무관한 장르 기본 진행이 Suno의 화성을 엉뚱하게 끌고 갈 수 있다
 
@@ -314,6 +368,8 @@ try {
     localStorage.setItem('music.suno.exclDefault', '1');
   }
 } catch {}
+// 지웠거나 다른 브라우저에서 만든 자동 추가 장르를 가리키는 저장값은 비운다(스타일에 한글 장르 이름이 들어가지 않게)
+if (sb.genre && !GENRE_EN[sb.genre] && !customGenre(sb.genre)) sb.genre = '';
 // 예전에는 페이드아웃이 8번 편곡에 있었다 → 1번 아웃트로로 옮긴다
 if (sb.arr.includes('fade-out')) {
   sb.arr = sb.arr.filter((a) => a !== 'fade-out');
@@ -404,7 +460,8 @@ function limitHint(box, key, max) {
 let sbGenreTab = 0;
 // 선택된 세부 장르가 들어 있는 장르 탭을 연다(불러오기·새로고침 뒤에도 선택이 보이게)
 const syncGenreTab = () => {
-  const i = GENRES.findIndex((g) => g.items.some((it) => it.name === sb.genre));
+  const cat = customGenre(sb.genre)?.cat;
+  const i = GENRES.findIndex((g) => g.name === cat || g.items.some((it) => it.name === sb.genre));
   if (i >= 0) sbGenreTab = i;
 };
 // 말풍선: 설명 아래에 '장르 / 세부 장르' 줄(대표 장르부터)을 붙인다
@@ -507,6 +564,17 @@ function renderGroup(g) {
       // BPM은 3번에서 정한 값을 그대로 둔다(장르의 BPM은 말풍선에 추천값으로만 보여 줌)
       commit();
     }, false, `${GENRE_DESC[it.name]}<br>추천 ${it.bpm} BPM · ${it.prog.join(' – ')} (믹서 추천 조합 기준)`, genreLine(it.name))));
+    // 곡 분석에서 자동으로 추가한 세부 장르(✦). × 로 목록에서 지운다
+    customGenres.filter((cg) => cg.cat === GENRES[sbGenreTab].name).forEach((cg) => {
+      const c = chip(`${cg.name} ✦`, sb.genre === cg.name, () => { sb.genre = sb.genre === cg.name ? '' : cg.name; commit(); },
+        false, `곡 분석에서 자동으로 추가한 장르입니다(분석: ${cg.src}). 오른쪽 ×로 지울 수 있어요.`, cg.en);
+      c.classList.add('is-custom');
+      const del = Object.assign(document.createElement('button'), { type: 'button', className: 'sb-chip-del', textContent: '×', title: `'${cg.name}' 장르를 목록에서 지우기` });
+      del.onclick = () => removeCustomGenre(cg.name);
+      const wrap = Object.assign(document.createElement('span'), { className: 'sb-chip-wrap' });
+      wrap.append(c, del);
+      box.append(wrap);
+    });
     if (sb.genreCustom) {
       const c = chip(`분석: ${sb.genreCustom}`, true, () => { sb.genreCustom = ''; commit(); });
       c.title = '곡 분석에서 가져온 장르(누르면 제거)';
@@ -544,6 +612,31 @@ function conceptParts(text = concept) {
   const lines = text.split('\n').map((l) => l.trim()).filter(Boolean);
   const english = lines.filter((l) => /^[:：]/.test(l)).map((l) => l.slice(1).trim());
   return (english.length ? english : lines).map((p) => p.replace(/[.\s]+$/, '')).filter(Boolean);
+}
+
+/* 컨셉 도우미 접기: 1~11번 선택이 먼저 보이게 처음에는 접어 둔다(페이지를 열 때마다 접힌 상태로 시작).
+ * Concept은 도우미에 딸린 칸이라 도우미를 접으면 함께 숨고, 펼치면 함께 보인다.
+ * 접혀 있을 때는 이름 아래에 무엇이 들어 있는지 한 줄 요약을 보여 준다 */
+let helperFolded = true;
+function foldSummary() {
+  const picked = HELPER_QS.reduce((a, q) => a + helper[q.key].length, 0) + (helper.extra.trim() ? 1 : 0);
+  const lines = concept.split('\n').filter((l) => l.trim()).length;
+  return `${picked ? `${picked}개 고름` : '고른 항목 없음'} · Concept ${lines ? `${lines}줄${conceptManual ? '(직접 고침)' : ''}` : '비어 있음'}`;
+}
+function applyFold() {
+  const btn = $('.sb-fold', helperRow);
+  if (!btn) return; // 도우미 행을 그리기 전
+  helperRow.classList.toggle('folded', helperFolded);
+  conceptRow.hidden = helperFolded;
+  btn.setAttribute('aria-expanded', String(!helperFolded));
+  $('.sb-fold-sum', btn).textContent = foldSummary();
+  if (!helperFolded) fitConcept();
+}
+function foldLabel(title, sub) {
+  const b = Object.assign(document.createElement('button'), { type: 'button', className: 'sb-label sb-fold', title: '눌러서 컨셉 도우미·Concept 펼치기/접기' });
+  b.innerHTML = `<b><span class="chev" aria-hidden="true"></span>${title}</b><small>${sub}</small><small class="sb-fold-sum"></small>`;
+  b.onclick = () => { helperFolded = !helperFolded; applyFold(); };
+  return b;
 }
 
 // renderSb가 행을 매번 새로 그려도 입력 중인 내용이 사라지지 않게 컨셉 행은 한 번만 만들어 재사용한다
@@ -586,6 +679,7 @@ function setConcept(text, manual) {
     : '도우미에서 고른 항목으로 자동 작성됩니다. 직접 고치면 자동 작성이 멈춥니다. \':\' 뒤의 영어 문장만 스타일에 들어갑니다.';
   fitConcept();
   renderStyleCount();
+  applyFold();
 }
 conceptBox.oninput = () => setConcept(conceptBox.value, true);
 // 도우미 선택이 바뀌면(직접 고치지 않았을 때만) Concept을 다시 쓴다
@@ -678,11 +772,9 @@ function renderHelper() {
   foot.className = 'sb-concept-foot';
   foot.append(preview, apply);
   body.append(ref, foot);
-  helperRow.replaceChildren(
-    Object.assign(document.createElement('div'), { className: 'sb-label', innerHTML: '<b>컨셉 도우미</b><small>고른 항목으로 아래 Concept이 작성돼요</small>' }),
-    body,
-  );
+  helperRow.replaceChildren(foldLabel('컨셉 도우미', '고른 항목으로 아래 Concept이 작성돼요'), body);
   renderHelperPreview();
+  applyFold();
 }
 /* ⑤ 직접 추가: 곡마다 덧붙이는 자유 지시. 영어는 그대로, 한글은 [영어로 번역](허브 /api/music/translate → Morfac)으로 바꿔 넣는다.
  * 원문을 고치면 번역이 낡은 것이 되어 Concept에서 빠지고 다시 번역하라고 알린다 */
@@ -815,7 +907,7 @@ function stepValues(n, s = sb) {
     case 1: return [s.intro && `${s.intro} intro`, s.outro && OUTRO_EN[s.outro]];
     case 2: return [s.main && SUNO_TERM[s.main]];
     case 3: return [`${s.bpm} bpm`, ...s.feel];
-    case 4: return [s.genre && (s.genreShort ? GENRE_EN[s.genre] : genreLine(s.genre)), s.genreCustom];
+    case 4: return [s.genre && (s.genreShort ? genreEn(s.genre) : genreLine(s.genre)), s.genreCustom];
     case 5: return s.support.map((id) => SUNO_TERM[id]);
     case 6: return [...s.mood, s.energy];
     case 7: return [s.key && `${s.key} key`, ...s.harmony];
@@ -847,7 +939,7 @@ const sentence = (t) => `${t[0].toUpperCase()}${t.slice(1)}.`;
 // (스타일 칸에 'no ○○'로 쓰면 오히려 그 소리로 끌려갈 수 있다)
 function styleProse(s, conceptLines = [], { withExcl = true } = {}) {
   const head = [...s.mood, ENERGY_ADJ[s.energy]].filter(Boolean).join(', ');
-  const genre = [s.genre && (s.genreShort ? GENRE_EN[s.genre] : genreLine(s.genre)), s.genreCustom].filter(Boolean).join(', ');
+  const genre = [s.genre && (s.genreShort ? genreEn(s.genre) : genreLine(s.genre)), s.genreCustom].filter(Boolean).join(', ');
   const out = conceptLines.map(sentence);
   out.push(sentence([[head, genre].filter(Boolean).join(' '), `${s.bpm} BPM`, ...s.feel].filter(Boolean).join(', ')));
   if (s.intro) out.push(sentence(`begin with ${s.intro}${PUNCHY_INTRO.test(s.intro) ? ', no slow or atmospheric intro' : ''}`));
@@ -999,14 +1091,14 @@ function songSb({ res, mix, intro, feel = [], hints = {} }) {
     // 실제 곡의 장조/단조가 분위기 추정보다 정확해서 분석 결과를 쓴다(키 이름은 분위기에 영향이 없어 뺀다)
     key: res.key ? (res.scale === 'minor' ? 'minor' : 'major') : '',
     keyManual: !!res.key,
-    genreCustom: res.genres.slice(0, 2).map(([g]) => g.split('---').pop().toLowerCase()).join(', '),
+    // 4번 장르: 기존 세부 장르와 같으면 그 이름, 없으면(아직 추가 전) 영어 장르명을 분석 칩으로. 두 번째 장르는 분석 칩으로 덧붙인다
+    ...(() => {
+      const g = analysisGenre(res);
+      if (!g.main) return {};
+      const known = g.main.existing || customGenre(g.main.name);
+      return known ? { genre: g.main.name, genreCustom: g.second } : { genre: '', genreCustom: [g.main.en, g.second].filter(Boolean).join(', ') };
+    })(),
   };
-}
-
-// '곡으로 조합 만들기' 결과의 Suno Style 칸(목록형은 1~10번)
-function songStyleOut(an) {
-  const s = songSb(an);
-  return { list: styleLines(s, SB_STEPS.filter((st) => st.n <= 10)).join('\n'), prose: styleProse(s) };
 }
 
 function fromMixer() {
@@ -1023,7 +1115,12 @@ function fromSong() {
   if (!last) return flash('먼저 "곡으로 조합 만들기" 탭에서 곡을 분석해 주세요.', 'warn');
   const { res, mix } = last;
   const s = songSb(last);
-  Object.assign(sb, { main: s.main, support: s.support, bpm: s.bpm, key: s.key, keyManual: s.keyManual, genre: '', genreCustom: s.genreCustom });
+  // 분석 장르가 4번에 없으면 새 세부 장르로 추가하고 고른다
+  const g = analysisGenre(res);
+  const added = addCustomGenre(genreFromAnalysis(last)); // 보통은 분석 직후 이미 추가돼 있다
+  Object.assign(sb, { main: s.main, support: s.support, bpm: s.bpm, key: s.key, keyManual: s.keyManual,
+    genre: g.main?.name ?? '', genreCustom: g.second });
+  syncGenreTab();
   if (s.intro) sb.intro = s.intro; // 도입부를 못 잡았으면 직접 고른 인트로를 그대로 둔다
   // 리듬·분위기·편곡·사운드는 곡마다 추정하는 값이라 새 곡 기준으로 덮어쓴다(못 찾으면 비움 — 이전 곡 값이 남지 않게)
   Object.assign(sb, { feel: s.feel, mood: s.mood, energy: s.energy, arr: s.arr, mix: s.mix });
@@ -1033,7 +1130,11 @@ function fromSong() {
   // 불러온 값과 부딪치는 제외 항목은 따로 알리지 않고 아래 알림에 합친다(경고가 바로 덮여 사라지지 않게)
   const freed = resolveConflicts(true);
   commit();
-  flash(`"${res.name}" 분석 결과를 불러왔습니다.${freed.length ? ` 제외 항목에서 해제: ${freed.join(' · ')}.` : ''}${voice && !sb.vocal ? ' 보컬이 감지되었으니 10번에서 보컬 종류를 골라 주세요.' : ''}`, 'ok');
+  // 웹에서 찾은 원곡의 리듬·분위기 설명이 있으면 제목·가사 탭의 주제·메모에 넣는다(가사에 곡 분위기를 반영)
+  const w = typeof webInfo !== 'undefined' ? webInfo : null;
+  const themed = w?.found && (w.rhythmKo || w.moodKo) && typeof setLyricsTheme === 'function';
+  if (themed) setLyricsTheme([w.rhythmKo && `리듬: ${w.rhythmKo.slice(0, 280)}`, w.moodKo && `분위기: ${w.moodKo.slice(0, 280)}`].filter(Boolean).join('\n'));
+  flash(`"${res.name}" 분석 결과를 불러왔습니다.${added ? ` 4번 장르에 없던 '${g.main.name}'을(를) ${g.main.cat} 탭에 새로 추가했습니다.` : ''}${freed.length ? ` 제외 항목에서 해제: ${freed.join(' · ')}.` : ''}${voice && !sb.vocal ? ' 보컬이 감지되었으니 10번에서 보컬 종류를 골라 주세요.' : ''}${themed ? ' 원곡의 리듬·분위기 설명을 제목·가사 탭의 주제·메모에 덧붙였습니다.' : ''}`, 'ok');
 }
 
 // 고른 주 악기 + 반주 악기를 믹서로 들어보기(장르를 골랐으면 그 장르의 코드 진행으로)

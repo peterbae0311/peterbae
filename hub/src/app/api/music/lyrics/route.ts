@@ -75,7 +75,7 @@ export async function POST(request: NextRequest) {
 
   const body = await request.json().catch(() => null);
   const style = str(body?.style, 1200);
-  const theme = str(body?.theme, 300);
+  const theme = str(body?.theme, 600); // 웹에서 찾은 원곡 리듬·분위기 설명(2줄)까지 들어올 수 있다
   const length = str(body?.length, 120); // 예: "about 2:55 at 121 BPM (2 bars per lyric line)"
   const plan = str(body?.plan, 600); // 예: "Intro 4 bars (instrumental) > Verse 1 8 > … > Final Chorus 16 (same lyrics as Chorus)"
   const ending = str(body?.ending, 120);

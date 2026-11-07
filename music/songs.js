@@ -48,22 +48,31 @@ const SUNO_DEFAULTS = { maxMode: 'Off', weirdness: '20', styleInfluence: '80', v
 const SONG_FIELDS = ['rating', 'ratingNote', 'titleKo', 'titleEn', 'usage', 'sourceName', 'genre', 'bpm', 'duration', 'style',
   'vocalGender', 'maxMode', 'weirdness', 'styleInfluence', 'variety', 'personalize', 'lyricsKo', 'lyricsEn', 'sunoUrl', 'llm', 'createdOn', 'prompt'];
 // 장르 선택지: 추천 조합의 세부 장르(영문) + 자주 쓰는 큰 장르
+// 영어 장르명 → 보관함 장르 표기(단어 첫 글자 대문자). 'euro house' → 'Euro House'
+function songGenreLabel(g) {
+  return g.replace(/\b[a-z]/g, (c) => c.toUpperCase()).replace('Edm', 'EDM').replace('R&b', 'R&B').replace('K-Pop', 'K-pop');
+}
+// Style Builder에서 고른 값 → 보관함 장르·보컬 성별. 곡 분석으로 자동 추가한 장르(유로 하우스 등)도 영어 이름으로 넘긴다
+function sbSongGenre() {
+  if (!sb.genre) return '';
+  const en = genreEn(sb.genre).split(', ')[0];
+  return SONG_GENRES.find((x) => x.toLowerCase() === en.toLowerCase()) ?? songGenreLabel(en);
+}
+const sbVocalGender = () => ({ 'female vocals': 'Female', 'male vocals': 'Male' })[sb.vocal] ?? '';
+
 const SONG_GENRES = [...new Set([
   ...Object.values(GENRE_EN).flatMap((g) => g.split(', ')),
   'k-pop', 'pop', 'ballad', 'r&b', 'hip hop', 'jazz', 'electronic', 'ambient', 'classical', 'cinematic', 'acoustic', 'other',
-])].map((g) => g.replace(/\b[a-z]/g, (c) => c.toUpperCase()).replace('Edm', 'EDM').replace('R&b', 'R&B').replace('K-Pop', 'K-pop'))
-  .sort((a, b) => a.localeCompare(b));
+])].map((g) => songGenreLabel(g)).sort((a, b) => a.localeCompare(b));
 
 const songEl = {
   panel: $('#panel-songs'), tbody: $('#song-rows'), empty: $('#song-empty'), count: $('#song-count'),
-  dialog: $('#song-dialog'), form: $('#song-form'), player: $('#song-player'),
+  dialog: $('#song-dialog'), form: $('#song-form'),
 };
 let songs = [];
 let editing = null; // 수정 중인 곡(null이면 새 곡)
 let pendingFile;    // 팝업에서 고른 파일: Blob · null(삭제) · undefined(그대로)
-let playingId = null;
 
-const fmtSize = (n) => (n > 1048576 ? `${(n / 1048576).toFixed(1)}MB` : `${Math.max(1, Math.round(n / 1024))}KB`);
 const today = () => new Date().toISOString().slice(0, 10);
 const newId = () => (crypto.randomUUID ? crypto.randomUUID() : `s${Date.now()}${Math.random().toString(16).slice(2)}`);
 
@@ -103,13 +112,6 @@ function renderSongs() {
     title.className = 'song-title';
     title.append(Object.assign(document.createElement('b'), { textContent: s.titleKo }));
     if (s.titleEn) title.append(Object.assign(document.createElement('small'), { textContent: s.titleEn }));
-    const play = document.createElement('td');
-    if (s.fileName) {
-      const b = Object.assign(document.createElement('button'), { className: 'ghost song-play', textContent: playingId === s.id ? '■ 정지' : '▶ 재생' });
-      b.setAttribute('aria-label', `${s.titleKo} ${playingId === s.id ? '정지' : '재생'}`);
-      b.onclick = (e) => { e.stopPropagation(); toggleSongPlay(s); };
-      play.append(b);
-    } else play.append(Object.assign(document.createElement('span'), { className: 'muted', textContent: '—' }));
     const link = document.createElement('td');
     if (s.sunoUrl) {
       const a = Object.assign(document.createElement('a'), { href: s.sunoUrl, target: '_blank', rel: 'noopener noreferrer', textContent: '열기 ↗' });
@@ -125,38 +127,15 @@ function renderSongs() {
     usage.className = 'song-usage';
     usage.append(Object.assign(document.createElement('span'), { textContent: s.usage }));
     if (s.sourceName) usage.append(Object.assign(document.createElement('small'), { textContent: s.sourceName }));
-    tr.append(rating, title, usage, cell(s.genre), cell(s.bpm ? String(s.bpm) : '', 'num'), cell(s.duration, 'num'), cell(s.createdOn, 'num'), play, link, del);
+    tr.append(rating, title, usage, cell(s.genre), cell(s.bpm ? String(s.bpm) : '', 'num'), cell(s.duration, 'num'), cell(s.createdOn, 'num'), link, del);
     tr.ondblclick = () => openSong(s);
     tr.onkeydown = (e) => { if (e.key === 'Enter' && e.target === tr) openSong(s); };
     return tr;
   }));
 }
 
-async function toggleSongPlay(s) {
-  const p = songEl.player;
-  if (playingId === s.id) {
-    p.pause();
-    playingId = null;
-    return renderSongs();
-  }
-  const file = await songStore.getFile(s.id).catch(() => null);
-  if (!file) return flash('음원 파일을 찾지 못했습니다. 곡을 수정해서 파일을 다시 올려 주세요.', 'error');
-  if (p.src) URL.revokeObjectURL(p.src);
-  p.src = URL.createObjectURL(file);
-  stopTransport(); // 믹서와 겹쳐 들리지 않게
-  playingId = s.id;
-  p.play().catch(() => { playingId = null; renderSongs(); flash('이 파일은 브라우저에서 재생할 수 없습니다.', 'error'); });
-  renderSongs();
-}
-songEl.player.onended = songEl.player.onpause = () => {
-  if (!songEl.player.ended && !songEl.player.paused) return;
-  playingId = null;
-  renderSongs();
-};
-
 async function deleteSong(s) {
-  if (!confirm(`"${s.titleKo}" 곡을 삭제할까요?\n음원 파일도 함께 지워지고 되돌릴 수 없습니다.`)) return false;
-  if (playingId === s.id) { songEl.player.pause(); playingId = null; }
+  if (!confirm(`"${s.titleKo}" 곡을 삭제할까요?\n되돌릴 수 없습니다.`)) return false;
   try {
     await songStore.remove(s.id);
   } catch (err) {
@@ -177,16 +156,6 @@ function fillGenreOptions() {
   sel.replaceChildren(new Option('선택 안 함', ''), ...SONG_GENRES.map((g) => new Option(g, g)));
 }
 
-function renderFileState(name, size) {
-  const box = $('#song-file-state');
-  box.replaceChildren();
-  if (!name) return;
-  box.append(Object.assign(document.createElement('span'), { textContent: `${name}${size ? ` (${fmtSize(size)})` : ''}` }));
-  const rm = Object.assign(document.createElement('button'), { type: 'button', className: 'ghost', textContent: '파일 빼기' });
-  rm.onclick = () => { pendingFile = null; f('file').value = ''; renderFileState(); };
-  box.append(rm);
-}
-
 // draft: 새 곡을 미리 채워 열 때의 값(제목·가사 탭의 [Suno 작곡에 저장])
 function openSong(s = null, draft = {}) {
   editing = s;
@@ -202,7 +171,6 @@ function openSong(s = null, draft = {}) {
   showRanges();
   // 예전에 고른 장르가 목록에 없으면(직접 입력 등) 선택지로 넣어 둔다
   if (v.genre && !SONG_GENRES.includes(v.genre)) f('genre').append(new Option(v.genre, v.genre, true, true));
-  renderFileState(s?.fileName, s?.fileSize);
   songEl.dialog.showModal();
   f('titleKo').focus();
 }
@@ -213,35 +181,18 @@ function showRanges() {
 }
 songEl.form.addEventListener('input', (e) => { if (e.target.type === 'range') showRanges(); });
 
-// 음원 파일을 고르면 재생시간을 비어 있을 때 자동으로 채운다
-f('file').onchange = () => {
-  const file = f('file').files[0];
-  if (!file) return;
-  if (!/^audio\//.test(file.type) && !/\.(mp3|wav|m4a|flac|ogg|aac)$/i.test(file.name)) {
-    f('file').value = '';
-    return showFormError('오디오 파일(MP3, WAV 등)만 올릴 수 있습니다.');
-  }
-  pendingFile = file;
-  renderFileState(file.name, file.size);
-  const probe = new Audio();
-  probe.preload = 'metadata';
-  probe.src = URL.createObjectURL(file);
-  probe.onloadedmetadata = () => {
-    if (!f('duration').value && isFinite(probe.duration)) f('duration').value = fmtTime(probe.duration).padStart(5, '0'); // 03:45 형식
-    URL.revokeObjectURL(probe.src);
-  };
-};
-
 $('#song-style-import').onclick = () => {
   const text = $('#sb-style').value.trim();
   if (!text) return showFormError('Suno Style Builder에서 먼저 [생성]을 눌러 스타일을 만들어 주세요.');
   f('style').value = text;
-  // Style Builder에서 고른 장르·BPM도 비어 있으면 같이 채운다
+  // Style Builder에서 고른 장르·BPM·보컬 성별도 비어 있으면 같이 채운다
   if (!f('bpm').value && sb.bpm) f('bpm').value = sb.bpm;
-  if (!f('genre').value && sb.genre) {
-    const g = SONG_GENRES.find((x) => x.toLowerCase() === GENRE_EN[sb.genre].split(', ')[0]);
-    if (g) f('genre').value = g;
+  const g = sbSongGenre();
+  if (!f('genre').value && g) {
+    if (!SONG_GENRES.includes(g) && ![...f('genre').options].some((o) => o.value === g)) f('genre').append(new Option(g, g));
+    f('genre').value = g;
   }
+  if (!f('vocalGender').value) f('vocalGender').value = sbVocalGender();
 };
 
 function showFormError(msg) {
@@ -262,8 +213,7 @@ songEl.form.onsubmit = async (e) => {
     bpm: v.bpm ? Math.round(Number(v.bpm)) : '',
     updatedAt: Date.now(),
   };
-  if (pendingFile) Object.assign(song, { fileName: pendingFile.name, fileType: pendingFile.type, fileSize: pendingFile.size });
-  if (pendingFile === null) Object.assign(song, { fileName: '', fileType: '', fileSize: 0 });
+  // 음원 파일 항목은 없앴다(2026-11-07). 예전에 올린 파일은 지우지 않고 그대로 둔다(pendingFile은 항상 undefined = 그대로)
   try {
     await songStore.save(song, pendingFile);
   } catch (err) {

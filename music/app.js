@@ -244,8 +244,46 @@ async function applyCombo(ids, bpm, semis = 0, prog = DEFAULT_PROG) {
 
 const applyPreset = (p) => {
   markPreset(p.name);
-  return applyCombo(p.ids, p.bpm, 0, p.prog);
+  return applyCombo(p.ids, p.bpm, p.semis ?? 0, p.prog);
 };
+
+/* ---------------- 곡 분석에서 자동으로 추가한 세부 장르 ----------------
+ * 분석한 곡의 장르가 기존 세부 장르에 없으면 새로 만든다(upload.js가 분석 직후 호출, suno.js analysisGenre가 판단).
+ * 추천 조합 탭에는 분석한 악기·BPM·키로 재생하는 카드(✦)로, Style Builder 4번에는 장르 칩(✦)으로 보인다.
+ * 이 브라우저에 저장하고, 카드·칩 옆 ×로 지운다(두 곳에서 함께 지워짐). */
+const CUSTOM_GENRE_KEY = 'music.customGenres';
+let customGenres = [];
+try {
+  customGenres = JSON.parse(localStorage.getItem(CUSTOM_GENRE_KEY) || localStorage.getItem('music.suno.customGenres') || '[]')
+    .filter((g) => g?.name && g?.en && g?.cat);
+} catch {}
+const saveCustomGenres = () => { try { localStorage.setItem(CUSTOM_GENRE_KEY, JSON.stringify(customGenres)); } catch {} };
+const customGenre = (name) => customGenres.find((g) => g.name === name);
+// 바뀐 목록을 추천 조합 탭과 Style Builder에 다시 그린다
+function refreshCustomGenres() {
+  const i = [...el.genreTabs.children].findIndex((t) => t.getAttribute('aria-selected') === 'true');
+  showGenre(Math.max(0, i));
+  if (typeof renderSb === 'function') renderSb();
+}
+function addCustomGenre(g) {
+  if (!g || GENRES.some((x) => x.items.some((it) => it.name === g.name)) || customGenre(g.name)) return false;
+  customGenres.push(g);
+  saveCustomGenres();
+  refreshCustomGenres();
+  return true;
+}
+function removeCustomGenre(name) {
+  customGenres = customGenres.filter((x) => x.name !== name);
+  saveCustomGenres();
+  if (currentPreset === name) markPreset(null);
+  if (typeof sb !== 'undefined' && sb.genre === name) { sb.genre = ''; if (typeof commit === 'function') commit(); }
+  refreshCustomGenres();
+}
+// 코드 진행을 semis만큼 옮긴 이름(카드에 보여 줄 값). setHarmony와 같은 샵/플랫 규칙
+function progNames(prog, semis = 0) {
+  const sharpKey = [4, 11, 6, 1].includes((((9 + semis) % 12) + 12) % 12);
+  return prog.map((sym) => buildChord(sym, semis, sharpKey).name);
+}
 
 /* ---------------- 상단 탭: 곡으로 조합 만들기 / 추천 조합 ---------------- */
 function buildPanelTabs() {
@@ -282,13 +320,14 @@ function buildPanelTabs() {
 function setPanelOpen(btn, open) {
   btn.setAttribute('aria-expanded', String(open));
   document.getElementById(btn.getAttribute('aria-controls')).hidden = !open;
-  try { localStorage.setItem(`music.open.${btn.getAttribute('aria-controls')}`, open ? '1' : ''); } catch {}
+  try { localStorage.setItem(`music.open2.${btn.getAttribute('aria-controls')}`, open ? '1' : '0'); } catch {}
 }
 
 function buildPanelToggles() {
   document.querySelectorAll('.pdesc').forEach((btn) => {
-    let open = false;
-    try { open = !!localStorage.getItem(`music.open.${btn.getAttribute('aria-controls')}`); } catch {}
+    // 처음에는 펼쳐 둔다(접으면 기능이 안 보여 처음 쓰는 사람이 헤맨다). 접거나 편 상태는 탭마다 기억한다
+    let open = true;
+    try { const v = localStorage.getItem(`music.open2.${btn.getAttribute('aria-controls')}`); if (v !== null) open = v === '1'; } catch {}
     setPanelOpen(btn, open);
     btn.onclick = () => setPanelOpen(btn, btn.getAttribute('aria-expanded') !== 'true');
   });
@@ -313,16 +352,23 @@ function buildGenres() {
 
 function showGenre(i) {
   [...el.genreTabs.children].forEach((t, k) => t.setAttribute('aria-selected', String(k === i)));
-  el.presets.replaceChildren(...GENRES[i].items.map((p) => {
+  const custom = customGenres.filter((g) => g.cat === GENRES[i].name && g.ids?.length);
+  el.presets.replaceChildren(...[...GENRES[i].items, ...custom].map((p) => {
     const b = document.createElement('button');
     b.className = 'preset';
     b.dataset.name = p.name;
     b.classList.toggle('on', p.name === currentPreset);
-    const inst = p.ids.map((id) => byId[id].ko).join(' · ');
+    const inst = p.ids.filter((id) => byId[id]).map((id) => byId[id].ko).join(' · ');
     // small: 터치 화면용(카드에 그대로 표시), desc: 마우스 화면용 말풍선 — 악기 카드와 같은 규칙
-    const chords = p.prog.join(' – ');
-    b.innerHTML = `<b>${p.name}</b><small>${p.bpm} BPM · ${chords}<br>${inst}</small><span class="desc"><b>${p.bpm} BPM · ${chords}</b>${inst}</span>`;
+    const chords = progNames(p.prog, p.semis).join(' – ');
+    const mine = !!p.src;
+    b.innerHTML = `<b>${p.name}${mine ? ' ✦' : ''}</b><small>${p.bpm} BPM · ${chords}<br>${inst}</small><span class="desc"><b>${p.bpm} BPM · ${chords}</b>${inst}${mine ? `<br>곡 분석에서 자동으로 추가한 장르(${p.from || p.src})` : ''}</span>`;
     b.onclick = () => applyPreset(p);
+    if (!mine) return b;
+    b.classList.add('is-custom');
+    const del = Object.assign(document.createElement('span'), { className: 'preset-del', textContent: '×', title: `'${p.name}' 장르를 지우기(Style Builder에서도 지워짐)`, role: 'button', tabIndex: 0 });
+    del.onclick = (e) => { e.stopPropagation(); removeCustomGenre(p.name); };
+    b.append(del);
     return b;
   }));
   try { localStorage.setItem('music.genreTab', String(i)); } catch {}
@@ -354,6 +400,15 @@ function clearAll() {
     if (state[id].solo) setSolo(id, false);
     deactivate(id);
   });
+}
+
+// 믹서를 처음 상태로: 재생 정지, 악기·추천 조합 표시 해제, BPM·코드 진행 기본값('추천 조합'·'곡으로 조합 만들기' 초기화가 함께 씀)
+function resetMixer() {
+  stopTransport();
+  clearAll();
+  document.querySelectorAll('audio').forEach((a) => a.pause());
+  setBpm(el.bpm.defaultValue);
+  applyHarmony(DEFAULT_PROG, 0);
 }
 
 function setBpm(v) {
@@ -408,6 +463,13 @@ function buildUI() {
 
   el.play.onclick = togglePlay;
   el.clear.onclick = clearAll;
+  $('#preset-reset').onclick = () => {
+    const anyOn = Object.values(state).some((s) => s.active) || currentPreset;
+    if (anyOn && !confirm('켜 둔 악기와 BPM·코드 진행을 처음 상태로 되돌릴까요?')) return;
+    resetMixer();
+    showGenre(0);
+    flash('추천 조합을 초기화했습니다.', 'ok');
+  };
   el.count.onclick = copySelected;
   el.bpm.oninput = () => setBpm(el.bpm.value);
   el.vol.oninput = () => master && (master.volume.value = +el.vol.value);
