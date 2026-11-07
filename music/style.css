@@ -714,3 +714,27 @@ body.no-board #board { display: none; } /* Suno Style Builder·Suno 작곡 탭 *
 @media (max-width: 720px) {
   .src-tabs button, .ly-mode button, .preset-reset, .src-again, .pdesc { min-height: 44px; }
 }
+
+/* ---------- 인기곡 ---------- */
+#panel-ref > .pdesc-static { margin-bottom: 12px; }
+.ref-subs { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 14px; }
+.ref-out { display: flex; flex-direction: column; gap: 8px; }
+.ref-head { display: flex; align-items: baseline; gap: 10px; flex-wrap: wrap; }
+.ref-head h3 { margin: 0; font-size: 15px; }
+.ref-head small { font-size: 12.5px; color: var(--muted); }
+.ref-head .ghost { margin-left: auto; padding: 4px 10px; font-size: 12px; }
+.ref-list { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: repeat(auto-fill, minmax(420px, 1fr)); gap: 6px 16px; }
+.ref-list li { display: grid; grid-template-columns: 28px minmax(0, 1fr) auto; align-items: center; gap: 8px; padding: 7px 10px; border: 1px solid var(--line); border-radius: 10px; }
+.ref-rank { font-weight: 700; color: var(--accent); text-align: right; font-size: 13px; }
+.ref-song { min-width: 0; }
+.ref-song b { display: block; font-size: 13.5px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.ref-song small { display: block; font-size: 12px; color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.ref-song .ref-from { color: var(--accent); }
+.ref-acts { display: flex; gap: 4px; flex-wrap: wrap; justify-content: flex-end; }
+.ref-acts a, .ref-acts button { padding: 4px 9px; font-size: 12px; text-decoration: none; white-space: nowrap; }
+.ref-empty { font-size: 13px; color: var(--muted); padding: 10px 0; }
+@media (max-width: 720px) {
+  .ref-list { grid-template-columns: 1fr; }
+  .ref-list li { grid-template-columns: 24px minmax(0, 1fr); }
+  .ref-acts { grid-column: 2; justify-content: flex-start; }
+}

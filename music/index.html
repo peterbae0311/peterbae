@@ -24,7 +24,7 @@
   <link rel="stylesheet" crossorigin
         href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/static/pretendard.css">
   <!-- 파일을 고치면 ?v= 값을 올려 브라우저 캐시에 남은 예전 파일을 쓰지 않게 한다 -->
-  <link rel="stylesheet" href="style.css?v=20261107s">
+  <link rel="stylesheet" href="style.css?v=20261107t">
 </head>
 <body>
   <header class="hero">
@@ -62,6 +62,7 @@
     <section class="panel">
       <div class="ptabs" role="tablist" aria-label="조합 만들기 방법">
         <button class="ptab" role="tab" id="tab-presets" aria-controls="panel-presets">추천 조합 <span id="preset-current" class="cur"></span></button>
+        <button class="ptab" role="tab" id="tab-ref" aria-controls="panel-ref">인기곡</button>
         <button class="ptab" role="tab" id="tab-upload" aria-controls="panel-upload">곡으로 조합 만들기</button>
         <button class="ptab" role="tab" id="tab-suno" aria-controls="panel-suno">Suno Style Builder</button>
         <button class="ptab" role="tab" id="tab-lyrics" aria-controls="panel-lyrics">제목·가사</button>
@@ -79,6 +80,13 @@
           </div>
           <div id="presets" class="presets"></div>
         </div>
+      </div>
+
+      <div class="ppanel" role="tabpanel" id="panel-ref" aria-labelledby="tab-ref" hidden>
+        <p class="pdesc-static">세부 장르를 고르면 <b>인기곡 Top 20</b>을 보여 줍니다(Last.fm 청취자 태그 기준). 들어 보고, 마음에 드는 곡은 <b>[원곡 정보 찾기]</b>로 리듬·분위기를 확인하세요.</p>
+        <div id="ref-tabs" class="gtabs" role="tablist" aria-label="장르"></div>
+        <div id="ref-subs" class="ref-subs"></div>
+        <div id="ref-out" class="ref-out"></div>
       </div>
 
       <div class="ppanel" role="tabpanel" id="panel-upload" aria-labelledby="tab-upload" hidden>
@@ -306,10 +314,11 @@
 
   <script src="https://cdnjs.cloudflare.com/ajax/libs/tone/14.8.49/Tone.js"></script>
   <script src="instruments.js?v=20261018y"></script>
-  <script src="app.js?v=20261107c"></script>
+  <script src="app.js?v=20261107d"></script>
   <script src="upload.js?v=20261107i"></script>
   <script src="suno.js?v=20261107h"></script>
   <script src="songs.js?v=20261107d"></script>
   <script src="lyrics.js?v=20261107d"></script>
+  <script src="ref.js?v=20261107a"></script>
 </body>
 </html>
