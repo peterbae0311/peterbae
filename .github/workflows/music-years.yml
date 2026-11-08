@@ -1,0 +1,37 @@
+name: Music Track Years
+
+# music 인기곡 탭 '최근 곡' 보기용 발매 연도를 매일 밤 미리 채운다(.github/scripts/music-years.mts).
+# MusicBrainz는 초당 1회 제한이라 화면에서 처음 확인하면 몇 분씩 걸려서, 사용하지 않는 시간에 미리 확인해
+# DB(music_track_years)에 저장해 둔다. 첫 실행은 1~2시간, 이후에는 새로 순위에 든 곡만 확인한다.
+
+on:
+  schedule:
+    # 매일 03:00 KST(UTC 18:00)
+    - cron: "0 18 * * *"
+  workflow_dispatch:
+
+concurrency:
+  group: music-track-years
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+jobs:
+  warm:
+    runs-on: ubuntu-latest
+    timeout-minutes: 340
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+
+      - name: Fill release years
+        env:
+          HUB_ENV: ${{ secrets.HUB_ENV }}
+          MAX_MINUTES: "320"
+        run: |
+          printf '%s\n' "$HUB_ENV" > /tmp/hub.env
+          node --experimental-strip-types .github/scripts/music-years.mts /tmp/hub.env
