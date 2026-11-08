@@ -225,7 +225,8 @@ function parseLyrics(text, sections) {
     if (!arr?.length) throw new Error(`'${name}' 섹션이 빠졌습니다. 다시 생성해 주세요.`);
     lyrics[name] = arr.slice(0, lines).map((l) => ({ en: String(l.en ?? '').trim(), ko: String(l.ko ?? '').trim(), koSrc: String(l.ko ?? '').trim() }));
   }
-  const titles = (j.titles ?? []).map((t) => String(t).trim()).filter((t) => t && !NON_EN.test(t)).slice(0, 5);
+  // 제목은 템플릿에서 { words, title } 꼴로 온다(예전 응답은 문자열)
+  const titles = (j.titles ?? []).map((t) => String(typeof t === 'object' && t ? t.title ?? '' : t).trim()).filter((t) => t && !NON_EN.test(t)).slice(0, 5);
   return { titles, title: titles[0] ?? '', lyrics };
 }
 

@@ -53,14 +53,18 @@ OUTPUT
 Fill in the JSON template given by the user and return ONLY that JSON, no Markdown or extra text.
 - Replace every "" with your text. Keep every slot: do not add, remove or merge lines or sections.
 - The letter after each line number (A, B, C...) marks which lines must rhyme with each other.
-- Exactly 3 English titles (2-5 words each; the chorus hook is a good candidate).`;
+- titles: fill each "title" with an English song title of EXACTLY the given number of "words" (count words strictly;
+  a one-word title is a single word). Make the three titles different; the chorus hook or a key image is a good source.`;
 
 const str = (v: unknown, max: number) => (typeof v === 'string' ? v.trim().slice(0, max) : '');
+
+const titleWords = () => { const r = Math.random(); return r < 0.7 ? 1 : r < 0.9 ? 2 : 3; };
 
 // 빈칸 템플릿: 줄마다 번호+운 글자(AABB…)를 달아 줄 수와 각운을 형식으로 고정한다
 function template(sections: { name: string; lines: number }[]) {
   return JSON.stringify({
-    titles: ['', '', ''],
+    // 제목 단어 수: 1단어 70% · 2단어 20% · 3단어 10%(후보마다 따로 뽑음)
+    titles: [titleWords(), titleWords(), titleWords()].map((words) => ({ words, title: '' })),
     sections: sections.map((s) => ({
       name: s.name,
       lines: Array.from({ length: s.lines }, (_, i) => ({ n: `${i + 1}${String.fromCharCode(65 + Math.floor(i / 2))}`, en: '', ko: '' })),
