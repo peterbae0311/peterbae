@@ -72,6 +72,7 @@ async function handleFile(file, { partial = false, source = '' } = {}) {
     if (lastAudioUrl) URL.revokeObjectURL(lastAudioUrl);
     lastAudioUrl = URL.createObjectURL(file);
     renderResult();
+    if (webInfo) { webInfo.kept = false; renderWeb(); } // ②의 원곡 정보는 유지하고, ③은 새 분석 기준으로 다시 고르게
     up.progress.hidden = true;
     markPreset(null);
     if (mix.picks.length) await applyCombo(mix.picks.map((p) => p.id), res.bpm, semis);
@@ -428,10 +429,18 @@ function splitTitle(raw) {
 }
 // 곡 정보 채우기 요청 번호: 늦게 끝난 이전 요청(예: 유튜브 제목 조회)이 새 곡 정보를 덮어쓰지 않게 한다
 let songInfoSeq = 0;
+// ②에서 이미 웹 정보를 찾았으면(예: 인기곡 → 원곡 정보 찾기 후 ①에 링크·파일을 넣음) 제목·가수·웹 정보를 그대로 둔다.
+// 다른 곡이면 ②의 [초기화]로 지우면 된다
+function keepWebInfo() {
+  if (!webInfo) return false;
+  si.src.textContent = '②에서 찾은 원곡 정보를 그대로 둡니다. 다른 곡이면 ② [초기화] 후 다시 찾아 주세요.';
+  return true;
+}
 async function songInfoFromFile(file) {
+  if (keepWebInfo()) return;
   const seq = ++songInfoSeq;
   const tag = await readId3(file).catch(() => null);
-  if (seq !== songInfoSeq) return;
+  if (seq !== songInfoSeq || keepWebInfo()) return;
   // Suno로 만든 곡은 태그의 가수가 Suno 아이디라 웹 검색을 방해한다 → 가수는 비우고 ②를 건너뛰어도 된다고 알린다
   if (tag?.title && tag.suno) return setSongInfo(tag.title, '', 'Suno로 만든 곡이에요(파일 태그). 웹에는 정보가 없을 수 있어 ②는 건너뛰어도 돼요.');
   if (tag?.title) return setSongInfo(tag.title, tag.artist || '', '파일의 곡 정보 태그에서 가져왔습니다. 다르면 고쳐 주세요.');
@@ -439,15 +448,16 @@ async function songInfoFromFile(file) {
   setSongInfo(g.title, g.artist, '파일 이름에서 가져왔습니다. 다르면 고쳐 주세요.');
 }
 async function songInfoFromLink(href) {
+  if (keepWebInfo()) return;
   const seq = ++songInfoSeq;
   si.src.textContent = '링크에서 곡 제목을 가져오는 중…';
   try {
     const d = await describeApi({ resolve: href });
-    if (seq !== songInfoSeq) return;
+    if (seq !== songInfoSeq || keepWebInfo()) return;
     const g = splitTitle(d.title || '');
     setSongInfo(g.title, g.artist, `영상 제목 "${d.title}"에서 가져왔습니다. 다르면 고쳐 주세요.`);
   } catch (e) {
-    if (seq !== songInfoSeq) return;
+    if (seq !== songInfoSeq || webInfo) return;
     si.src.textContent = e.message === 'NO_SERVER'
       ? '링크 제목 가져오기는 배포 사이트에서만 됩니다. 제목을 직접 입력해 주세요.'
       : `제목을 가져오지 못했습니다(${e.message}). 직접 입력해 주세요.`;
