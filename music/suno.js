@@ -351,10 +351,11 @@ const OPTION_KO = Object.fromEntries(SB_STEPS.flatMap((st) => st.groups).filter(
 
 const SB_KEY = 'music.suno.v1';
 // 11번 제외 항목은 보컬만 빼고 모두 켜 둔다(보컬은 10번에서 연주곡을 고를 때만 자동으로 들어감)
-const EXCL_DEFAULT = () => SB_STEPS.find((st) => st.n === 11).groups[0].options.map((x) => x.en).filter((en) => en !== 'vocals');
+// 11번 제외 항목은 기본으로 아무것도 고르지 않는다(2026-11-08 사용자 요청). 예전 기본값(보컬 외 전체)은 아래에서 한 번 비운다
+const EXCL_OLD_DEFAULT = () => SB_STEPS.find((st) => st.n === 11).groups[0].options.map((x) => x.en).filter((en) => en !== 'vocals');
 const SB_DEFAULT = () => ({
   intro: '', outro: '', main: '', bpm: 120, feel: [], genre: '', genreCustom: '', support: [], mood: [], energy: '',
-  key: '', keyManual: false, harmony: [], arr: [], mix: [], vocal: '', tone: [], lang: '', excl: EXCL_DEFAULT(),
+  key: '', keyManual: false, harmony: [], arr: [], mix: [], vocal: '', tone: [], lang: '', excl: [],
 });
 let sb = SB_DEFAULT();
 try {
@@ -362,10 +363,11 @@ try {
   for (const [k, v] of Object.entries(sb)) {
     if (k in saved && Array.isArray(v) === Array.isArray(saved[k]) && typeof v === typeof saved[k]) sb[k] = saved[k];
   }
-  // 제외 기본값이 생기기 전에 저장된 선택(제외 없음)에는 한 번만 기본값을 채운다. 이후에 직접 끈 항목은 그대로 둔다
-  if (!localStorage.getItem('music.suno.exclDefault')) {
-    if (!sb.excl.length) sb.excl = EXCL_DEFAULT();
-    localStorage.setItem('music.suno.exclDefault', '1');
+  // 예전 기본값(보컬 외 전체)이 그대로 남아 있으면 한 번만 비운다. 직접 골라 바꾼 제외 항목은 그대로 둔다
+  if (!localStorage.getItem('music.suno.exclNoDefault')) {
+    const old = EXCL_OLD_DEFAULT();
+    if (sb.excl.length === old.length && old.every((x) => sb.excl.includes(x))) sb.excl = [];
+    localStorage.setItem('music.suno.exclNoDefault', '1');
   }
 } catch {}
 // 지웠거나 다른 브라우저에서 만든 자동 추가 장르를 가리키는 저장값은 비운다(스타일에 한글 장르 이름이 들어가지 않게)
