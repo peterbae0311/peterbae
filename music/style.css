@@ -746,3 +746,15 @@ body.no-board #board { display: none; } /* Suno Style Builder·Suno 작곡 탭 *
 /* 인기곡: 발매 연도 배지 */
 .ref-year { display: inline-block; margin-left: 6px; padding: 0 6px; border-radius: 999px; font-size: 11px; font-weight: 600; line-height: 17px; vertical-align: 1px; color: var(--accent); background: var(--accent-faint); }
 .ref-year.pending, .ref-year.none { color: var(--muted); background: none; border: 1px dashed var(--line); font-weight: 500; }
+/* 녹음 중인 버튼 강조 */
+/* 녹음 방식 토글(라디오) — 고른 쪽을 채운 색으로 */
+.rec-mode button { padding: 5px 12px; font-size: 12.5px; }
+.rec-mode button[aria-checked="true"] { background: var(--accent); color: #fff; font-weight: 600; }
+.rec-mode button:disabled { opacity: 0.5; cursor: default; }
+#rec-start.recording { background: var(--error-text, #ef4444); border-color: var(--error-text, #ef4444); color: #fff; opacity: 1; }
+/* 녹음 상태(경과 시간·멈추기)는 [● 녹음 중] 버튼 바로 오른쪽에 */
+.rec-row .rec-status { flex: 1 1 360px; min-width: 0; gap: 8px; }
+.rec-row .rec-status > span { flex: 0 1 auto; font-size: 12.5px; }
+.rec-row .rec-status .bar { flex: 1 1 80px; min-width: 60px; }
+/* ② 원곡 정보 [초기화]: 단계 제목 줄 오른쪽 끝 */
+.step-h #song-reset { margin-left: auto; align-self: center; font-weight: 500; }

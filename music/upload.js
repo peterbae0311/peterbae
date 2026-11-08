@@ -147,8 +147,7 @@ function renderResult() {
       <p class="muted r-note">분석으로 추정한 값입니다.${res.partial ? ' 곡 일부를 녹음해서 페이드아웃·브레이크다운·점점 고조는 판단하지 않았습니다.' : ''} Suno 스타일은 Suno Style Builder 탭의 [곡 분석 불러오기]로 이 값을 가져와 보컬·Concept과 함께 만듭니다.</p>
     </div>`;
   up.result.hidden = false;
-  // ② 원곡 정보 확인은 분석이 끝난 뒤에 보인다. 이미 찾은 웹 결과가 있으면 ③ 선택 상태를 새 결과에 맞춰 다시 그린다
-  $('#song-step').hidden = false;
+  // ② 원곡 정보는 처음부터 ①과 함께 보인다. 이미 찾은 웹 결과가 있으면 ③ 선택 상태를 새 결과에 맞춰 다시 그린다
   if (webInfo && !si.out.hidden) renderWeb();
   // 결과가 있으면 큰 파일 선택 칸은 숨기고 '다른 곡 선택' 버튼으로 대신한다(세로 공간 확보)
   up.panel.classList.add('has-result');
@@ -208,7 +207,7 @@ function showStream(url) {
   $('#stream-open').href = url.href;
   const can = !!(navigator.mediaDevices?.getDisplayMedia && window.MediaRecorder);
   $('#stream-unsupported').hidden = can;
-  $('#rec-full').disabled = $('#rec-90').disabled = !can;
+  $('#rec-start').disabled = !can;
   songInfoFromLink(url.href);
   $('#stream-open').focus();
 }
@@ -242,7 +241,8 @@ async function analyzeUrl(raw) {
   await handleFile(new File([blob], name, { type: /^audio\//.test(blob.type) ? blob.type : 'audio/mpeg' }), { source: '링크' });
 }
 
-// '곡으로 조합 만들기' 초기화: 분석 결과·원곡·링크 입력을 지우고 파일 선택 화면과 믹서를 처음 상태로
+// ① 곡 분석 초기화: 분석 결과·원곡·링크 입력·녹음 칸을 지우고 파일 선택 화면과 믹서를 처음 상태로.
+// ② 원곡 정보(제목·가수·웹 정보)는 따로 [초기화]가 있어 여기서는 그대로 둔다
 $('#upload-reset').onclick = () => {
   if (busy || rec) return flash('지금 분석하거나 녹음하는 중입니다. 끝난 뒤(또는 녹음 [취소] 후)에 초기화해 주세요.', 'warn');
   if (last && !confirm('분석 결과와 켜 둔 악기를 지울까요?')) return;
@@ -256,11 +256,24 @@ $('#upload-reset').onclick = () => {
   up.progress.hidden = true;
   up.panel.classList.remove('has-result');
   $('#url-input').value = '';
-  webInfo = null;
-  setSongInfo('', '', '');
-  $('#song-step').hidden = true;
   streamBox.hidden = true;
+  // ②는 그대로 두되, 반영할 분석 결과가 없어졌으니 ③ 선택 칸을 새 상태로 다시 그린다
+  if (webInfo && !si.out.hidden) renderWeb();
   flash('곡 분석을 초기화했습니다. 새 곡을 선택해 주세요.', 'ok');
+};
+
+// ② 원곡 정보 초기화: 제목·가수·웹에서 찾은 정보를 지운다. ③에서 웹 정보로 바꿔 둔 분석값은 소리 분석 값으로 되돌린다
+$('#song-reset').onclick = () => {
+  const has = si.title.value || si.artist.value || webInfo;
+  if (has && !confirm('제목·가수와 웹에서 찾은 정보를 지울까요?')) return;
+  if (last?.web) {
+    delete last.web;
+    deriveFromBpm();
+    renderResult();
+  }
+  songInfoSeq++; // 진행 중이던 링크 제목 조회가 다시 채우지 않게
+  setSongInfo('', '', '');
+  flash('원곡 정보를 초기화했습니다.', 'ok');
 };
 
 $('#url-form').onsubmit = (e) => { e.preventDefault(); analyzeUrl($('#url-input').value); };
@@ -283,8 +296,12 @@ async function startRecording(full) {
   try {
     // 크롬은 소리만 공유할 수 없어 화면도 함께 받지만, 녹음에는 소리만 쓴다
     stream = await navigator.mediaDevices.getDisplayMedia({ video: true, audio: true, selfBrowserSurface: 'exclude', systemAudio: 'include' });
-  } catch {
-    return; // 공유 창에서 취소
+  } catch (e) {
+    // 공유 창에서 [취소]한 경우도 NotAllowedError라 구분이 어렵다 → 이유와 함께 안내해 '눌러도 아무 일 없음'처럼 보이지 않게
+    console.warn('getDisplayMedia', e);
+    return flash(e?.name === 'NotAllowedError'
+      ? '녹음을 시작하지 못했습니다. 공유 창에서 [취소]했거나 브라우저가 화면 공유를 막았습니다. 다시 눌러 곡이 재생되는 탭을 고르고 "탭 오디오도 공유"를 켜 주세요.'
+      : `녹음을 시작하지 못했습니다(${e?.name || e}). 데스크톱 Chrome·Edge 최신 버전에서 시도해 주세요.`, 'warn');
   }
   const tracks = stream.getAudioTracks();
   if (!tracks.length) {
@@ -303,7 +320,23 @@ async function startRecording(full) {
   tracks[0].onended = () => stopRecording(); // 브라우저의 [공유 중지]
   recorder.start(1000);
   rec.timer = setInterval(tickRecording, 250);
+  setRecButtons(full);
   tickRecording();
+}
+
+// 녹음 방식 토글(곡 끝까지 / 앞부분 90초): 누르면 바로 선택이 바뀌고 기억한다. 녹음은 [● 녹음 시작]으로 한다
+let recFull = true;
+try { recFull = localStorage.getItem('music.rec.mode') !== 'part'; } catch {}
+function renderRecMode() {
+  document.querySelectorAll('#rec-mode [data-rec]').forEach((b) => b.setAttribute('aria-checked', String((b.dataset.rec === 'full') === recFull)));
+}
+// 녹음 중에는 시작 버튼을 빨간 '● 녹음 중'으로 바꾸고 방식 토글을 잠근다. 끝나면 원래대로
+function setRecButtons(recording) {
+  const b = $('#rec-start');
+  b.textContent = recording !== undefined ? '● 녹음 중' : '● 녹음 시작';
+  b.classList.toggle('recording', recording !== undefined);
+  b.disabled = recording !== undefined;
+  document.querySelectorAll('#rec-mode [data-rec]').forEach((x) => { x.disabled = recording !== undefined; });
 }
 
 function tickRecording() {
@@ -313,8 +346,10 @@ function tickRecording() {
   const db = 10 * Math.log10(buf.reduce((s, v) => s + v * v, 0) / buf.length + 1e-12);
   if (db > REC_QUIET_DB) { rec.heard += 0.25; rec.quietSince = 0; } else if (!rec.quietSince) rec.quietSince = sec;
   const limit = rec.full ? REC_MAX : REC_SECONDS;
-  // 끝까지 녹음: 소리가 30초 넘게 난 뒤 4초 동안 조용하면 곡이 끝난 것으로 본다
-  const ended = rec.full && rec.heard >= 30 && rec.quietSince && sec - rec.quietSince >= 4;
+  // 끝까지 녹음: 소리가 60초 넘게 난 뒤 8초 동안 조용하면 곡이 끝난 것으로 본다.
+  // 예전 기준(30초 뒤 4초)은 곡 중간의 조용한 구간·유튜브 버퍼링·일시정지에서도 멈춰 90초쯤에 끝나 버렸다
+  const ended = rec.full && rec.heard >= 60 && rec.quietSince && sec - rec.quietSince >= 8;
+  if (ended) rec.endedBySilence = true;
   if (sec >= limit || ended) return stopRecording();
   const box = $('#rec-status');
   box.hidden = false;
@@ -334,10 +369,12 @@ function stopRecording(cancel = false) {
 }
 
 function finishRecording() {
-  const { chunks, recorder, full, cancel, heard } = rec;
+  const { chunks, recorder, full, cancel, heard, endedBySilence } = rec;
   rec = null;
   $('#rec-status').hidden = true;
+  setRecButtons();
   if (cancel) return;
+  if (endedBySilence) flash('8초 동안 소리가 없어 곡이 끝난 것으로 보고 녹음을 멈췄습니다. 곡 중간이었다면 다시 녹음해 주세요.', 'ok');
   if (heard < 10) return flash('녹음된 소리가 10초도 되지 않아 분석하지 않았습니다. 곡을 재생하면서 다시 녹음해 주세요.', 'warn');
   const type = recorder.mimeType || 'audio/webm';
   const now = new Date();
@@ -345,8 +382,15 @@ function finishRecording() {
   handleFile(new File(chunks, name, { type }), { partial: !full, source: full ? '녹음(곡 전체)' : '녹음(앞부분)' });
 }
 
-$('#rec-90').onclick = () => startRecording(false);
-$('#rec-full').onclick = () => startRecording(true);
+$('#rec-mode').onclick = (e) => {
+  const b = e.target.closest('[data-rec]');
+  if (!b || b.disabled) return;
+  recFull = b.dataset.rec === 'full';
+  try { localStorage.setItem('music.rec.mode', recFull ? 'full' : 'part'); } catch {}
+  renderRecMode();
+};
+renderRecMode();
+$('#rec-start').onclick = () => startRecording(recFull);
 $('#rec-stop').onclick = () => stopRecording();
 $('#rec-cancel').onclick = () => stopRecording(true);
 
@@ -464,6 +508,7 @@ function renderWeb() {
   const w = webInfo;
   const box = si.out;
   box.hidden = false;
+  // Last.fm 태그(청취자들이 붙인 꼬리표)는 분위기 단서로 함께 보여 준다. 출처 링크는 보이지 않는다
   const tagRow = w.tags.length ? `<div class="chips"><span class="w-label">Last.fm 태그</span>${w.tags.map((t) => `<span class="chip">${esc(t)}</span>`).join('')}</div>` : '';
   if (!w.found) {
     box.innerHTML = `<p>웹에서 <b>${esc(w.query)}</b>의 리듬·분위기 정보를 찾지 못했습니다. 제목·가수를 정확히 적었는지 확인해 주세요. 직접 만든 곡(Suno 등)은 웹에 정보가 없으니 소리 분석 결과를 쓰면 됩니다.</p>${tagRow}`;
@@ -477,7 +522,6 @@ function renderWeb() {
     <div class="chips"><span class="w-label">리듬</span>${chips('feel', w.rhythm)}</div>
     <div class="chips"><span class="w-label">분위기</span>${chips('mood', w.mood)}${w.energy ? chips('energy', [w.energy]) : ''}</div>
     ${tagRow}
-    ${w.sources.length ? `<div><span class="w-label">출처</span><ol>${w.sources.map((x) => `<li><a href="${esc(x.url)}" target="_blank" rel="noopener noreferrer">${esc(x.title || x.url)}</a></li>`).join('')}</ol></div>` : ''}
     <div class="w-step">
       <h3 class="step-h"><span class="step-n">3</span>반영 여부 선택</h3>
       <div class="w-foot">${last?.web

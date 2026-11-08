@@ -33,8 +33,11 @@ Map what the evidence says to these exact values (use only values supported by t
 
 Return ONLY compact JSON:
 {"found":bool,"song":"title as found","artist":"artist as found","rhythm":[...],"mood":[...],"energy":"",
- "rhythmKo":"1-2 natural Korean sentences describing the groove/beat/tempo feel, citing what the sources say",
- "moodKo":"1-2 natural Korean sentences describing the mood","sources":[indexes of the web results you relied on]}`;
+ "rhythmKo":"1-2 natural Korean sentences describing the song's groove, beat and tempo feel",
+ "moodKo":"1-2 natural Korean sentences describing the song's mood and emotion","sources":[indexes of the web results you relied on]}
+rhythmKo and moodKo are used as a brief for writing new lyrics, so describe the song itself directly
+(e.g. "느긋한 셔플 그루브 위로 베이스가 통통 튄다"). Never mention sources, reviews, websites, critics, tags,
+Last.fm, the artist's career or chart history — only the sound and feeling of this song.`;
 
 type WebResult = { title: string; url: string; content: string };
 

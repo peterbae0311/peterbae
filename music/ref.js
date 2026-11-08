@@ -215,7 +215,6 @@ function refFindInfo(t) {
   $('#tab-upload').click();
   const btn = $('#panel-upload .pdesc');
   if (btn && btn.getAttribute('aria-expanded') !== 'true') setPanelOpen(btn, true);
-  $('#song-step').hidden = false;
   songInfoSeq++; // 진행 중이던 링크 제목 조회가 덮어쓰지 않게
   setSongInfo(t.name, t.artist, '인기곡 탭에서 가져왔습니다. 소리까지 분석하려면 위 ①에서 곡을 가져오세요.');
   $('#song-step').scrollIntoView({ behavior: 'smooth', block: 'start' });
