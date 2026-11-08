@@ -738,3 +738,11 @@ body.no-board #board { display: none; } /* Suno Style Builder·Suno 작곡 탭 *
   .ref-list li { grid-template-columns: 24px minmax(0, 1fr); }
   .ref-acts { grid-column: 2; justify-content: flex-start; }
 }
+.ref-mode { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; margin-bottom: 14px; }
+.ref-mode select { padding: 4px 8px; font-size: 12.5px; border: 1px solid var(--line); border-radius: 8px; background: var(--field-bg); color: var(--text); }
+.ref-mode select[hidden] { display: none; }
+.ref-mode small { font-size: 12px; }
+.ref-foot { margin: 4px 0 0; font-size: 12px; }
+/* 인기곡: 발매 연도 배지 */
+.ref-year { display: inline-block; margin-left: 6px; padding: 0 6px; border-radius: 999px; font-size: 11px; font-weight: 600; line-height: 17px; vertical-align: 1px; color: var(--accent); background: var(--accent-faint); }
+.ref-year.pending, .ref-year.none { color: var(--muted); background: none; border: 1px dashed var(--line); font-weight: 500; }
