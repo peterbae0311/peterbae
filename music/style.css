@@ -507,7 +507,7 @@ body.no-board #board { display: none; } /* Suno Style Builder·Suno 작곡 탭 *
 .ly-chips { display: inline-flex; gap: 5px; flex-wrap: wrap; }
 .ly-titles input { flex: 1; min-width: 200px; font-size: 14px; font-weight: 600; }
 .ly-structure { font-size: 12px; }
-.ly-mode { margin-bottom: 14px; }
+.ly-mode-row { display: flex; align-items: center; gap: 8px; margin-bottom: 14px; }
 .ly-mode button { padding: 5px 14px; font-size: 13px; }
 #panel-lyrics.manual .ly-ai-only { display: none; }
 .ly-manual { margin-top: 18px; border-top: 1px solid var(--line); padding-top: 14px; display: flex; flex-direction: column; gap: 10px; }

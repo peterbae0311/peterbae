@@ -24,7 +24,7 @@
   <link rel="stylesheet" crossorigin
         href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/static/pretendard.css">
   <!-- 파일을 고치면 ?v= 값을 올려 브라우저 캐시에 남은 예전 파일을 쓰지 않게 한다 -->
-  <link rel="stylesheet" href="style.css?v=20261108h">
+  <link rel="stylesheet" href="style.css?v=20261108i">
 </head>
 <body>
   <header class="hero">
@@ -198,9 +198,12 @@
       </div>
       <div class="ppanel" role="tabpanel" id="panel-lyrics" aria-labelledby="tab-lyrics" hidden>
         <p class="pdesc-static">스타일에 맞는 <b>영어 제목·가사</b>를 만들어 드려요. 이미 쓴 가사가 있으면 <b>[직접 입력]</b>을 선택하세요.</p>
-        <span class="fmt-tabs ly-mode" role="tablist" aria-label="가사 만드는 방법" id="ly-mode">
-          <button type="button" role="tab" data-mode="ai" aria-selected="true">AI 생성</button><button type="button" role="tab" data-mode="manual" aria-selected="false">직접 입력</button>
-        </span>
+        <div class="ly-mode-row">
+          <span class="fmt-tabs ly-mode" role="tablist" aria-label="가사 만드는 방법" id="ly-mode">
+            <button type="button" role="tab" data-mode="ai" aria-selected="true">AI 생성</button><button type="button" role="tab" data-mode="manual" aria-selected="false">직접 입력</button>
+          </span>
+          <button type="button" class="ghost preset-reset" id="ly-reset" title="스타일·곡 길이·BPM·주제·메모를 처음 상태로 되돌립니다(만든 가사는 그대로)">초기화</button>
+        </div>
         <div class="ly-top">
           <div class="ly-style">
             <div class="ly-head"><b>스타일</b><small id="ly-style-src" class="muted"></small>
@@ -329,7 +332,7 @@
   <script src="upload.js?v=20261108i"></script>
   <script src="suno.js?v=20261108b"></script>
   <script src="songs.js?v=20261107d"></script>
-  <script src="lyrics.js?v=20261108b"></script>
+  <script src="lyrics.js?v=20261108e"></script>
   <script src="ref.js?v=20261108c"></script>
 </body>
 </html>

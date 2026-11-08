@@ -78,7 +78,11 @@ function uniqueSections(plan) {
 const fmtLen = (sec) => `${Math.floor(sec / 60)}:${String(Math.round(sec % 60)).padStart(2, '0')}`;
 
 /* ---------------- 입력 ---------------- */
+// 곡 길이를 고르지 않으면(초기화 후) 기본 2:55로 계산한다
+const LEN_DEFAULT = 175;
+const lenSec = () => +ly.len.value || LEN_DEFAULT;
 function fillLengths() {
+  ly.len.append(new Option('선택 안 함', '', false, !lyState.len));
   for (let s = 120; s <= 240; s += 5) ly.len.append(new Option(fmtLen(s), String(s), false, s === lyState.len));
 }
 // 스타일 문장에 적힌 곡 길이(초). "about 2:55" → 175, "2:50–3:00" → 가운데 175, "3 minutes" → 180.
@@ -97,6 +101,7 @@ function lengthFromStyle(text) {
 function pullStyle(quiet = false) {
   const text = (styleOut.prose || styleOut.list || '').trim();
   if (!text) return quiet || flash('Suno Style Builder에서 먼저 [생성]을 눌러 스타일을 만들어 주세요.', 'warn');
+  lyState.cleared = false;
   ly.style.value = text;
   lyState.style = text;
   ly.bpm.value = lyState.bpm = sb.bpm;
@@ -112,9 +117,9 @@ function renderPlan() {
   const sync = $('#ly-bpm-sync');
   sync.hidden = !sb.bpm || +sb.bpm === bpm;
   sync.textContent = `Style Builder BPM(${sb.bpm})과 달라요 · 맞추기`;
-  const plan = planSong(+ly.len.value, bpm);
+  const plan = planSong(lenSec(), bpm);
   const bars = totalBars(plan);
-  ly.plan.textContent = `${bars}마디 · 예상 ${fmtLen(bars * 240 / bpm)} (Suno는 ±15초 정도 달라질 수 있어요)`;
+  ly.plan.textContent = `${bars}마디 · 예상 ${fmtLen(bars * 240 / bpm)} (${ly.len.value ? '' : `곡 길이 기본 ${fmtLen(LEN_DEFAULT)} 기준 · `}Suno는 ±15초 정도 달라질 수 있어요)`;
 }
 
 /* ---------------- 생성 ---------------- */
@@ -129,7 +134,7 @@ async function generateLyrics() {
   const style = ly.style.value.trim();
   if (!style) return flash('스타일이 비어 있습니다. [Style Builder에서 가져오기]를 누르거나 직접 붙여 넣어 주세요.', 'warn');
   const bpm = Math.max(60, Math.min(180, Math.round(+ly.bpm.value) || 120));
-  const plan = planSong(+ly.len.value, bpm);
+  const plan = planSong(lenSec(), bpm);
   const sections = uniqueSections(plan);
   const theme = ly.theme.value.trim();
   const payload = {
@@ -348,7 +353,15 @@ function setLyricsTheme(desc) {
   lyState.theme = ly.theme.value;
   saveLy();
 }
-ly.stylePull.onclick = () => pullStyle();
+// [Style Builder에서 가져오기]: 스타일·BPM·곡 길이와 함께 Theme의 영어 문장(':' 줄)을 주제·메모에 넣는다
+ly.stylePull.onclick = () => {
+  pullStyle();
+  const en = conceptParts();
+  if (!en.length || !(styleOut.prose || styleOut.list || '').trim()) return; // 스타일이 없으면 pullStyle의 안내를 그대로 보인다
+  ly.theme.value = lyState.theme = en.map((p) => `${p}.`).join('\n').slice(0, 600);
+  saveLy();
+  flash('스타일·BPM과 함께 Theme의 영어 문장을 주제·메모에 넣었습니다.', 'ok');
+};
 $('#ly-bpm-sync').onclick = () => { ly.bpm.value = lyState.bpm = sb.bpm; saveLy(); renderPlan(); };
 ly.gen.onclick = generateLyrics;
 $('#ly-prev').onclick = () => { lyState.cur--; saveLy(); renderLyrics(); };
@@ -379,7 +392,20 @@ ly.mKo.value = lyState.manual.ko;
   ly[el].oninput = () => { lyState.manual[key] = ly[el].value; saveLy(); if (key !== 'title') renderManualFoot(); };
 });
 // 탭을 처음 열 때 스타일이 비어 있으면 Style Builder 결과를 가져온다
-$('#tab-lyrics').addEventListener('click', () => { if (!ly.style.value.trim()) pullStyle(true); renderPlan(); });
-if (!ly.style.value.trim()) pullStyle(true);
+// 스타일 칸이 비어 있으면 탭을 열 때 Style Builder 스타일을 자동으로 가져온다. [초기화]로 비운 뒤에는 버튼을 누를 때까지 가져오지 않는다
+const autoPull = () => { if (!ly.style.value.trim() && !lyState.cleared) pullStyle(true); };
+$('#tab-lyrics').addEventListener('click', () => { autoPull(); renderPlan(); });
+autoPull();
+// [초기화]: 스타일·곡 길이·BPM·주제·메모를 처음 상태로(만든 가사 버전·직접 입력 내용은 그대로)
+$('#ly-reset').onclick = () => {
+  const has = ly.style.value.trim() || ly.theme.value.trim();
+  if (has && !confirm('스타일·곡 길이·BPM·주제·메모를 지울까요?')) return;
+  Object.assign(lyState, { style: '', len: 0, bpm: 0, theme: '', cleared: true });
+  ly.style.value = ly.theme.value = ly.bpm.value = ly.len.value = '';
+  ly.styleSrc.textContent = '';
+  saveLy();
+  renderPlan();
+  flash('스타일·곡 길이·BPM·주제·메모를 초기화했습니다.', 'ok');
+};
 renderPlan();
 renderMode();
