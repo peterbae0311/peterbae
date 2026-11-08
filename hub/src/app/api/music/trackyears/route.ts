@@ -41,7 +41,7 @@ export async function POST(request: NextRequest) {
 
   const started = Date.now();
   const years: Record<string, number | null> = {};
-  const fresh: { key: string; artist: string; title: string; year: number | null }[] = [];
+  const fresh: { key: string; artist: string; title: string; year: number | null; checked_at: string }[] = [];
   let checked = 0;
   for (const t of tracks) {
     const k = dbKey(t);
@@ -51,7 +51,7 @@ export async function POST(request: NextRequest) {
     if (Date.now() - started > BUDGET_MS) break; // 남은 곡은 다음 요청에서
     const y = await mb.findYear(t);
     memory.set(k, y);
-    fresh.push({ key: k, artist: t.artist, title: t.name, year: y });
+    fresh.push({ key: k, artist: t.artist, title: t.name, year: y, checked_at: new Date().toISOString() });
     years[clientKey] = y;
     checked++;
   }

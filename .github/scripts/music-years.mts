@@ -70,18 +70,25 @@ async function pool(key: string, tags: string[]): Promise<Track[]> {
   return out;
 }
 
-// DB에 이미 있는 키 전부(페이지로 나눠 읽기)
+// DB에 이미 있는 키(페이지로 나눠 읽기). '못 찾음'(year null)으로 저장된 곡은 7일이 지나면 다시 확인한다
+// (찾는 방법이 나아지면 — 예: 제목 꼬리표 정리 — 예전에 못 찾은 곡도 채워지게)
+const RECHECK_MS = 7 * 24 * 60 * 60 * 1000;
+// 찾는 방법을 바꾼 시각: 이보다 전에 '못 찾음'으로 저장된 곡은 기다리지 않고 바로 다시 확인한다(2026-11-08 제목 꼬리표 정리 추가)
+const METHOD_SINCE = Date.parse('2026-11-08T08:00:00Z');
 async function knownKeys(): Promise<Set<string>> {
   const keys = new Set<string>();
   for (let from = 0; ; from += 1000) {
-    const r = await sb('music_track_years?select=key', { headers: { Range: `${from}-${from + 999}` } });
+    const r = await sb('music_track_years?select=key,year,checked_at', { headers: { Range: `${from}-${from + 999}` } });
     if (!r.ok) throw new Error(`music_track_years 읽기 실패(${r.status}): 마이그레이션(20261108_music_track_years.sql)을 실행했는지 확인하세요`);
-    const rows = await r.json() as { key: string }[];
-    rows.forEach((x) => keys.add(x.key));
+    const rows = await r.json() as { key: string; year: number | null; checked_at: string }[];
+    rows.forEach((x) => {
+      const at = Date.parse(x.checked_at);
+      if (x.year !== null || (Date.now() - at < RECHECK_MS && at >= METHOD_SINCE)) keys.add(x.key);
+    });
     if (rows.length < 1000) return keys;
   }
 }
-async function save(rows: { key: string; artist: string; title: string; year: number | null }[]) {
+async function save(rows: { key: string; artist: string; title: string; year: number | null; checked_at?: string }[]) {
   if (!rows.length) return;
   const r = await sb('music_track_years?on_conflict=key', { method: 'POST', headers: { Prefer: 'resolution=merge-duplicates' }, body: JSON.stringify(rows) });
   if (!r.ok) console.error('저장 실패', r.status, await r.text());
@@ -98,12 +105,12 @@ let found = 0, checked = 0;
 outer: for (const [name, t] of Object.entries(tags)) {
   const list = (await pool(key, t)).filter((x) => !known.has(dbKey(x)));
   console.log(`${name} (${t.join(', ')}): 새로 확인할 곡 ${list.length}곡`);
-  let batch: { key: string; artist: string; title: string; year: number | null }[] = [];
+  let batch: { key: string; artist: string; title: string; year: number | null; checked_at: string }[] = [];
   for (const x of list) {
     if ((Date.now() - started) / 60000 > MAX_MINUTES) { await save(batch); console.log('시간 제한에 닿아 멈춥니다(다음 실행에서 이어서)'); break outer; }
     const y = await mb.findYear(x);
     known.add(dbKey(x));
-    batch.push({ key: dbKey(x), artist: x.artist, title: x.name, year: y });
+    batch.push({ key: dbKey(x), artist: x.artist, title: x.name, year: y, checked_at: new Date().toISOString() });
     checked++; if (y) found++;
     if (batch.length >= 25) { await save(batch); batch = []; }
   }

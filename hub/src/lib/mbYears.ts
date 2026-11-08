@@ -27,6 +27,14 @@ const earliest = (recs: Rec[] | undefined, minScore: number, title?: string) => 
   return ys.length ? Math.min(...ys) : null;
 };
 
+// ' - Remastered 2009', '(2011 Remaster)', ' - Single Version', ' - Live', '(feat. X)' 같은 꼬리표를 뗀다(뗀 뒤 비면 원래 제목)
+const TAIL = /\s*(?:-\s*(?:\d{4}\s*)?(?:remaster(?:ed)?|single|radio|album|mono|stereo|live|demo|edit|version|mix|acoustic)\b.*|[([](?:[^)\]]*\b(?:remaster(?:ed)?|version|edit|mono|stereo|live|feat\.?|ft\.)\b[^)\]]*)[)\]])\s*$/i;
+export function cleanTitle(name: string) {
+  let s = name;
+  for (let i = 0; i < 3; i++) s = s.replace(TAIL, '').trim();
+  return s || name;
+}
+
 export function createMbClient(userAgent: string, gapMs = 1100) {
   let queue: Promise<unknown> = Promise.resolve();
   let lastAt = 0;
@@ -63,7 +71,10 @@ export function createMbClient(userAgent: string, gapMs = 1100) {
     return hit?.id ?? null;
   }
 
-  async function findYear(t: MbTrack): Promise<number | null> {
+  async function findYear(track: MbTrack): Promise<number | null> {
+    // Last.fm 제목의 리마스터·버전 꼬리표는 MusicBrainz 녹음 제목에 없어 떼고 찾는다
+    // 실측: 'Do You Want To Know A Secret - Remastered 2009'(The Beatles)가 꼬리표 때문에 연도를 못 찾았다
+    const t = { ...track, name: cleanTitle(track.name) };
     const arid = await artistId(t.artist);
     if (arid) {
       // 검색어 안의 and·or·not은 MusicBrainz 검색에서 연산자로 읽히므로 뺀다
