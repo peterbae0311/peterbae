@@ -511,12 +511,13 @@ function renderWeb() {
   // Last.fm 태그(청취자들이 붙인 꼬리표)는 분위기 단서로 함께 보여 준다. 출처 링크는 보이지 않는다
   const tagRow = w.tags.length ? `<div class="chips"><span class="w-label">Last.fm 태그</span>${w.tags.map((t) => `<span class="chip">${esc(t)}</span>`).join('')}</div>` : '';
   if (!w.found) {
-    box.innerHTML = `<p>웹에서 <b>${esc(w.query)}</b>의 리듬·분위기 정보를 찾지 못했습니다. 제목·가수를 정확히 적었는지 확인해 주세요. 직접 만든 곡(Suno 등)은 웹에 정보가 없으니 소리 분석 결과를 쓰면 됩니다.</p>${tagRow}`;
+    box.innerHTML = `<p>웹에서 <b>${esc(w.query)}</b>의 주제·리듬·분위기 정보를 찾지 못했습니다. 제목·가수를 정확히 적었는지 확인해 주세요. 직접 만든 곡(Suno 등)은 웹에 정보가 없으니 소리 분석 결과를 쓰면 됩니다.</p>${tagRow}`;
     return;
   }
   const chips = (key, vals) => vals.map((v) => `<span class="chip on">${OPTION_KO[key]?.[v] ?? esc(v)}</span>`).join('') || '<span class="muted">근거 없음</span>';
   box.innerHTML = `
     <h4>웹에서 찾은 원곡 정보: ${esc(w.song)}${w.artist ? ` — ${esc(w.artist)}` : ''}</h4>
+    ${w.themeKo ? `<p><b>주제</b> ${esc(w.themeKo)}</p>` : ''}
     ${w.rhythmKo ? `<p><b>리듬</b> ${esc(w.rhythmKo)}</p>` : ''}
     ${w.moodKo ? `<p><b>분위기</b> ${esc(w.moodKo)}</p>` : ''}
     <div class="chips"><span class="w-label">리듬</span>${chips('feel', w.rhythm)}</div>

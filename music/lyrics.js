@@ -342,8 +342,8 @@ ly.bpm.onchange = () => { lyState.bpm = Math.max(60, Math.min(180, Math.round(+l
 ly.theme.oninput = () => { lyState.theme = ly.theme.value; saveLy(); };
 // Style Builder [곡 분석 불러오기]가 웹에서 찾은 원곡의 리듬·분위기 설명을 주제·메모에 넣을 때 쓴다
 function setLyricsTheme(desc) {
-  // 직접 적어 둔 메모는 지우지 않는다. 이전 곡에서 자동으로 넣은 '리듬: …/분위기: …' 줄만 새 설명으로 바꾼다
-  const mine = ly.theme.value.split('\n').filter((l) => !/^(리듬|분위기): /.test(l)).join('\n').trim();
+  // 직접 적어 둔 메모는 지우지 않는다. 이전 곡에서 자동으로 넣은 '주제/리듬/분위기: …' 줄만 새 설명으로 바꾼다
+  const mine = ly.theme.value.split('\n').filter((l) => !/^(주제|리듬|분위기): /.test(l)).join('\n').trim();
   ly.theme.value = (mine ? `${mine}\n${desc}` : desc).slice(0, 600);
   lyState.theme = ly.theme.value;
   saveLy();

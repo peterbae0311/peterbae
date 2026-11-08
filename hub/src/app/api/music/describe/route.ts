@@ -6,7 +6,7 @@ import { musicChat } from '@/lib/musicLlm';
 /**
  * music '곡으로 조합 만들기'의 [웹에서 원곡 정보 찾기]. 두 가지 쓰임:
  *  - { resolve: url }        유튜브 등 링크의 영상 제목만 가져온다(oEmbed — 영상·음원은 받지 않음, 약관상 금지)
- *  - { title, artist? }      Last.fm 태그 + Tavily 웹 검색 결과를 LLM(musicChat)이 정리해 원곡의 리듬·분위기를
+ *  - { title, artist? }      Last.fm 태그 + Tavily 웹 검색 결과를 LLM(musicChat)이 정리해 원곡의 주제·리듬·분위기를
  *                            Style Builder 선택지 값으로 돌려준다. 근거가 없으면 지어내지 말고 found=false.
  * 키: Key 관리의 TAVILY_API_KEY(무료 월 1,000회), LASTFM_API_KEY. 둘 중 하나만 있어도 동작한다.
  * 경로가 /api/music/... 이라 nginx auth_request가 music 앱 권한으로 판별한다.
@@ -20,11 +20,11 @@ const ENERGIES = ['low energy', 'medium energy', 'high energy', 'building energy
 
 const str = (v: unknown, max: number) => (typeof v === 'string' ? v.trim().slice(0, max) : '');
 
-const SYSTEM_PROMPT = `You describe the rhythm and mood of ONE specific released song, using ONLY the evidence given
+const SYSTEM_PROMPT = `You describe the theme, rhythm and mood of ONE specific released song, using ONLY the evidence given
 (Last.fm listener tags and web search snippets). Never use outside knowledge and never guess.
 
 First decide if the evidence is really about this exact song (same title and, if given, same artist).
-If it is not, or it says nothing useful about rhythm/groove or mood, set "found": false and leave the lists empty.
+If it is not, or it says nothing useful about its theme, rhythm/groove or mood, set "found": false and leave the lists empty.
 
 Map what the evidence says to these exact values (use only values supported by the evidence; empty list if none):
 - rhythm (max 2): ${RHYTHMS.join(', ')}
@@ -34,10 +34,15 @@ Map what the evidence says to these exact values (use only values supported by t
 Return ONLY compact JSON:
 {"found":bool,"song":"title as found","artist":"artist as found","rhythm":[...],"mood":[...],"energy":"",
  "rhythmKo":"1-2 natural Korean sentences describing the song's groove, beat and tempo feel",
- "moodKo":"1-2 natural Korean sentences describing the song's mood and emotion","sources":[indexes of the web results you relied on]}
-rhythmKo and moodKo are used as a brief for writing new lyrics, so describe the song itself directly
-(e.g. "느긋한 셔플 그루브 위로 베이스가 통통 튄다"). Never mention sources, reviews, websites, critics, tags,
-Last.fm, the artist's career or chart history — only the sound and feeling of this song.`;
+ "moodKo":"1-2 natural Korean sentences describing the song's mood and emotion",
+ "themeKo":"1-2 natural Korean sentences on what the song is about (its story, message, speaker's attitude)",
+ "themeEn":"one concise English sentence of the same theme","rhythmEn":"one concise English sentence of the groove and beat",
+ "moodEn":"one concise English sentence of the mood","sources":[indexes of the web results you relied on]}
+Use "" for any field the evidence does not support. The Korean fields are a brief for writing new lyrics and the English
+fields go into a music-generation style prompt, so describe the song itself directly
+(e.g. "느긋한 셔플 그루브 위로 베이스가 통통 튄다", "Laid-back shuffle groove with a bouncy bassline").
+Never quote lyrics. Never mention the song title, the artist, sources, reviews, websites, critics, tags,
+Last.fm, the artist's career or chart history — only the story, sound and feeling of this song.`;
 
 type WebResult = { title: string; url: string; content: string };
 
@@ -67,7 +72,7 @@ async function tavily(apiKey: string, title: string, artist: string): Promise<We
     method: 'POST',
     headers: { Authorization: `Bearer ${apiKey}`, 'Content-Type': 'application/json' },
     body: JSON.stringify({
-      query: `"${title}"${artist ? ` ${artist}` : ''} song review groove rhythm tempo mood`,
+      query: `"${title}"${artist ? ` ${artist}` : ''} song meaning theme review groove rhythm mood`,
       search_depth: 'basic', max_results: 6, include_answer: false,
     }),
     signal: AbortSignal.timeout(TIMEOUT),
@@ -123,7 +128,7 @@ export async function POST(request: NextRequest) {
   ]);
   const tags = lf?.tags ?? [];
   if (!tags.length && !web.length) {
-    return NextResponse.json({ found: false, song: title, artist, rhythm: [], mood: [], energy: '', rhythmKo: '', moodKo: '', tags, sources: [] });
+    return NextResponse.json({ found: false, song: title, artist, rhythm: [], mood: [], energy: '', rhythmKo: '', moodKo: '', themeKo: '', themeEn: '', rhythmEn: '', moodEn: '', tags, sources: [] });
   }
 
   const evidence = [
@@ -136,7 +141,7 @@ export async function POST(request: NextRequest) {
   const llm = await musicChat([
     { role: 'system', content: SYSTEM_PROMPT },
     { role: 'user', content: evidence },
-  ], { maxTokens: 900, temperature: 0.2, timeoutMs: 25_000, connectMs: 15_000 });
+  ], { maxTokens: 1300, temperature: 0.2, timeoutMs: 25_000, connectMs: 15_000 });
   if (!llm.ok) return NextResponse.json({ error: `정리할 AI 서버에 연결하지 못했습니다(${llm.error}).` }, { status: 502 });
 
   const data = await llm.res.json().catch(() => null);
@@ -149,7 +154,7 @@ export async function POST(request: NextRequest) {
   const rhythm = pick(j.rhythm, RHYTHMS, 2);
   const mood = pick(j.mood, MOODS, 3);
   const energy = ENERGIES.includes(j.energy as string) ? j.energy as string : '';
-  const found = j.found === true && (rhythm.length + mood.length > 0 || !!energy);
+  const found = j.found === true && (rhythm.length + mood.length > 0 || !!energy || !!str(j.themeKo, 1));
 
   return NextResponse.json({
     found,
@@ -157,6 +162,8 @@ export async function POST(request: NextRequest) {
     artist: str(j.artist, 80) || lf?.artist || artist,
     rhythm: found ? rhythm : [], mood: found ? mood : [], energy: found ? energy : '',
     rhythmKo: found ? str(j.rhythmKo, 400) : '', moodKo: found ? str(j.moodKo, 400) : '',
+    themeKo: found ? str(j.themeKo, 400) : '',
+    themeEn: found ? str(j.themeEn, 240) : '', rhythmEn: found ? str(j.rhythmEn, 240) : '', moodEn: found ? str(j.moodEn, 240) : '',
     tags,
     sources: found ? [...new Set(idx)].map((i) => ({ title: web[i].title, url: web[i].url })) : [],
     provider: llm.provider,
