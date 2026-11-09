@@ -699,6 +699,7 @@ body.no-board #board { display: none; } /* Suno Style Builder·Suno 작곡 탭 *
 .ref-song b { display: block; font-size: 13.5px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .ref-song small { display: block; font-size: 12px; color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .ref-song .ref-from { color: var(--accent); }
+.ref-plays { color: var(--subtle); font-variant-numeric: tabular-nums; }
 .ref-acts { display: flex; gap: 4px; flex-wrap: wrap; justify-content: flex-end; }
 .ref-acts a, .ref-acts button { padding: 4px 9px; font-size: 12px; text-decoration: none; white-space: nowrap; }
 .ref-empty { font-size: 13px; color: var(--muted); padding: 10px 0; }

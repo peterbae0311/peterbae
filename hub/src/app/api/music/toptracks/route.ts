@@ -8,6 +8,8 @@ import { getTokenKeyValue } from '@/lib/tokenStore';
  *  - pool: '최근 곡' 보기용 후보 수. 주면 fallback 없이 태그 순위를 pool곡까지 돌려준다(발매 연도는 trackyears 라우트가 확인)
  *  - tags가 여러 개면(예: 하우스·EDM → house, edm) 순위를 번갈아 합치고 같은 곡(가수+제목)은 한 번만
  *  - N곡이 안 되면 fallback(넓은 장르) 태그로 채우고 그 곡에는 from: fallback을 붙인다
+ * 요청: { plays: [{ name, artist, mbid? }] } (최대 30곡) → { plays: { '가수\0제목'(소문자): { p: 누적 재생 수, l: 청취자 수 } } }
+ *  - 화면에 보이는 곡의 Last.fm 누적 재생 수(track.getInfo). 태그 순위 응답에는 재생 수가 없어서 따로 받는다
  * 키: Key 관리의 LASTFM_API_KEY. 경로가 /api/music/... 이라 nginx auth_request가 music 앱 권한으로 판별한다.
  */
 const TIMEOUT = 12_000;
@@ -29,12 +31,48 @@ async function topTracks(apiKey: string, tag: string, limit: number, page = 1): 
   })).filter((t: Track) => t.name && t.artist);
 }
 
+// 곡 하나의 누적 재생 수·청취자 수. 못 찾으면 null
+async function trackPlays(apiKey: string, t: { name: string; artist: string; mbid?: string }) {
+  const q = t.mbid ? `mbid=${encodeURIComponent(t.mbid)}` : `artist=${encodeURIComponent(t.artist)}&track=${encodeURIComponent(t.name)}`;
+  const get = async (query: string) => {
+    const r = await fetch(`https://ws.audioscrobbler.com/2.0/?method=track.getInfo&format=json&autocorrect=1&${query}&api_key=${encodeURIComponent(apiKey)}`,
+      { signal: AbortSignal.timeout(TIMEOUT) });
+    if (!r.ok) return null;
+    const d = await r.json();
+    return d?.track ?? null;
+  };
+  // mbid로 못 찾으면(가끔 지워진 mbid) 가수·제목으로 다시
+  let tr = await get(q);
+  if (!tr && t.mbid) tr = await get(`artist=${encodeURIComponent(t.artist)}&track=${encodeURIComponent(t.name)}`);
+  if (!tr) return null;
+  return { p: Number(tr.playcount) || 0, l: Number(tr.listeners) || 0 };
+}
+
+async function playsMode(raw: unknown[]) {
+  const apiKey = await getTokenKeyValue('LASTFM_API_KEY');
+  if (!apiKey) return NextResponse.json({ error: 'Key 관리에 LASTFM_API_KEY가 등록되어 있지 않습니다.' }, { status: 500 });
+  const raw2 = (v: unknown, max: number) => (typeof v === 'string' ? v.trim().slice(0, max) : '');
+  const list = raw.slice(0, 30).map((x) => {
+    const o = (x ?? {}) as Record<string, unknown>;
+    return { name: raw2(o.name, 200), artist: raw2(o.artist, 200), mbid: raw2(o.mbid, 64) || undefined };
+  }).filter((t) => t.name && t.artist);
+  const plays: Record<string, { p: number; l: number } | null> = {};
+  // Last.fm 한도(초당 5회 안팎)를 넘지 않게 5곡씩 나눠 받는다
+  for (let i = 0; i < list.length; i += 5) {
+    await Promise.all(list.slice(i, i + 5).map(async (t) => {
+      plays[`${t.artist}\u0000${t.name}`.toLowerCase()] = await trackPlays(apiKey, t).catch(() => null);
+    }));
+  }
+  return NextResponse.json({ plays });
+}
+
 export async function POST(request: NextRequest) {
   const supabase = await createServerSupabaseClient();
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) return NextResponse.json({ error: '로그인이 필요합니다.' }, { status: 401 });
 
   const body = await request.json().catch(() => null);
+  if (Array.isArray(body?.plays)) return playsMode(body.plays);
   const tags = (Array.isArray(body?.tags) ? body.tags : []).map((t: unknown) => str(t, 60)).filter(Boolean).slice(0, 3) as string[];
   const fallback = str(body?.fallback, 60);
   const limit = Math.min(30, Math.max(5, Number(body?.limit) || 20));

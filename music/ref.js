@@ -21,6 +21,8 @@ const REF_FALLBACK_SUB = { '트랩': 'hip-hop', '펑크': 'soul', 'R&B 발라드
 const REF_FALLBACK_TAB = { 재즈: 'jazz', 발라드: 'ballad', 팝: 'pop', 힙합: 'hip-hop', '일렉트로닉·밴드': 'electronic' };
 const REF_CACHE_KEY = 'music.ref.cache.v2';
 const REF_YEARS_KEY = 'music.ref.years.v1';
+const REF_PLAYS_KEY = 'music.ref.plays.v1';
+const REF_PLAYS_TTL = 7 * 24 * 60 * 60 * 1000; // 누적 재생 수는 천천히 바뀌어 일주일 동안 기억한다
 const REF_SEL_KEY = 'music.ref.sel';
 const REF_TTL = 24 * 60 * 60 * 1000;
 const REF_POOL = 250;     // 최근 곡 후보 수(태그 순위 상위)
@@ -34,13 +36,43 @@ let refCache = {};
 try { refCache = JSON.parse(localStorage.getItem(REF_CACHE_KEY) || '{}'); } catch {}
 let refYears = {};
 try { refYears = JSON.parse(localStorage.getItem(REF_YEARS_KEY) || '{}'); } catch {}
+// 곡별 Last.fm 누적 재생 수: { key: { p: 재생 수, l: 청취자 수, at } } — 못 찾은 곡은 p: null
+let refPlays = {};
+try { refPlays = JSON.parse(localStorage.getItem(REF_PLAYS_KEY) || '{}'); } catch {}
 const saveRef = () => {
   try {
     localStorage.setItem(REF_SEL_KEY, JSON.stringify(refSel));
     localStorage.setItem(REF_CACHE_KEY, JSON.stringify(refCache));
     localStorage.setItem(REF_YEARS_KEY, JSON.stringify(refYears));
+    localStorage.setItem(REF_PLAYS_KEY, JSON.stringify(refPlays));
   } catch {}
 };
+// 재생 수 약식: 1,234,567 → 123만, 45,678 → 4.6만, 3,456 → 3.5천, 1.2억
+function fmtPlays(n) {
+  const short = (v, unit) => `${v >= 10 ? Math.round(v) : Math.round(v * 10) / 10}${unit}`;
+  if (n >= 1e8) return short(n / 1e8, '억');
+  if (n >= 1e4) return short(n / 1e4, '만');
+  if (n >= 1e3) return short(n / 1e3, '천');
+  return String(n);
+}
+const playsOf = (t) => refPlays[refKey(t)]?.p ?? -1;
+// 정렬: 발매 연도 최신순 → 같은 해(또는 연도 모름)끼리는 재생 수 많은 순 → 태그 순위
+function sortRef(tracks) {
+  return tracks.map((t, i) => ({ t, i })).sort((a, b) =>
+    ((refYears[refKey(b.t)] || 0) - (refYears[refKey(a.t)] || 0)) || (playsOf(b.t) - playsOf(a.t)) || (a.i - b.i)).map((x) => x.t);
+}
+// 보이는 곡 중 재생 수를 모르는(또는 일주일 지난) 곡만 받아 기억한다. 실패해도 목록은 그대로 둔다
+async function fillPlays(tracks) {
+  const left = tracks.filter((t) => { const x = refPlays[refKey(t)]; return !x || Date.now() - x.at >= REF_PLAYS_TTL; });
+  if (!left.length) return false;
+  try {
+    const d = await refApi('/api/music/toptracks', { plays: left.slice(0, 30).map(({ name, artist, mbid }) => ({ name, artist, mbid })) });
+    const at = Date.now();
+    left.slice(0, 30).forEach((t) => { const x = d.plays?.[refKey(t)]; refPlays[refKey(t)] = { p: x ? x.p : null, l: x ? x.l : null, at }; });
+    saveRef();
+    return true;
+  } catch { return false; }
+}
 const refKey = (t) => `${t.artist}\u0000${t.name}`.toLowerCase();
 const refMinYear = () => REF_THIS_YEAR - refSel.years + 1;
 let refRun = 0; // 진행 중인 '최근 곡' 확인을 멈추거나 다른 장르로 바꿀 때 이전 작업을 버리는 번호
@@ -116,7 +148,11 @@ async function loadAll(name, force) {
   for (;;) {
     if (run !== refRun) return;
     const left = tracks.filter((t) => !(refKey(t) in refYears));
-    if (!left.length) return renderRefList(name, tracks, allHead(name, hit.data));
+    if (!left.length) {
+      renderRefList(name, tracks, allHead(name, hit.data));
+      if (await fillPlays(tracks) && run === refRun) renderRefList(name, tracks, allHead(name, hit.data));
+      return;
+    }
     renderRefList(name, tracks, allHead(name, hit.data, `발매 연도 확인 중… ${tracks.length - left.length}/${tracks.length}곡`));
     try {
       const d = await refApi('/api/music/trackyears', { tracks: left.slice(0, REF_BATCH).map(({ name: n, artist, mbid }) => ({ name: n, artist, mbid })) });
@@ -131,7 +167,7 @@ async function loadAll(name, force) {
 }
 const allHead = (name, d, status = '') => ({
   title: `${name} 인기곡 Top ${d.tracks.length} · 전체 기간`,
-  sub: `Last.fm '${d.tags.join("', '")}' 태그 · 청취자 순${d.fallback ? ` · 모자란 곡은 '${d.fallback}'에서 채움` : ''}${status ? ` · ${status}` : ''}`,
+  sub: `Last.fm '${d.tags.join("', '")}' 태그 순위 상위 ${d.tracks.length}곡 · 최신 연도 → 재생 수 많은 순${d.fallback ? ` · 모자란 곡은 '${d.fallback}'에서 채움` : ''}${status ? ` · ${status}` : ''}`,
   stop: status.startsWith('발매 연도 확인 중'),
 });
 
@@ -157,7 +193,7 @@ async function loadRecent(name, force) {
   const unchecked = () => tracks.filter((t) => !(refKey(t) in refYears));
   const head = (status) => ({
     title: `${name} 최근 인기곡 Top ${picked().length} · ${minYear}년~`,
-    sub: `Last.fm '${tags.join("', '")}' 태그 순위 상위 ${tracks.length}곡 중 발매 연도(MusicBrainz) 기준${status ? ` · ${status}` : ''}`,
+    sub: `Last.fm '${tags.join("', '")}' 태그 순위 상위 ${tracks.length}곡 중 발매 연도(MusicBrainz) 기준 · 최신 연도 → 재생 수 많은 순${status ? ` · ${status}` : ''}`,
     stop: !!status && status.startsWith('발매 연도 확인 중'),
   });
 
@@ -168,7 +204,9 @@ async function loadRecent(name, force) {
     const checkedN = tracks.length - left.length;
     if (done) {
       const note = picked().length < 20 ? `후보 ${tracks.length}곡 중 ${minYear}년 이후 곡이 ${picked().length}곡뿐이에요. 기간을 넓혀 보세요` : '';
-      return renderRefList(name, picked(), head(note), true);
+      renderRefList(name, picked(), head(note), true);
+      if (await fillPlays(picked()) && run === refRun) renderRefList(name, picked(), head(note), true);
+      return;
     }
     renderRefList(name, picked(), head(`발매 연도 확인 중… ${checkedN}/${tracks.length}곡`), true);
     try {
@@ -184,8 +222,14 @@ async function loadRecent(name, force) {
 }
 
 /* ---------- 목록 ---------- */
-function renderRefList(name, tracks, head, showYear = false) {
+function renderRefList(name, list, head, showYear = false) {
+  const tracks = sortRef(list);
   const q = (t) => encodeURIComponent(`${t.artist} ${t.name}`);
+  const playsBadge = (t) => {
+    const x = refPlays[refKey(t)];
+    if (!x || x.p == null) return '';
+    return ` <span class="ref-plays" title="Last.fm 누적 재생 ${x.p.toLocaleString()}회 · 청취자 ${(x.l ?? 0).toLocaleString()}명">▶ ${fmtPlays(x.p)}회</span>`;
+  };
   // 발매 연도 배지: 확인한 연도 / 확인했지만 못 찾음 / 아직 확인 전
   const yearBadge = (t) => {
     const k = refKey(t);
@@ -196,16 +240,16 @@ function renderRefList(name, tracks, head, showYear = false) {
     ${head.stop ? '<button type="button" class="ghost" id="ref-stop">멈추기</button>' : '<button type="button" class="ghost" id="ref-reload" title="하루 동안 기억한 목록 대신 지금 다시 가져옵니다">새로고침</button>'}</div>
     ${tracks.length ? `<ol class="ref-list">${tracks.map((t, i) => `<li>
       <span class="ref-rank">${i + 1}</span>
-      <span class="ref-song"><b title="${esc(t.name)}">${esc(t.name)}${yearBadge(t)}</b><small>${esc(t.artist)}${t.from ? ` <span class="ref-from">· '${esc(t.from)}'에서</span>` : ''}</small></span>
+      <span class="ref-song"><b title="${esc(t.name)}">${esc(t.name)}${yearBadge(t)}</b><small>${esc(t.artist)}${playsBadge(t)}${t.from ? ` <span class="ref-from">· '${esc(t.from)}'에서</span>` : ''}</small></span>
       <span class="ref-acts">
         <a class="ghost" href="https://www.youtube.com/results?search_query=${q(t)}" target="_blank" rel="noopener noreferrer">▶ 유튜브</a>
         <a class="ghost" href="https://open.spotify.com/search/${q(t)}" target="_blank" rel="noopener noreferrer">스포티파이</a>
         <button type="button" class="ghost" data-ref="${i}">원곡 정보 찾기</button>
       </span></li>`).join('')}</ol>` : '<p class="ref-empty">아직 찾은 곡이 없습니다.</p>'}
-    <p class="ref-foot muted">발매 연도는 MusicBrainz의 첫 발매일 기준입니다. 원곡이 다른 언어 제목으로만 등록된 곡은 재발매 연도로 잡힐 수 있어요.</p>`;
+    <p class="ref-foot muted">재생 수는 Last.fm 사용자들의 누적 재생 수(유튜브 조회수 아님)입니다. 발매 연도는 MusicBrainz의 첫 발매일 기준입니다. 원곡이 다른 언어 제목으로만 등록된 곡은 재발매 연도로 잡힐 수 있어요.</p>`;
   ref.out.querySelectorAll('[data-ref]').forEach((b) => { b.onclick = () => refFindInfo(tracks[+b.dataset.ref]); });
   const stop = $('#ref-stop');
-  if (stop) stop.onclick = () => { refRun++; renderRefList(name, tracks, { ...head, sub: `${head.sub.replace(/ · 발매 연도 확인 중.*$/, '')} · 확인을 멈췄습니다`, stop: false }, showYear); };
+  if (stop) stop.onclick = () => { refRun++; renderRefList(name, list, { ...head, sub: `${head.sub.replace(/ · 발매 연도 확인 중.*$/, '')} · 확인을 멈췄습니다`, stop: false }, showYear); };
   const reload = $('#ref-reload');
   if (reload) reload.onclick = () => loadRef(name, true);
 }
