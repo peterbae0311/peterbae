@@ -356,6 +356,7 @@ const EXCL_OLD_DEFAULT = () => SB_STEPS.find((st) => st.n === 11).groups[0].opti
 const SB_DEFAULT = () => ({
   intro: '', outro: '', main: '', bpm: 120, feel: [], genre: '', genreCustom: '', support: [], mood: [], energy: '',
   key: '', keyManual: false, harmony: [], arr: [], mix: [], vocal: '', tone: [], lang: '', excl: [],
+  custom: {}, // 1~11번 직접 추가: { '3': [{ en: 'bouncy groove', ko: '통통 튀는 그루브' }], ... }
 });
 let sb = SB_DEFAULT();
 try {
@@ -370,6 +371,10 @@ try {
     localStorage.setItem('music.suno.exclNoDefault', '1');
   }
 } catch {}
+// 직접 추가 값의 모양이 깨졌으면(예전 버전·손상) 버린다
+sb.custom = Object.fromEntries(Object.entries(sb.custom ?? {})
+  .filter(([n, v]) => /^(?:[1-9]|1[01])$/.test(n) && Array.isArray(v))
+  .map(([n, v]) => [n, v.filter((x) => typeof x?.en === 'string' && x.en.trim()).slice(0, 10)]));
 // 지웠거나 다른 브라우저에서 만든 자동 추가 장르를 가리키는 저장값은 비운다(스타일에 한글 장르 이름이 들어가지 않게)
 if (sb.genre && !GENRE_EN[sb.genre] && !customGenre(sb.genre)) sb.genre = '';
 // 예전에는 페이드아웃이 8번 편곡에 있었다 → 1번 아웃트로로 옮긴다
@@ -399,7 +404,9 @@ const hasVocal = () => sb.vocal && sb.vocal !== 'instrumental';
 
 /* ---------------- 제외 항목 ---------------- */
 // 11번에서 고른 값 + 연주곡이면 vocals. Style of Music 11번 줄에 'no …'로 들어간다
-const excludeWords = (s = sb) => [...new Set([...s.excl, ...(s.vocal === 'instrumental' ? ['vocals'] : [])])];
+// 직접 추가 값 중 켜 둔 것(off가 아닌 것)만 스타일에 넣는다
+const customOf = (n, s = sb) => (s.custom?.[n] ?? []).filter((x) => !x.off).map((x) => x.en);
+const excludeWords = (s = sb) => [...new Set([...s.excl, ...customOf(11, s), ...(s.vocal === 'instrumental' ? ['vocals'] : [])])];
 
 const usesTrap = () => sb.main === 'trap' || sb.support.includes('trap');
 // 제외 항목 중 지금 고른 다른 값과 부딪치는 것: [제외 값, 이유]
@@ -444,19 +451,105 @@ function chip(label, on, onClick, disabled = false, tip = '', en = '') {
 
 const MULTI_NAME = { feel: '리듬 느낌', support: '반주 악기', mood: '분위기', harmony: '멜로디·화성', arr: '편곡·구성', mix: '사운드·믹싱', tone: '보컬 톤', excl: '제외 항목' };
 
+// 개수 제한은 두지 않는다(2026-11-10 사용자 요청). 권장 개수(max)를 넘기는 순간에만 안내한다
 function toggleMulti(key, value, max) {
   const arr = sb[key];
   if (arr.includes(value)) sb[key] = arr.filter((x) => x !== value);
-  else if (arr.length >= max) return flash(`${MULTI_NAME[key]}는 최대 ${max}개까지 고를 수 있습니다. 이미 고른 것 중 하나를 먼저 해제해 주세요.`, 'warn');
   else sb[key] = [...arr, value];
   commit();
+  if (max && sb[key].length === max + 1) {
+    flash(`${MULTI_NAME[key]}을(를) ${max}개보다 많이 골랐습니다. 많이 고르면 Suno가 어느 쪽으로도 뚜렷하게 가지 못하고, 스타일이 1,000자를 넘으면 일부가 빠질 수 있어요.`, 'warn');
+  }
 }
 
-// 여러 개 고르는 항목: 'n/최대 선택' 표시, 한도가 차면 안 고른 칩을 흐리게(누르면 이유를 알려 줌)
+/* 1~11번 직접 추가: 선택지에 없는 값을 적어 넣는다. 영어는 그대로, 한글은 허브 번역(/api/music/translate)으로 영어로 바꿔 넣는다.
+ * 추가한 값은 칩으로 보이고(×로 지움) 그 번호 줄의 목록형·문장형 스타일에 들어간다. 11번은 제외(Exclude Styles)로 들어간다 */
+const CUSTOM_MAX = 10;
+const HANGUL_RE = /[가-힣ㄱ-ㅎㅏ-ㅣ]/;
+async function addCustom(n, raw, input) {
+  const text = raw.trim().replace(/\s+/g, ' ').slice(0, 120);
+  if (!text) return;
+  const list = sb.custom[n] ?? [];
+  if (list.length >= CUSTOM_MAX) return flash(`직접 추가는 항목마다 ${CUSTOM_MAX}개까지입니다.`, 'warn');
+  let en = text;
+  if (HANGUL_RE.test(text)) {
+    input.readOnly = true; // 번역하는 동안 다시 Enter를 눌러도 두 번 들어가지 않게
+    input.classList.add('busy');
+    input.title = '번역 중…';
+    try {
+      const r = await fetch('/api/music/translate', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ text }) });
+      const data = await r.json().catch(() => null);
+      if (!r.ok || !Array.isArray(data?.lines)) throw new Error(data?.error || ([404, 405, 501].includes(r.status) ? 'NO_SERVER' : `HTTP ${r.status}`));
+      en = data.lines.join(' ').replace(/[.\s]+$/, '').trim();
+      if (!en || HANGUL_RE.test(en)) throw new Error('번역 결과가 비었습니다');
+    } catch (e) {
+      input.readOnly = false;
+      input.classList.remove('busy');
+      input.title = '';
+      return flash(e.message === 'NO_SERVER'
+        ? '한글 번역은 허브가 있는 배포 사이트에서만 됩니다. 로컬에서는 영어로 적어 주세요.'
+        : `번역하지 못했습니다: ${e.message}`, 'error');
+    }
+  }
+  en = en.replace(/[.\s]+$/, '');
+  if (list.some((x) => x.en.toLowerCase() === en.toLowerCase())) { renderSb(); return flash('이미 추가한 값입니다.', 'warn'); }
+  sb.custom = { ...sb.custom, [n]: [...list, { en, ko: en === text ? '' : text }] };
+  commit();
+  $(`#sb-form .sb-custom-input[data-n="${n}"]`)?.focus(); // 다시 그린 같은 칸에 커서를 두어 이어서 입력
+  flash(`${n}번에 '${en}'을(를) 추가했습니다.`, 'ok');
+}
+// 칩을 누르면 켜기/끄기(값은 남기고 스타일에서만 뺀다), ×는 삭제
+function toggleCustom(n, i) {
+  sb.custom = { ...sb.custom, [n]: (sb.custom[n] ?? []).map((x, j) => (j === i ? { ...x, off: !x.off } : x)) };
+  commit();
+}
+function removeCustom(n, i) {
+  const list = (sb.custom[n] ?? []).filter((_, j) => j !== i);
+  const next = { ...sb.custom };
+  if (list.length) next[n] = list; else delete next[n];
+  sb.custom = next;
+  commit();
+}
+function customGroup(step) {
+  const n = String(step.n);
+  const box = document.createElement('div');
+  box.className = 'sb-group sb-custom';
+  (sb.custom[n] ?? []).forEach((x, i) => {
+    // 말풍선: 내가 적은 말(한글이면 원문) · 들어가는 곳 · 켜기/끄기 안내, 아래에 출력(실제로 들어가는 말)
+    const where = n === '11' ? 'Exclude Styles 칸에 들어갑니다.' : `스타일의 ${step.n}.${step.title} 줄(문장형은 해당 문장)에 들어갑니다.`;
+    const tip = [
+      x.ko ? `입력: ${esc(x.ko)}` : '직접 적은 값',
+      x.off ? '꺼져 있어 스타일에 들어가지 않습니다. 누르면 다시 켭니다.' : `${where} 누르면 끄고, ×로 지웁니다.`,
+    ].join('<br>');
+    const c = chip(x.en, !x.off, () => toggleCustom(n, i), false, tip, esc(n === '11' ? `no ${x.en}` : x.en));
+    c.classList.add('is-custom');
+    const del = Object.assign(document.createElement('button'), { type: 'button', className: 'sb-chip-del', textContent: '×', title: `'${x.en}' 지우기` });
+    del.onclick = () => removeCustom(n, i);
+    const wrap = Object.assign(document.createElement('span'), { className: 'sb-chip-wrap' });
+    wrap.append(c, del);
+    box.append(wrap);
+  });
+  const input = Object.assign(document.createElement('input'), {
+    type: 'text', className: 'sb-custom-input', maxLength: 120, spellcheck: false,
+    placeholder: n === '11' ? '+ 뺄 것 적고 Enter (예: 휘파람)' : '+ 직접 적고 Enter (영어·한글)',
+  });
+  input.setAttribute('aria-label', `${step.n}번 ${step.ko} 직접 추가`);
+  input.dataset.n = n;
+  // Enter로 추가한다(한글 조합 중 Enter는 무시)
+  input.onkeydown = (e) => { if (e.key === 'Enter' && !e.isComposing && !input.readOnly) { e.preventDefault(); addCustom(n, input.value, input); } };
+  box.append(input);
+  return box;
+}
+
+// 여러 개 고르는 항목: 'n개 선택 · 권장 max개 이하' 표시. 권장 개수를 넘으면 안내 색으로
 function limitHint(box, key, max) {
   const n = sb[key].length;
-  if (n >= max) box.querySelectorAll('.sb-chip[aria-pressed="false"]:not(:disabled)').forEach((c) => c.classList.add('full'));
-  box.append(Object.assign(document.createElement('small'), { className: `sb-hint${n >= max ? ' full' : ''}`, textContent: `${n}/${max} 선택` }));
+  const over = n > max;
+  const h = Object.assign(document.createElement('small'), {
+    className: `sb-hint${over ? ' full' : ''}`,
+    textContent: over ? `${n}개 선택 · 권장 ${max}개 이하라 스타일이 흐려질 수 있어요` : `${n}개 선택 · 권장 ${max}개 이하`,
+  });
+  box.append(h);
 }
 
 let sbGenreTab = 0;
@@ -684,6 +777,7 @@ function renderSb() {
     const body = document.createElement('div');
     body.className = 'sb-body';
     step.groups.forEach((g) => body.append(renderGroup(g)));
+    body.append(customGroup(step));
     row.append(body);
     return row;
   }));
@@ -703,16 +797,16 @@ const OUTRO_EN = Object.fromEntries(SB_STEPS[0].groups.find((g) => g.key === 'ou
 // 항목마다 고른 값을 영어로 모은다. 비어 있으면 그 줄은 생략
 function stepValues(n, s = sb) {
   switch (n) {
-    case 1: return [s.intro && `${s.intro} intro`, s.outro && OUTRO_EN[s.outro]];
-    case 2: return [s.main && SUNO_TERM[s.main]];
-    case 3: return [`${s.bpm} bpm`, ...s.feel];
-    case 4: return [s.genre && (s.genreShort ? genreEn(s.genre) : genreLine(s.genre)), s.genreCustom];
-    case 5: return s.support.map((id) => SUNO_TERM[id]);
-    case 6: return [...s.mood, s.energy];
-    case 7: return [s.key && `${s.key} key`, ...s.harmony];
-    case 8: return s.arr.map((a) => ARR_EN[a]);
-    case 9: return s.mix;
-    case 10: return s.vocal === 'instrumental' ? ['instrumental'] : [[s.tone.join(', '), s.vocal].filter(Boolean).join(' '), s.lang];
+    case 1: return [s.intro && `${s.intro} intro`, s.outro && OUTRO_EN[s.outro], ...customOf(1, s)];
+    case 2: return [s.main && SUNO_TERM[s.main], ...customOf(2, s)];
+    case 3: return [`${s.bpm} bpm`, ...s.feel, ...customOf(3, s)];
+    case 4: return [s.genre && (s.genreShort ? genreEn(s.genre) : genreLine(s.genre)), s.genreCustom, ...customOf(4, s)];
+    case 5: return [...s.support.map((id) => SUNO_TERM[id]), ...customOf(5, s)];
+    case 6: return [...s.mood, s.energy, ...customOf(6, s)];
+    case 7: return [s.key && `${s.key} key`, ...s.harmony, ...customOf(7, s)];
+    case 8: return [...s.arr.map((a) => ARR_EN[a]), ...customOf(8, s)];
+    case 9: return [...s.mix, ...customOf(9, s)];
+    case 10: return [...(s.vocal === 'instrumental' ? ['instrumental'] : [[s.tone.join(', '), s.vocal].filter(Boolean).join(' '), s.lang]), ...customOf(10, s)];
     // 11번: 단어만 쓰면 Suno가 오히려 그 소리를 넣을 수 있어 'no'를 붙인다
     case 11: return excludeWords(s).map((x) => `no ${x}`);
     default: return [];
@@ -738,20 +832,24 @@ const sentence = (t) => `${t[0].toUpperCase()}${t.slice(1)}.`;
 // (스타일 칸에 'no ○○'로 쓰면 오히려 그 소리로 끌려갈 수 있다)
 function styleProse(s, conceptLines = [], { withExcl = true } = {}) {
   const head = [...s.mood, ENERGY_ADJ[s.energy]].filter(Boolean).join(', ');
-  const genre = [s.genre && (s.genreShort ? genreEn(s.genre) : genreLine(s.genre)), s.genreCustom].filter(Boolean).join(', ');
+  const genre = [s.genre && (s.genreShort ? genreEn(s.genre) : genreLine(s.genre)), s.genreCustom, ...customOf(4, s)].filter(Boolean).join(', ');
   const out = conceptLines.map(sentence);
-  out.push(sentence([[head, genre].filter(Boolean).join(' '), `${s.bpm} BPM`, ...s.feel].filter(Boolean).join(', ')));
+  out.push(sentence([[head, genre].filter(Boolean).join(' '), `${s.bpm} BPM`, ...s.feel, ...customOf(3, s), ...customOf(6, s)].filter(Boolean).join(', ')));
   if (s.intro) out.push(sentence(`begin with ${s.intro}${PUNCHY_INTRO.test(s.intro) ? ', no slow or atmospheric intro' : ''}`));
-  const support = s.support.map((id) => SUNO_TERM[id]);
-  if (s.main) out.push(sentence(`${SUNO_TERM[s.main]} drives the song${support.length ? `, supported by ${joinAnd(support)}` : ''}`));
+  const support = [...s.support.map((id) => SUNO_TERM[id]), ...customOf(5, s)];
+  const mains = [s.main && SUNO_TERM[s.main], ...customOf(2, s)].filter(Boolean);
+  if (mains.length) out.push(sentence(`${joinAnd(mains)} ${mains.length > 1 ? 'drive' : 'drives'} the song${support.length ? `, supported by ${joinAnd(support)}` : ''}`));
   else if (support.length) out.push(sentence(`featuring ${joinAnd(support)}`));
-  const harmony = [s.key && `${s.key} key`, ...s.harmony].filter(Boolean);
+  const harmony = [s.key && `${s.key} key`, ...s.harmony, ...customOf(7, s)].filter(Boolean);
   if (harmony.length) out.push(sentence(harmony.join(', ')));
-  if (s.arr.length) out.push(sentence(joinAnd(s.arr.map((a) => ARR_EN[a]))));
-  if (s.mix.length) out.push(sentence(s.mix.join(', ')));
+  const arr = [...s.arr.map((a) => ARR_EN[a]), ...customOf(8, s)];
+  if (arr.length) out.push(sentence(joinAnd(arr)));
+  const mix = [...s.mix, ...customOf(9, s)];
+  if (mix.length) out.push(sentence(mix.join(', ')));
   const vocal = stepValues(10, s).filter(Boolean);
   if (vocal.length) out.push(sentence(vocal.join(', ')));
   if (s.outro) out.push(sentence(OUTRO_EN[s.outro])); // '선택 안 함'이면 끝맺음은 Suno에 맡긴다
+  if (customOf(1, s).length) out.push(sentence(customOf(1, s).join(', ')));
   const excl = withExcl ? excludeWords(s) : [];
   if (excl.length) out.push(sentence(excl.map((x) => `no ${x}`).join(', ')));
   return out.join(' ');
@@ -825,7 +923,8 @@ function generateStyle() {
   // 11번(제외)은 Exclude Styles 칸으로 따로 내보내므로 스타일 목록에서 뺀다
   const steps = SB_STEPS.filter((st) => st.n !== 11);
   const parts = conceptParts();
-  if (styleLines(sb, steps).length <= 1 && !sb.feel.length && !parts.length) return flash('항목을 하나 이상 고르거나 Theme을 적어 주세요.', 'warn');
+  const anyCustom = Object.keys(sb.custom).some((n) => customOf(n).length);
+  if (styleLines(sb, steps).length <= 1 && !sb.feel.length && !parts.length && !anyCustom) return flash('항목을 하나 이상 고르거나 Theme을 적어 주세요.', 'warn');
   // 목록형은 'Theme : 문장. 문장.' 한 줄을 맨 위에
   const conceptLine = (ps) => (ps.length ? [`Theme : ${ps.map((p) => `${p}.`).join(' ')}`] : []);
   const list = fitStyle((s, ps) => [...conceptLine(ps), ...styleLines(s, steps)].join('\n'), sb, parts);

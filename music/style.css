@@ -429,7 +429,6 @@ body.has-solo .card.active:not(.soloed) .solo { color: var(--text); }
 .sb-gtab { border-radius: 7px; padding: 3px 9px; font-size: 12px; }
 .sb-hint { font-size: 12px; color: var(--subtle); margin-left: 4px; }
 .sb-hint.full { color: var(--warn-text); }
-.sb-chip.full .lbl { opacity: 0.45; }
 .sb-select, .sb-num {
   background: var(--panel-2); color: var(--text); border: 1px solid var(--line); border-radius: 8px;
   padding: 5px 8px; font: inherit; font-size: 13px;
@@ -649,6 +648,13 @@ body.no-board #board { display: none; } /* Suno Style Builder·Suno 작곡 탭 *
 
 /* Style Builder 4번: 곡 분석에서 자동으로 추가한 세부 장르(✦) + 삭제(×) */
 .sb-chip-wrap { display: inline-flex; align-items: center; gap: 2px; }
+/* 1~11번 직접 추가 */
+.sb-custom-input {
+  flex: 0 1 260px; min-width: 140px; padding: 4px 10px; font-size: 12.5px; color: var(--text);
+  background: var(--field-bg); border: 1px solid var(--line); border-radius: 999px;
+}
+.sb-custom-input:focus { outline: 2px solid var(--focus); outline-offset: 0; border-color: transparent; }
+.sb-custom-input.busy { opacity: 0.6; cursor: progress; }
 .sb-chip.is-custom { border-style: dashed; }
 .sb-chip-del { border: 0; background: none; color: var(--muted); font-size: 14px; line-height: 1; padding: 2px 4px; cursor: pointer; border-radius: 6px; }
 .sb-chip-del:hover { color: var(--error-text, #ef4444); background: var(--accent-faint); }
