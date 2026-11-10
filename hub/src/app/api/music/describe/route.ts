@@ -15,7 +15,8 @@ const TIMEOUT = 12_000; // 단계마다. 전체가 nginx proxy_read_timeout 60�
 
 // suno.js 3번(리듬)·6번(분위기·에너지) 선택지의 en 값과 같아야 한다
 const RHYTHMS = ['straight beat', 'swing feel', 'shuffle groove', 'half-time', 'four-on-the-floor', 'syncopated groove', 'laid-back groove', 'driving beat'];
-const MOODS = ['emotional', 'melancholic', 'uplifting', 'dreamy', 'romantic', 'nostalgic', 'retro', 'dark', 'chill', 'epic', 'playful'];
+const MOODS = ['emotional', 'melancholic', 'uplifting', 'dreamy', 'romantic', 'nostalgic', 'retro', 'dark', 'chill', 'epic', 'playful', 'yearning', 'warm', 'lonely', 'elegant',
+  'wistful', 'lyrical', 'tender', 'poignant', 'bittersweet', 'solitary', 'understated', 'reflective', 'calm', 'gentle', 'mysterious', 'ethereal', 'refreshing', 'bright', 'lively', 'upbeat', 'funky', 'free-spirited', 'sophisticated', 'sensual', 'intense', 'dramatic', 'tense'];
 const ENERGIES = ['low energy', 'medium energy', 'high energy', 'building energy'];
 
 const str = (v: unknown, max: number) => (typeof v === 'string' ? v.trim().slice(0, max) : '');
