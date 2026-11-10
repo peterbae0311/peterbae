@@ -333,6 +333,10 @@ const SB_STEPS = [
         fits: { '일렉트로닉·밴드': ['하우스·EDM', '트랩'], 팝: ['신스 팝'] } },
       { ...o('브레이크다운', 'breakdown', '마지막 후렴 앞에서 악기를 덜어 내 잠시 숨을 고르는 구간을 넣습니다.', 'breakdown'),
         fits: { '일렉트로닉·밴드': ['하우스·EDM', '펑크'], 팝: ['시티 팝'], 발라드: ['록 발라드'] } },
+      { ...o('후렴 강조', 'chorus-emphasis', '후렴을 가장 크고 꽉 차게 만들어 곡의 중심으로 세웁니다.', 'big, emphasized chorus'),
+        fits: { 팝: ['신스 팝', '인디 팝'], 발라드: ['팝 발라드', '록 발라드'], '일렉트로닉·밴드': ['록'] } },
+      { ...o('다이내믹 대비', 'dynamic-contrast', '조용한 구간과 큰 구간의 차이를 크게 두어 극적으로 만듭니다.', 'strong dynamic contrast'),
+        fits: { 발라드: ['시네마틱 발라드', '록 발라드'], '일렉트로닉·밴드': ['록', '하우스·EDM'] } },
       // 페이드아웃 엔딩은 1번 아웃트로로 옮겼다
     ] },
   ] },
@@ -352,6 +356,12 @@ const SB_STEPS = [
         fits: { 힙합: ['붐뱁 힙합', '멜로딕 힙합'], '일렉트로닉·밴드': ['트랩', '록', '하우스·EDM'], 팝: ['인디 팝'] } },
       { ...o('테이프 질감', 'tape saturation', '카세트·릴 테이프 특유의 살짝 찌그러진 따뜻한 질감을 더합니다.'),
         fits: { 힙합: ['로파이 힙합', '붐뱁 힙합'], 팝: ['시티 팝', '인디 팝'], '일렉트로닉·밴드': ['펑크'] } },
+      { ...o('은은한 리버브', 'subtle reverb', '잔향을 살짝만 줘서 소리가 또렷하면서도 자연스럽게 퍼지게 합니다. 리버브 풍부와는 반대입니다.'),
+        fits: { 팝: ['어쿠스틱 팝', '인디 팝'], 발라드: ['어쿠스틱 발라드'], 재즈: ['보사노바 재즈'] } },
+      { ...o('자연스러운 강약', 'natural dynamics', '소리를 너무 눌러 평평하게 만들지 않고 연주의 세고 여린 차이를 살립니다.'),
+        fits: { 재즈: ['재즈 발라드', '스윙 재즈'], 발라드: ['어쿠스틱 발라드', '시네마틱 발라드'] } },
+      { ...o('전면 보컬', 'upfront vocals', '보컬을 반주보다 앞에 또렷하게 세워 가사가 잘 들리게 합니다. 연주곡이면 고르지 마세요.'),
+        fits: { 발라드: ['팝 발라드', 'R&B 발라드'], 팝: ['어쿠스틱 팝', '시티 팝'], 힙합: ['멜로딕 힙합'] } },
     ] },
   ] },
   { n: 10, title: 'Vocal Style', ko: '보컬', groups: [
@@ -379,6 +389,12 @@ const SB_STEPS = [
         fits: { 팝: ['드림 팝'], 재즈: ['보사노바 재즈'], 힙합: ['칠 힙합'] } },
       { ...o('부드러운', 'smooth', '매끄럽고 편안하게 흐르는 음색입니다.'),
         fits: { 재즈: ['재즈 발라드', '재즈 팝'], 발라드: ['R&B 발라드'], 팝: ['시티 팝'] } },
+      { ...o('감성적인', 'emotional', '감정을 듬뿍 실어 부르는 목소리입니다.'),
+        fits: { 발라드: ['팝 발라드', 'R&B 발라드', '록 발라드'], 힙합: ['멜로딕 힙합'] } },
+      { ...o('담담한', 'understated', '감정을 과장하지 않고 차분하게 부르는 목소리입니다.'),
+        fits: { 발라드: ['어쿠스틱 발라드'], 팝: ['인디 팝', '어쿠스틱 팝'], 힙합: ['칠 힙합'] } },
+      { ...o('청아한', 'clear', '맑고 깨끗하게 울리는 목소리입니다.'),
+        fits: { 발라드: ['팝 발라드', '어쿠스틱 발라드'], 팝: ['어쿠스틱 팝', '드림 팝'] } },
     ] },
     { key: 'lang', type: 'single', needsVocal: true, options: [
       o('한국어', 'korean lyrics', '한국어로 부르게 합니다. 가사 칸에 한국어 가사를 넣으면 더 정확합니다.'),
@@ -386,7 +402,7 @@ const SB_STEPS = [
     ] },
   ] },
   { n: 11, title: 'Exclusions', ko: '제외', groups: [
-    { key: 'excl', type: 'multi', max: 8, options: [
+    { key: 'excl', type: 'multi', max: 11, options: [
       o('보컬', 'vocals', '노래 없이 연주곡으로 만들 때 고릅니다. 10번에서 "연주곡"을 고르면 자동으로 들어갑니다.'),
       o('오토튠', 'autotune', '음정을 기계적으로 보정해서 로봇처럼 들리는 보컬 효과를 뺍니다.'),
       o('EDM 드롭', 'edm drop', '빌드업 뒤에 전자음이 한꺼번에 터지는 "드롭" 구간을 뺍니다.'),
@@ -395,6 +411,9 @@ const SB_STEPS = [
       o('기타 솔로', 'guitar solo', '곡 중간에 길게 나오는 일렉 기타 솔로를 뺍니다.'),
       o('과한 리버브', 'excessive reverb', '소리가 멀고 뭉개지게 만드는 과한 잔향을 줄입니다.'),
       o('808', '808 bass', '트랩에서 쓰는, 묵직하게 길게 울리는 808 저음을 뺍니다.'),
+      o('긴 인트로', 'long intro', '도입부가 길게 늘어지지 않고 바로 본 곡으로 들어가게 합니다.'),
+      o('페이드아웃', 'fade-out', '소리가 점점 작아지며 흐지부지 끝나지 않게 합니다. 1번 아웃트로에서 페이드아웃을 고르면 선택할 수 없습니다.'),
+      o('보컬 애드리브', 'vocal ad-libs', '"yeah", "oh" 같은 즉흥 추임새를 넣지 않게 합니다.'),
     ] },
   ] },
 ];
@@ -469,6 +488,7 @@ const EXCL_CONFLICTS = [
   ['808 bass', usesTrap, '트랩 드럼(808 포함)을 골라서 808은 제외할 수 없습니다'],
   ['edm drop', () => sb.arr.includes('build-up-drop'), '8번에서 빌드업 → 드롭을 골라서 EDM 드롭은 제외할 수 없습니다'],
   ['excessive reverb', () => sb.mix.includes('lush reverb'), '9번에서 리버브 풍부를 골라서 과한 리버브는 제외할 수 없습니다'],
+  ['fade-out', () => sb.outro === 'fade-out', '1번에서 페이드아웃 아웃트로를 골라서 페이드아웃은 제외할 수 없습니다'],
 ];
 const exclConflict = (en) => EXCL_CONFLICTS.find(([v, on]) => v === en && on());
 
@@ -844,6 +864,7 @@ function renderSb() {
 const ARR_EN = {
   minimal: 'minimal arrangement', layered: 'layered arrangement', 'verse-chorus': 'verse-chorus structure',
   'build-up-drop': 'build-up and drop', breakdown: 'breakdown',
+  'chorus-emphasis': 'big, emphasized chorus', 'dynamic-contrast': 'strong dynamic contrast',
 };
 // 1번 아웃트로: 값 → 스타일 문장(선택지의 '출력'과 같다)
 const OUTRO_EN = Object.fromEntries(SB_STEPS[0].groups.find((g) => g.key === 'outro').options.filter((x) => x.en).map((x) => [x.en, x.shown]));
