@@ -1033,6 +1033,8 @@ function commit() {
   syncGenreTab();
   saveSb();
   renderSb();
+  if (typeof refreshMelody === 'function') refreshMelody(); // 7번·2번·3번이 바뀌면 믹서 멜로디도 맞춘다(melody.js)
+  if (typeof refreshFlow === 'function') refreshFlow(); // 8번·1번이 바뀌면 곡 흐름 구성도(arrange.js)
 }
 
 /* ---------------- 불러오기 ---------------- */
@@ -1159,3 +1161,5 @@ if (resolveConflicts(true).length) saveSb();
 syncGenreTab();
 renderSb();
 showStyle();
+if (typeof refreshMelody === 'function') refreshMelody(); // 멜로디 라벨에 7번·2번 반영 상태를 보이게
+if (typeof refreshFlow === 'function') refreshFlow(); // 곡 흐름이 8번 변경을 알아차릴 기준값

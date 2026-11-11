@@ -24,7 +24,7 @@
   <link rel="stylesheet" crossorigin
         href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/static/pretendard.css">
   <!-- 파일을 고치면 ?v= 값을 올려 브라우저 캐시에 남은 예전 파일을 쓰지 않게 한다 -->
-  <link rel="stylesheet" href="style.css?v=20261110c">
+  <link rel="stylesheet" href="style.css?v=20261112b">
 </head>
 <body>
   <header class="hero">
@@ -42,7 +42,6 @@
     <button id="play" class="play" aria-label="재생"><span class="icon"></span></button>
     <div class="pos">
       <div id="chords" class="chords"></div>
-      <div id="beats" class="beats"></div>
     </div>
     <label class="slider">
       <span>BPM <b id="bpm-val">140</b></span>
@@ -52,6 +51,43 @@
       <span>마스터 음량</span>
       <input id="master" type="range" min="-30" max="6" value="-4">
     </label>
+    <div class="mel" role="group" aria-label="멜로디">
+      <span class="mel-label">멜로디 <button type="button" class="qhelp" aria-expanded="false" aria-controls="mel-help" title="멜로디 작동 방법">?</button>
+        <span class="qhelp-pop" id="mel-help" role="dialog" aria-label="멜로디 작동 방법" hidden>
+          <b>멜로디 작동 방법</b>
+          <span>• <b>♪ 켜기</b>: 왼쪽 코드 진행(Am7 …)에 맞춘 8마디 멜로디를 반복 재생합니다. 악기를 켜지 않아도 들을 수 있어요.</span>
+          <span>• <b>소리</b>: '자동'이면 Suno Style Builder <b>2번 주 악기</b> 소리로 연주합니다(베이스·드럼·없음이면 신스 리드). 신스 리드·벨·부드러운 소리를 직접 고를 수도 있어요.</span>
+          <span>• <b>멜로디 모양</b>: Style Builder <b>7번 멜로디·화성</b>을 따라갑니다 — 중독성 훅(짧은 동기 반복) · 서정적(길게 이어 부름) · 단순한 팝(4분음표) · 재즈 7th(스윙·접근음) · 풍성한 화성(화음 겹침) · 모달(선법 색깔음). 3번 스윙·셔플도 반영해요.</span>
+          <span>• <b>🎲 다시 만들기</b>: 새 멜로디를 만듭니다. 마음에 든 멜로디는 다음에 열어도 그대로예요.</span>
+          <span class="qhelp-note">규칙으로 만든 스케치라 Suno가 만들 실제 멜로디와는 다릅니다. 고른 느낌을 미리 들어 보는 용도예요.</span>
+        </span> <small id="mel-from" class="mel-from"></small></span>
+      <div class="mel-row">
+        <button type="button" id="mel-on" class="ghost mel-on" aria-pressed="false" title="지금 코드 진행에 맞춘 8마디 멜로디를 켜고 끕니다">♪ 켜기</button>
+        <select id="mel-sound" class="mel-sound" aria-label="멜로디 소리"></select>
+        <button type="button" id="mel-new" class="ghost mel-new" title="새 멜로디 만들기">🎲 다시 만들기</button>
+      </div>
+    </div>
+    <div class="mel flow" role="group" aria-label="편곡">
+      <span class="mel-label">편곡 <button type="button" class="qhelp" aria-expanded="false" aria-controls="flow-help" title="편곡 작동 방법">?</button>
+        <span class="qhelp-pop" id="flow-help" role="dialog" aria-label="편곡 작동 방법" hidden>
+          <b>편곡 작동 방법</b>
+          <span>• <b>루프</b>: 4마디 코드 진행을 계속 반복합니다.</span>
+          <span>• <b>곡 흐름</b>: 인트로 → 벌스 → 후렴 → … → 아웃트로로 이어지며 구간마다 악기가 들어오고 빠집니다. 누르면 처음(인트로)부터 재생해요. 미리 듣기용이라 구간을 짧게(벌스·후렴 4마디) 두었어요.</span>
+          <span>• <b>구성</b>: Style Builder <b>8번 편곡·구성</b>을 따라갑니다(8번은 곡 흐름에서만 들려요).<br>
+            벌스-코러스: 벌스는 드럼 없이, 후렴에서 전체 · 빌드업 → 드롭: 후렴 앞 2마디는 드럼만 점점 크게 · 브레이크다운: 마지막 후렴 앞에 화성 악기만 ·
+            미니멀: 드럼 빼고 적게 · 층층이 쌓기: 화성 → 베이스 → 드럼 순으로 하나씩 · 후렴 강조: 후렴 멜로디 크게 · 다이내믹 대비: 벌스는 아주 작게, 후렴은 크게.
+            아무것도 안 고르면 인트로 → 본곡 → 아웃트로예요.</span>
+          <span>• <b>끝맺음</b>: 1번 아웃트로가 페이드아웃이면 점점 작아지며, 깔끔한 엔딩이면 마지막 마디에서 멈춥니다. 그 밖에는 처음부터 다시 반복해요.</span>
+          <span>• <b>악기 역할</b>: 켜 둔 악기를 리듬(드럼·타악기) · 베이스 · 화성으로 나눠 켜고 끕니다. 인트로는 화성만, 후렴은 전체, 멜로디는 벌스·후렴에서만 나와요.</span>
+          <span class="qhelp-note">재생 중에는 라벨 옆에 지금 구간(예: ▶ 후렴 3/8)이 보입니다.</span>
+        </span> <small id="flow-status" class="mel-from"></small></span>
+      <div class="mel-row">
+        <span class="fmt-tabs" id="flow-mode">
+          <button type="button" data-flow="loop" aria-pressed="true" title="4마디 코드 진행을 계속 반복합니다">루프</button><button type="button" data-flow="song" aria-pressed="false" title="Suno Style Builder 8번(편곡·구성)과 1번 아웃트로대로 인트로→벌스→후렴… 구간이 이어지며 악기가 들어오고 빠집니다">곡 흐름</button>
+        </span>
+        <small id="flow-now" class="flow-now" aria-live="polite"></small>
+      </div>
+    </div>
     <div class="sel">
       <button id="count" class="ghost count" title="선택된 악기 목록을 클립보드에 복사"></button>
       <button id="clear" class="ghost">모두 해제</button>
@@ -209,6 +245,16 @@
             <div class="ly-head"><b>스타일</b><small id="ly-style-src" class="muted"></small>
               <button class="ghost" id="ly-style-pull">Style Builder에서 가져오기</button></div>
             <textarea id="ly-style" rows="4" spellcheck="false" aria-label="가사에 반영할 스타일"></textarea>
+            <div class="ly-opts">
+              <div class="ly-row">
+                <label>곡 길이 <select id="ly-len"></select></label>
+                <label>BPM <input id="ly-bpm" type="number" min="60" max="180" step="1"></label>
+                <span id="ly-plan" class="muted"></span>
+                <button type="button" class="ghost ly-bpm-sync" id="ly-bpm-sync" hidden></button>
+              </div>
+              <label class="ly-theme ly-ai-only">주제·메모 (선택, 한글 가능)
+                <textarea id="ly-theme" rows="2" maxlength="600" placeholder="예: 가을 드라이브에서 다시 사랑에 빠지는 설렘"></textarea></label>
+            </div>
             <div class="ly-row ly-gen-row ly-ai-only">
               <button class="primary" id="ly-gen">가사 생성</button>
               <span class="ly-ver" id="ly-ver-box" hidden>
@@ -217,15 +263,15 @@
               <span id="ly-status" class="muted" role="status"></span>
             </div>
           </div>
-          <div class="ly-opts">
-            <div class="ly-row">
-              <label>곡 길이 <select id="ly-len"></select></label>
-              <label>BPM <input id="ly-bpm" type="number" min="60" max="180" step="1"></label>
-              <span id="ly-plan" class="muted"></span>
-              <button type="button" class="ghost ly-bpm-sync" id="ly-bpm-sync" hidden></button>
-            </div>
-            <label class="ly-theme ly-ai-only">주제·메모 (선택, 한글 가능)
-              <textarea id="ly-theme" rows="2" maxlength="600" placeholder="예: 가을 드라이브에서 다시 사랑에 빠지는 설렘"></textarea></label>
+          <div class="ly-side">
+            <details class="ly-banned" id="ly-banned" open>
+              <summary>금지 표현 <span id="ly-banned-n" class="muted"></span> <small class="muted">— AI에 쓰지 말라고 전하고, 가사에 들어가면 아래에 표시해요</small></summary>
+              <div class="ly-banned-box">
+                <span id="ly-banned-chips" class="ly-chips"></span>
+                <input type="text" id="ly-banned-input" class="sb-custom-input" maxlength="40" spellcheck="false" placeholder="+ 단어나 표현 적고 Enter" aria-label="금지 표현 추가">
+                <button type="button" class="ghost ly-banned-reset" id="ly-banned-reset" title="금지 표현을 처음 목록으로 되돌립니다">기본 목록으로</button>
+              </div>
+            </details>
           </div>
         </div>
         <div id="ly-result" hidden>
@@ -253,6 +299,7 @@
               <textarea id="ly-m-ko" rows="18" placeholder="[Verse 1]&#10;빗방울이 유리창을 두드려&#10;..."></textarea></label>
           </div>
         </div>
+        <div class="ly-banned-hits" id="ly-banned-hits" role="status" hidden></div>
         <div class="ly-foot" id="ly-foot" hidden>
           <span id="ly-length" class="muted"></span>
           <button class="ghost" id="ly-copy-en">Suno용 가사 복사</button>
@@ -328,11 +375,13 @@
 
   <script src="https://cdnjs.cloudflare.com/ajax/libs/tone/14.8.49/Tone.js"></script>
   <script src="instruments.js?v=20261018y"></script>
-  <script src="app.js?v=20261107d"></script>
+  <script src="app.js?v=20261112a"></script>
+  <script src="melody.js?v=20261111g"></script>
+  <script src="arrange.js?v=20261112b"></script>
   <script src="upload.js?v=20261108i"></script>
-  <script src="suno.js?v=20261110g"></script>
+  <script src="suno.js?v=20261111c"></script>
   <script src="songs.js?v=20261107d"></script>
-  <script src="lyrics.js?v=20261108e"></script>
+  <script src="lyrics.js?v=20261111a"></script>
   <script src="ref.js?v=20261109a"></script>
 </body>
 </html>

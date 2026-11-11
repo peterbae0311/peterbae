@@ -49,7 +49,7 @@ const byId = Object.fromEntries(INSTRUMENTS.map((d) => [d.id, d]));
 const catById = Object.fromEntries(CATEGORIES.map((c) => [c.id, c]));
 const state = {}; // id -> { obj, channel, meter, part, active, loading, solo }
 
-let master, started = false, initP = null;
+let master, flowGain, started = false, initP = null; // flowGain: 편곡 흐름(arrange.js)이 곡 전체 크기를 조절
 
 // 첫 동작이 추천 조합(악기 여러 개 동시 activate)이면 여러 번 동시에 불린다 → 진행 중인 초기화를 공유
 const initAudio = () => (initP ??= initAudioOnce().catch((e) => { initP = null; throw e; }));
@@ -57,7 +57,8 @@ const initAudio = () => (initP ??= initAudioOnce().catch((e) => { initP = null; 
 async function initAudioOnce() {
   await Tone.start();
   const limiter = new Tone.Limiter(-1).toDestination();
-  master = new Tone.Volume(-4).connect(limiter);
+  flowGain = new Tone.Gain(1).connect(limiter);
+  master = new Tone.Volume(-4).connect(flowGain);
   Tone.getTransport().bpm.value = +el.bpm.value;
   Tone.getTransport().on('start', (time) => {
     forActive((s) => s.obj.start?.(time));
@@ -173,6 +174,7 @@ async function activate(id) {
   if (s.active) return; // 같은 악기를 연달아 켠 경우 첫 요청이 이미 켬
   s.active = true;
   s.part.mute = false;
+  if (typeof flowApplyNow === 'function') flowApplyNow(); // 곡 흐름 중이면 지금 구간에 맞춰 켜고 끈다(arrange.js)
   if (isRunning()) s.obj.start?.(Tone.now());
   else startTransport();
   render(id);
@@ -199,7 +201,8 @@ function deactivate(id) {
   // 다시 켜면 새로 만든다(샘플은 브라우저 캐시에서 다시 읽음).
   teardown(id, s);
   render(id);
-  if (!Object.values(state).some((x) => x.active)) stopTransport();
+  // 멜로디가 켜져 있으면 악기를 다 꺼도 멜로디는 계속 재생한다(melody.js)
+  if (!Object.values(state).some((x) => x.active) && !(typeof melIsOn === 'function' && melIsOn())) stopTransport();
   renderTransport();
 }
 
@@ -224,8 +227,8 @@ function stopTransport() {
 async function togglePlay() {
   await initAudio();
   if (isRunning()) return stopTransport();
-  if (!Object.values(state).some((s) => s.active)) {
-    flash('먼저 아래에서 악기를 하나 이상 선택해 주세요.');
+  if (!Object.values(state).some((s) => s.active) && !(typeof melIsOn === 'function' && melIsOn())) {
+    flash('먼저 아래에서 악기를 하나 이상 선택하거나 위의 멜로디를 켜 주세요.');
     return;
   }
   startTransport();
@@ -295,8 +298,9 @@ function buildPanelTabs() {
       t.tabIndex = on ? 0 : -1;
       document.getElementById(t.getAttribute('aria-controls')).hidden = !on;
     });
-    // Suno Style Builder·제목·가사·Suno 작곡·인기곡 탭에서는 하단 악기 목록을 숨김
-    document.body.classList.toggle('no-board', id === 'tab-suno' || id === 'tab-lyrics' || id === 'tab-songs' || id === 'tab-ref');
+    // 제목·가사·Suno 작곡·인기곡 탭에서는 하단 악기 목록을 숨김.
+    // Suno Style Builder 탭은 보인다(2·5번 악기를 고르면서 멜로디·편곡 흐름을 악기와 함께 들어 보도록)
+    document.body.classList.toggle('no-board', id === 'tab-lyrics' || id === 'tab-songs' || id === 'tab-ref');
     try { localStorage.setItem('music.panelTab.v2', id); } catch {}
   };
   tabs.forEach((t, i) => {
@@ -390,7 +394,8 @@ function applyHarmony(prog, semis) {
     s.part.clear();
     byId[id].events().forEach((e) => s.part.add(e));
   }
-  [...el.chords.children].forEach((c, i) => (c.textContent = PROG[i].name));
+  [...el.chords.children].forEach((c, i) => ($('.chord', c).textContent = PROG[i].name));
+  if (typeof refreshMelody === 'function') refreshMelody(); // 멜로디도 새 코드에 맞춘다
 }
 
 function clearAll() {
@@ -404,6 +409,7 @@ function clearAll() {
 
 // 믹서를 처음 상태로: 재생 정지, 악기·추천 조합 표시 해제, BPM·코드 진행 기본값('추천 조합'·'곡으로 조합 만들기' 초기화가 함께 씀)
 function resetMixer() {
+  if (typeof melIsOn === 'function' && melIsOn()) melodyOff();
   stopTransport();
   clearAll();
   document.querySelectorAll('audio').forEach((a) => a.pause());
@@ -421,7 +427,7 @@ function setBpm(v) {
 const $ = (sel, root = document) => root.querySelector(sel);
 const el = {
   play: $('#play'), bpm: $('#bpm'), bpmVal: $('#bpm-val'), vol: $('#master'),
-  count: $('#count'), clear: $('#clear'), chords: $('#chords'), beats: $('#beats'),
+  count: $('#count'), clear: $('#clear'), chords: $('#chords'),
   presets: $('#presets'), genreTabs: $('#genre-tabs'), presetCurrent: $('#preset-current'), board: $('#board'), toast: $('#toast'),
 };
 
@@ -443,13 +449,15 @@ function buildUI() {
   buildPanelTabs();
   buildPanelToggles();
 
+  // 코드마다 아래에 4박 점을 둔다(지금 마디의 코드 아래 점만 박자에 맞춰 켜진다)
   PROG.forEach((p) => {
-    const c = document.createElement('span');
-    c.className = 'chord';
-    c.textContent = p.name;
-    el.chords.append(c);
+    const col = Object.assign(document.createElement('span'), { className: 'chord-col' });
+    const c = Object.assign(document.createElement('span'), { className: 'chord', textContent: p.name });
+    const beats = Object.assign(document.createElement('span'), { className: 'beats' });
+    for (let i = 0; i < 4; i++) beats.append(document.createElement('i'));
+    col.append(c, beats);
+    el.chords.append(col);
   });
-  for (let i = 0; i < 4; i++) el.beats.append(document.createElement('i'));
 
   CATEGORIES.forEach((cat) => {
     const list = INSTRUMENTS.filter((d) => d.cat === cat.id);
@@ -560,8 +568,11 @@ async function copySelected() {
 function drawPosition() {
   const playing = Tone.getTransport().state === 'started';
   const [bar, beat] = Tone.getTransport().position.split(':').map((x) => parseInt(x, 10));
-  [...el.chords.children].forEach((c, i) => c.classList.toggle('on', playing && i === bar % 4));
-  [...el.beats.children].forEach((b, i) => b.classList.toggle('on', playing && i === beat));
+  [...el.chords.children].forEach((col, i) => {
+    const now = playing && i === bar % 4;
+    $('.chord', col).classList.toggle('on', now);
+    [...$('.beats', col).children].forEach((b, k) => b.classList.toggle('on', now && k === beat));
+  });
 }
 
 function meterLoop() {

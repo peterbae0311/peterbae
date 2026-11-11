@@ -24,6 +24,25 @@ const isManual = () => lyState.mode === 'manual';
 const saveLy = () => { try { localStorage.setItem(LY_KEY, JSON.stringify(lyState)); } catch {} };
 const curVer = () => lyState.versions[lyState.cur] ?? null;
 
+/* ---------------- 금지 표현 ----------------
+ * 트렌디하지 않은 단어·올드 팝 클리셰·가사에 들어가면 안 되는 악기 이름. 생성 요청에 함께 보내 AI가 피하게 하고,
+ * 만든(또는 직접 입력한) 영어 가사에 들어가 있으면 결과 아래에 줄과 함께 표시한다. 목록은 화면에서 더하고 뺀다 */
+const BANNED_KEY = 'music.lyrics.banned';
+const BANNED_DEFAULT = [
+  'dearest', 'forever and ever', 'my lonely heart', 'destiny', 'shine like a star', 'bright and true', 'turn the page',
+  'haters', 'perfectly imperfect', 'dancing in the rain', 'heart of gold', 'touch the sky', 'set my soul on fire',
+  'till the end of time', 'dance the night away', 'evermore', 'thee', 'thou', 'yonder', 'sorrow', 'heavenly',
+  'bass drop', 'synth', 'playlist', 'remix',
+];
+let banned = BANNED_DEFAULT.slice();
+try { const v = JSON.parse(localStorage.getItem(BANNED_KEY) || 'null'); if (Array.isArray(v)) banned = v.filter((x) => typeof x === 'string' && x.trim()); } catch {}
+const saveBanned = () => { try { localStorage.setItem(BANNED_KEY, JSON.stringify(banned)); } catch {} };
+const escRe = (t) => t.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+// 단어 경계로 찾는다(예: 'thou'가 'thought'에 걸리지 않게). 대소문자·곧은/굽은 따옴표는 구분하지 않는다
+const bannedRe = () => (banned.length
+  ? new RegExp(`(?<![\\w'’])(${banned.map((b) => escRe(b.toLowerCase()).replace(/'/g, "['’]")).join('|')})(?![\\w'’])`, 'gi')
+  : null);
+
 /* ---------------- 곡 길이 → 섹션 구성 ----------------
  * 기본 88마디 팝 구성(2마디에 가사 한 줄)에서 목표 마디 수에 가까워질 때까지 줄이거나 늘린다.
  * key: 가사를 공유하는 섹션 이름(null이면 악기만) */
@@ -142,6 +161,7 @@ async function generateLyrics() {
     length: `about ${fmtLen(totalBars(plan) * 240 / bpm)} at ${bpm} BPM (2 bars per lyric line)`,
     plan: planText(plan),
     ending: plannedEnding(),
+    banned: banned.slice(0, 80),
   };
   ly.gen.disabled = true;
   const t0 = performance.now();
@@ -244,6 +264,7 @@ function renderMode() {
   ly.manual.hidden = !manual;
   renderLyrics();
   if (manual) renderManualFoot();
+  checkBanned();
 }
 function renderManualFoot() {
   const count = (t) => t.split('\n').filter((l) => l.trim() && !/^\s*\[.*\]\s*$/.test(l)).length; // 태그 줄([Verse 1] 등)은 빼고 센다
@@ -277,6 +298,44 @@ function renderLyrics() {
   ly.aiKo.value = verText(v, 'ko');
   const bars = totalBars(v.plan);
   ly.length.textContent = `${bars}마디 · ${v.bpm} BPM · 예상 ${fmtLen(bars * 240 / v.bpm)}`;
+  checkBanned();
+}
+
+// 지금 보이는 영어 가사(AI 결과 또는 직접 입력)에서 금지 표현이 들어간 줄을 찾아 보여 준다
+function checkBanned() {
+  const box = $('#ly-banned-hits');
+  const text = isManual() ? ly.mEn.value : (curVer() ? ly.aiEn.value : '');
+  const re = bannedRe();
+  const hits = [];
+  if (re && text) {
+    let sec = '';
+    text.split('\n').forEach((line) => {
+      const tag = line.match(/^\s*\[([^\]]+)\]\s*$/);
+      if (tag) { sec = tag[1].replace(/\s*[–-]\s*\d+\s*Bars?$/i, ''); return; }
+      re.lastIndex = 0;
+      if (!re.test(line)) return;
+      re.lastIndex = 0;
+      const key = `${sec}|${line.trim()}`;
+      if (!hits.some((h) => h.key === key)) hits.push({ key, sec, html: esc(line.trim()).replace(re, (m) => `<mark>${m}</mark>`) });
+    });
+  }
+  box.hidden = !hits.length;
+  box.innerHTML = hits.length
+    ? `<b>금지 표현이 들어간 줄 ${hits.length}개</b> — 고치거나 다시 생성해 보세요.<ul>${hits.map((h) => `<li>${h.sec ? `[${esc(h.sec)}] ` : ''}${h.html}</li>`).join('')}</ul>`
+    : '';
+}
+
+function renderBanned() {
+  $('#ly-banned-n').textContent = `(${banned.length})`;
+  $('#ly-banned-chips').replaceChildren(...banned.map((b, i) => {
+    const c = Object.assign(document.createElement('span'), { className: 'sb-chip-wrap' });
+    const t = Object.assign(document.createElement('span'), { className: 'sb-chip', textContent: b });
+    t.setAttribute('aria-pressed', 'false');
+    const del = Object.assign(document.createElement('button'), { type: 'button', className: 'sb-chip-del', textContent: '×', title: `'${b}' 빼기` });
+    del.onclick = () => { banned.splice(i, 1); saveBanned(); renderBanned(); checkBanned(); };
+    c.append(t, del);
+    return c;
+  }));
 }
 
 /* ---------------- 내보내기 ---------------- */
@@ -373,6 +432,7 @@ ly.title.oninput = () => { const v = curVer(); if (v) { v.title = ly.title.value
     if (!v) return;
     v.text = { en: verText(v, 'en'), ko: verText(v, 'ko'), [lang]: ly[el].value };
     saveLy();
+    if (lang === 'en') checkBanned();
   };
 });
 $('#ly-copy-en').onclick = () => copyLyrics('en');
@@ -389,8 +449,30 @@ ly.mTitle.value = lyState.manual.title;
 ly.mEn.value = lyState.manual.en;
 ly.mKo.value = lyState.manual.ko;
 [['mTitle', 'title'], ['mEn', 'en'], ['mKo', 'ko']].forEach(([el, key]) => {
-  ly[el].oninput = () => { lyState.manual[key] = ly[el].value; saveLy(); if (key !== 'title') renderManualFoot(); };
+  ly[el].oninput = () => { lyState.manual[key] = ly[el].value; saveLy(); if (key !== 'title') renderManualFoot(); if (key === 'en') checkBanned(); };
 });
+// 금지 표현 추가(Enter)·기본 목록으로
+$('#ly-banned-input').onkeydown = (e) => {
+  if (e.key !== 'Enter' || e.isComposing) return;
+  e.preventDefault();
+  const t = e.target.value.trim().replace(/\s+/g, ' ').toLowerCase();
+  if (!t) return;
+  if (/[가-힣ㄱ-ㅎㅏ-ㅣ]/.test(t)) return flash('금지 표현은 영어로 적어 주세요(가사는 영어로 만들어집니다).', 'warn');
+  if (banned.includes(t)) return flash('이미 있는 표현입니다.', 'warn');
+  banned.push(t);
+  e.target.value = '';
+  saveBanned();
+  renderBanned();
+  checkBanned();
+};
+$('#ly-banned-reset').onclick = () => {
+  if (!confirm('금지 표현을 처음 목록으로 되돌릴까요? 직접 더한 표현은 사라집니다.')) return;
+  banned = BANNED_DEFAULT.slice();
+  saveBanned();
+  renderBanned();
+  checkBanned();
+};
+renderBanned();
 // 탭을 처음 열 때 스타일이 비어 있으면 Style Builder 결과를 가져온다
 // 스타일 칸이 비어 있으면 탭을 열 때 Style Builder 스타일을 자동으로 가져온다. [초기화]로 비운 뒤에는 버튼을 누를 때까지 가져오지 않는다
 const autoPull = () => { if (!ly.style.value.trim() && !lyState.cleared) pullStyle(true); };

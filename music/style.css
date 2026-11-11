@@ -107,13 +107,14 @@ button { font: inherit; color: inherit; cursor: pointer; }
 .play.playing .icon { margin: 0; width: 16px; height: 16px; border: 0; background: #fff; border-radius: 2px; }
 
 .pos { display: flex; flex-direction: column; gap: 6px; }
-.chords { display: flex; gap: 4px; }
+.chords { display: flex; gap: 14px; } /* 코드(마디) 사이를 띄워 박자 점 묶음이 구분되게 */
 .chord {
   font-size: 12px; font-weight: 600; padding: 4px 8px; border-radius: 6px;
   background: var(--panel-2); color: var(--muted); min-width: 52px; text-align: center; transition: 0.1s;
 }
 .chord.on { background: var(--accent); color: #fff; }
-.beats { display: flex; gap: 6px; padding-left: 2px; }
+.chord-col { display: flex; flex-direction: column; align-items: center; gap: 6px; }
+.beats { display: flex; gap: 6px; }
 .beats i { width: 8px; height: 8px; border-radius: 50%; background: var(--line); transition: 0.05s; }
 .beats i.on { background: var(--text-strong); }
 .beats i:first-child.on { background: var(--accent); box-shadow: 0 0 0 3px rgba(139, 92, 246, 0.3); }
@@ -122,6 +123,29 @@ button { font: inherit; color: inherit; cursor: pointer; }
 .slider b { color: var(--text); font-variant-numeric: tabular-nums; }
 .slider input { width: 150px; }
 
+/* 멜로디(마스터 음량 오른쪽) */
+.mel { display: flex; flex-direction: column; gap: 6px; font-size: 12px; color: var(--muted); }
+.mel-row { display: flex; align-items: center; gap: 6px; }
+.mel-from { color: var(--accent); margin-left: 4px; }
+#flow-mode button { padding: 4px 12px; font-size: 12.5px; }
+.flow-now { font-size: 12px; color: var(--text); max-width: 360px; line-height: 1.35; }
+.flow-now .warn { color: var(--warn-text); }
+/* 멜로디·편곡 '?' 도움말(누르면 열고 닫음 — 터치에서도 되게 호버 말풍선 대신 버튼으로) */
+.mel-label { position: relative; display: inline-flex; align-items: center; gap: 2px; }
+.qhelp { width: 18px; height: 18px; padding: 0; margin-left: 4px; border-radius: 50%; border: 1px solid var(--line);
+  background: var(--panel-2); color: var(--muted); font-size: 11px; font-weight: 700; line-height: 1; cursor: pointer; }
+.qhelp:hover, .qhelp[aria-expanded="true"] { color: #fff; background: var(--accent); border-color: var(--accent); }
+.qhelp-pop { position: absolute; left: 0; top: calc(100% + 8px); z-index: 30; width: 360px; max-width: calc(100vw - 32px);
+  display: flex; flex-direction: column; gap: 6px; padding: 12px 14px; border-radius: 10px;
+  background: var(--tip-bg); border: 1px solid var(--tip-line); box-shadow: var(--tip-shadow);
+  font-size: 12.5px; line-height: 1.55; color: var(--text); word-break: keep-all; font-weight: 400; }
+.qhelp-pop[hidden] { display: none; }
+.qhelp-pop > b { font-size: 13px; }
+.qhelp-note { color: var(--muted); font-size: 12px; }
+#flow-mode button[aria-pressed="true"] { background: var(--accent-faint); color: var(--accent); font-weight: 600; }
+.mel .ghost { padding: 4px 10px; font-size: 12.5px; }
+.mel-on[aria-pressed="true"] { background: var(--accent); border-color: var(--accent); color: #fff; }
+.mel-sound { padding: 4px 6px; font-size: 12.5px; border-radius: 8px; border: 1px solid var(--line); background: var(--field-bg); color: var(--text); }
 .sel { margin-left: auto; display: flex; align-items: center; gap: 12px; font-size: 13px; color: var(--muted); }
 .ghost { background: transparent; border: 1px solid var(--line); border-radius: 8px; padding: 6px 12px; font-size: 13px; }
 .ghost:disabled { opacity: 0.4; cursor: default; }
@@ -475,14 +499,16 @@ body.has-solo .card.active:not(.soloed) .solo { color: var(--text); }
 .ghost.danger:hover { border-color: var(--error-text); }
 
 /* ---------- Suno 작곡(곡 목록) ---------- */
-body.no-board #board { display: none; } /* Suno Style Builder·Suno 작곡 탭 */
+body.no-board #board { display: none; } /* 제목·가사·Suno 작곡·인기곡 탭 */
 .song-head { display: flex; align-items: flex-start; justify-content: space-between; gap: 16px; flex-wrap: wrap; margin-bottom: 12px; }
 .pdesc-static { margin: 0; font-size: 13px; color: var(--muted); max-width: 760px; }
 .pdesc-static b { color: var(--text); font-weight: 600; }
 
 /* ---------- 제목·가사 ---------- */
 #panel-lyrics > .pdesc-static { margin-bottom: 14px; }
+/* 왼쪽: 스타일 → 곡 길이·BPM → 주제·메모 → [가사 생성] / 오른쪽: 금지 표현 */
 .ly-top { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 20px; align-items: start; }
+.ly-style > .ly-opts { margin-top: 10px; }
 .ly-head { display: flex; align-items: center; gap: 8px; margin-bottom: 4px; }
 .ly-head b { font-size: 13.5px; white-space: nowrap; }
 .ly-head small { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
@@ -498,6 +524,16 @@ body.no-board #board { display: none; } /* Suno Style Builder·Suno 작곡 탭 *
 .ly-opts #ly-bpm { width: 72px; }
 .ly-theme { flex-direction: column; align-items: stretch !important; gap: 4px !important; }
 .ly-theme textarea { width: 100%; resize: vertical; line-height: 1.5; min-height: calc(2 * 1.5em + 14px); }
+/* 금지 표현 목록(접기)과 가사 검사 결과 */
+.ly-banned summary { cursor: pointer; font-size: 13px; font-weight: 600; }
+.ly-banned summary small { font-weight: 400; }
+.ly-banned-box { display: flex; flex-wrap: wrap; align-items: center; gap: 5px; margin-top: 8px; }
+.ly-banned-reset { padding: 4px 10px; font-size: 12px; }
+.ly-banned-hits { margin: 10px 0 0; padding: 8px 12px; border-radius: 8px; font-size: 12.5px; line-height: 1.6;
+  background: var(--accent-faint); border: 1px solid var(--line); }
+.ly-banned-hits b { color: var(--warn-text); }
+.ly-banned-hits mark { background: none; color: var(--error-text, #ef4444); font-weight: 700; text-decoration: underline; }
+.ly-banned-hits ul { margin: 4px 0 0; padding-left: 18px; }
 .ly-ver { display: inline-flex; align-items: center; gap: 4px; font-size: 12.5px; color: var(--muted); }
 .ly-ver .ghost { padding: 2px 8px; font-size: 11px; }
 #ly-result { margin-top: 18px; border-top: 1px solid var(--line); padding-top: 14px; display: flex; flex-direction: column; gap: 10px; }

@@ -17,57 +17,104 @@ const TIMEOUT_MS = 120_000;
  * - 줄 번호 옆 운 글자(1A 2A 3B 4B)로 짝 각운을 지정하니 운이 확실히 맞았다.
  * - 주제가 한글이면 가사까지 한글·일본어로 쓰는 일이 있어 LANGUAGE 규칙을 맨 앞에 둔다(남는 경우는 클라이언트가 재시도).
  * - "10음절 이하·짧을수록 좋음"으로 10음절 초과 줄이 0이 됐다.
+ * 2026-11-11 사용자 작사 가이드 반영(역할·규칙 1~7·최근 사용한 소재·자가 점검). 앱은 화면이 정한 섹션·줄 수의 JSON을 받아야 해서
+ * 가이드의 출력 형식(스타일 프롬프트·길이 계산·코드 블록)과 구조 바꾸기(Post-Chorus 추가 등)는 빼고, 줄 수는 템플릿으로 고정한다.
+ * 운 글자(1A 2A…)는 운을 강제해서 없앴다. 자가 점검은 출력하지 않고 고친 결과만 내게 한다.
  */
-const SYSTEM_PROMPT = `You are a professional pop songwriter writing ORIGINAL, natural, singable English lyrics for Suno AI.
+// 최근 곡에서 쓴 소재·훅. 새 가사가 겹치지 않게 한다(새 곡을 만들면 여기에 더한다)
+const RECENT_IMAGES = ['coffee', 'morning sunlight', 'city lights', 'neon', 'fallen leaves', 'sweater', 'keys', 'vinyl records', 'phone photos'];
+const RECENT_HOOKS = ['Golden', 'Unfiltered', 'Killer Groove', 'Neon Heartbeat', 'Good vibes only', 'Sunrise on the boulevard', "Let's say goodbye"];
+
+const SYSTEM_PROMPT = `ROLE
+You are a professional lyricist writing English pop lyrics for Suno AI. Write like a native speaker with a 2020s pop
+sensibility: natural, modern and singable.
 
 TASK
-LANGUAGE: "en" lines and titles are ALWAYS in English only (no Korean, Japanese or other scripts), even when the theme is written in Korean. Only "ko" is Korean.
-Write lyrics for the given style, theme and song plan. The plan lists every section in play order with bar counts;
-you write only the sections in the template, with exactly the given number of lines each.
+LANGUAGE: "en" lines and titles are ALWAYS in English only (no Korean, Japanese or other scripts), even when the theme
+is written in Korean. Only "ko" is Korean.
+Write lyrics for the given style, theme and song plan, following every RULE below. The plan lists every section in play
+order with bar counts; you write only the sections in the template, with exactly the given number of lines each.
 Repeated sections (e.g. later choruses) reuse what you write, so write each section once.
+Before answering, run the SELF-CHECK silently, fix anything that fails, and output only the fixed result.
 
-LINES (most important)
-- Every line has 5-8 words and at most 10 syllables. Short lines are better than long ones.
-- Use contractions as in natural speech (I'm, don't, we're, you're, it's).
-- Conversational, idiomatic English with natural word stress, smooth vowels and easy breathing.
-- Keep lines within the same section similar in length and rhythm.
+RULES
+1. Modern vocabulary
+- Use everyday spoken English that people really use now. Use contractions naturally (I'm, don't, gonna, wanna).
+- Write every section the way a real person would actually say it to someone — verses, chorus and bridge alike.
+- Prefer plain, modern words whose meaning is instantly clear. Avoid fleeting internet slang that dates quickly
+  (e.g. lowkey, no cap, slay, rizz, vibe check) unless the theme asks for it.
+- Avoid old-pop clichés and overly literary words. Banned examples (and anything like them): dearest, forever and ever,
+  my lonely heart, destiny, shine like a star, bright and true, turn the page, haters, perfectly imperfect,
+  dancing in the rain.
 
-RHYME & HOOK
-- In every Verse, Pre-Chorus and Chorus, lines rhyme in pairs (AABB). Use natural rhymes, not forced ones,
-  and do not reuse the same rhyme word within a section.
-- The Chorus opens and closes with a short, catchy hook (3-6 words). Use the hook 2-3 times per Chorus, not more.
+2. Concrete scenes
+- Show feelings through actions, objects, places and dialogue instead of declaring them
+  (e.g. not "I miss you" but "Your old sweater smells like rain").
+- Not every feeling needs a metaphor. Short, direct lines are fine.
 
-STORY
-- One clear central message and point of view, told with vivid, specific images (avoid clichés).
-- Verse: concrete scenes and details. Pre-Chorus: build anticipation. Chorus: the main message.
-- Bridge: a new angle or turning point. Outro: close the story in a way that fits the planned ending.
-- Match the genre, BPM, mood, energy and vocal style of the given style prompt.
+3. Rhyme and flow
+- Verses: write as if speaking, not bound by rhyme or syllable counts. Mix short and longer lines.
+- Chorus: it MUST contain at least one memorable hook line, repeated at least twice within the chorus.
+  This rule overrides any rule about reducing repetition.
+- Rhyme loosely with similar sounds (slant rhyme). If a rhyme would break grammar or meaning, drop the rhyme.
+- LINE LENGTH (hard limit): each line is sung in about two bars, so no line may exceed 10 words.
+  Most lines should be 4-8 words; a 2-3 word line is welcome for contrast. Split long thoughts across two lines.
 
-ORIGINALITY
+4. Lyrics, not arrangement
+- Never put instruments or sound words (bass, bass drop, beat drop, synth, drums, remix, playlist…), genre names
+  (disco, house, G-funk…) or arrangement directions (break it down, build it up…) in the lyric lines.
+- Text in parentheses is sung as backing vocals, so use parentheses only for ad-libs and call-and-response.
+
+5. Clarity and consistency
+- Prefer expressions that are understood at once over novelty. If originality makes the meaning vague, choose the
+  simpler words.
+- Time, place, objects and actions must not contradict each other.
+- Keep the speaker (I, we, you) and any gender references consistent through the whole song.
+- Use a tone that fits the genre and mood.
+- Avoid anything that could read as sexual unless the theme asks for it.
+
+6. Variety
+- In the final lines of the Chorus or the Bridge, let the feeling move forward instead of only restating the verse.
+- BANNED recent images — do not mention these words or close variants anywhere in the lyrics or titles:
+  ${RECENT_IMAGES.join(', ')}.
+- BANNED recent hooks and titles — do not use them or near-copies: ${RECENT_HOOKS.join(', ')}.
+
+7. Form
+- Never put the song title inside the lyrics as a label, and never write bar counts or section names inside lines.
 - Write completely original lyrics. Do not copy, quote or closely imitate existing songs.
 
 KOREAN
 - Give a natural Korean translation for every line, keeping meaning, imagery and tone (no forced rhymes).
 
+SELF-CHECK (do not output)
+- Is every line 10 words or fewer?
+- Does the Chorus have a hook line that repeats at least twice?
+- Is any line's grammar or meaning broken for the sake of a rhyme?
+- Are there instruments, genre names or arrangement directions in the lyrics?
+- Do the scenes and the speaker contradict each other anywhere?
+- Are any banned examples, clichés or fleeting slang left? Does every line sound like natural speech?
+- Does any banned recent image (e.g. coffee, neon) or hook appear anywhere?
+- Does every section have exactly the number of lines in the template?
+
 OUTPUT
 Fill in the JSON template given by the user and return ONLY that JSON, no Markdown or extra text.
 - Replace every "" with your text. Keep every slot: do not add, remove or merge lines or sections.
-- The letter after each line number (A, B, C...) marks which lines must rhyme with each other.
 - titles: fill each "title" with an English song title of EXACTLY the given number of "words" (count words strictly;
-  a one-word title is a single word). Make the three titles different; the chorus hook or a key image is a good source.`;
+  a one-word title is a single word). Make the three titles different, modern and not cliché;
+  the chorus hook or a key image is a good source.`;
 
 const str = (v: unknown, max: number) => (typeof v === 'string' ? v.trim().slice(0, max) : '');
 
 const titleWords = () => { const r = Math.random(); return r < 0.7 ? 1 : r < 0.9 ? 2 : 3; };
 
-// 빈칸 템플릿: 줄마다 번호+운 글자(AABB…)를 달아 줄 수와 각운을 형식으로 고정한다
+// 빈칸 템플릿: 줄마다 번호를 달아 줄 수를 형식으로 고정한다(운은 강제하지 않아 운 글자는 달지 않는다)
 function template(sections: { name: string; lines: number }[]) {
   return JSON.stringify({
     // 제목 단어 수: 1단어 70% · 2단어 20% · 3단어 10%(후보마다 따로 뽑음)
     titles: [titleWords(), titleWords(), titleWords()].map((words) => ({ words, title: '' })),
     sections: sections.map((s) => ({
       name: s.name,
-      lines: Array.from({ length: s.lines }, (_, i) => ({ n: `${i + 1}${String.fromCharCode(65 + Math.floor(i / 2))}`, en: '', ko: '' })),
+      lines: Array.from({ length: s.lines }, (_, i) => ({ n: i + 1, en: '', ko: '' })),
     })),
   });
 }
@@ -83,6 +130,9 @@ export async function POST(request: NextRequest) {
   const length = str(body?.length, 120); // 예: "about 2:55 at 121 BPM (2 bars per lyric line)"
   const plan = str(body?.plan, 600); // 예: "Intro 4 bars (instrumental) > Verse 1 8 > … > Final Chorus 16 (same lyrics as Chorus)"
   const ending = str(body?.ending, 120);
+  // 화면의 금지 표현 목록(트렌디하지 않은 단어·클리셰 등). 사용자가 더하고 뺀다
+  const banned = (Array.isArray(body?.banned) ? body.banned : [])
+    .map((b: unknown) => str(b, 40)).filter(Boolean).slice(0, 80) as string[];
   const sections: { name: string; lines: number }[] = Array.isArray(body?.sections)
     ? body.sections
       .filter((s: { name?: unknown; lines?: unknown }) => typeof s?.name === 'string' && Number.isInteger(s?.lines) && (s.lines as number) > 0 && (s.lines as number) <= 16)
@@ -98,6 +148,7 @@ export async function POST(request: NextRequest) {
     length ? `Target length: ${length}.` : '',
     plan ? `Song plan: ${plan}.` : '',
     ending ? `Planned ending: ${ending}.` : '',
+    banned.length ? `Banned words and phrases (never use them or close variants anywhere in the lyrics or titles): ${banned.join(', ')}.` : '',
     `Template:\n${template(sections)}`,
   ].filter(Boolean).join('\n');
 
