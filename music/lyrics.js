@@ -479,15 +479,31 @@ const autoPull = () => { if (!ly.style.value.trim() && !lyState.cleared) pullSty
 $('#tab-lyrics').addEventListener('click', () => { autoPull(); renderPlan(); });
 autoPull();
 // [초기화]: 스타일·곡 길이·BPM·주제·메모를 처음 상태로(만든 가사 버전·직접 입력 내용은 그대로)
+// [초기화]: 스타일·곡 길이·BPM·주제·메모와 제목·영어 가사·한글 가사(AI로 만든 버전 모두 + 직접 입력)를 처음 상태로
 $('#ly-reset').onclick = () => {
-  const has = ly.style.value.trim() || ly.theme.value.trim();
-  if (has && !confirm('스타일·곡 길이·BPM·주제·메모를 지울까요?')) return;
-  Object.assign(lyState, { style: '', len: 0, bpm: 0, theme: '', cleared: true });
+  const m = lyState.manual;
+  const n = lyState.versions.length;
+  const has = ly.style.value.trim() || ly.theme.value.trim() || n || m.title.trim() || m.en.trim() || m.ko.trim();
+  if (has && !confirm(`스타일·곡 길이·BPM·주제·메모와 제목·영어 가사·한글 가사${n ? `(AI로 만든 ${n}개 버전 포함)` : ''}를 모두 지울까요?`)) return;
+  Object.assign(lyState, { style: '', len: 0, bpm: 0, theme: '', cleared: true, versions: [], cur: -1, manual: { title: '', en: '', ko: '' } });
   ly.style.value = ly.theme.value = ly.bpm.value = ly.len.value = '';
+  ly.mTitle.value = ly.mEn.value = ly.mKo.value = '';
   ly.styleSrc.textContent = '';
   saveLy();
   renderPlan();
-  flash('스타일·곡 길이·BPM·주제·메모를 초기화했습니다.', 'ok');
+  renderMode(); // 결과 칸·버전 표시·하단 버튼을 비운 상태로
+  flash('스타일·곡 길이·BPM·주제·메모와 제목·영어 가사·한글 가사를 초기화했습니다.', 'ok');
 };
+// 스타일·제목·영어 가사·한글 가사 옆 복사 아이콘: 그 칸의 내용을 그대로 복사한다
+document.querySelectorAll('[data-ly-copy]').forEach((b) => {
+  b.onclick = async (e) => {
+    e.preventDefault(); // 라벨 안에 있어 눌렀을 때 입력칸으로 초점이 옮겨 가지 않게
+    const field = document.getElementById(b.dataset.lyCopy);
+    const text = field.value.trim();
+    const name = b.getAttribute('aria-label').replace(/ 복사$/, '');
+    if (!text) return flash(`${name}이(가) 비어 있습니다.`, 'warn');
+    if (await copyText(text)) flash(`${name}을(를) 복사했습니다.`, 'ok');
+  };
+});
 renderPlan();
 renderMode();

@@ -24,7 +24,7 @@
   <link rel="stylesheet" crossorigin
         href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/static/pretendard.css">
   <!-- 파일을 고치면 ?v= 값을 올려 브라우저 캐시에 남은 예전 파일을 쓰지 않게 한다 -->
-  <link rel="stylesheet" href="style.css?v=20261112b">
+  <link rel="stylesheet" href="style.css?v=20261112c">
 </head>
 <body>
   <header class="hero">
@@ -242,7 +242,7 @@
         </div>
         <div class="ly-top">
           <div class="ly-style">
-            <div class="ly-head"><b>스타일</b><small id="ly-style-src" class="muted"></small>
+            <div class="ly-head"><b>스타일</b><button type="button" class="sd-copy" data-ly-copy="ly-style" aria-label="스타일 복사" title="스타일 복사"><svg viewBox="0 0 24 24" width="14" height="14" aria-hidden="true"><rect x="9" y="9" width="11" height="11" rx="2" fill="none" stroke="currentColor" stroke-width="2"/><path d="M5 15V5a2 2 0 0 1 2-2h8" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg></button><small id="ly-style-src" class="muted"></small>
               <button class="ghost" id="ly-style-pull">Style Builder에서 가져오기</button></div>
             <textarea id="ly-style" rows="4" spellcheck="false" aria-label="가사에 반영할 스타일"></textarea>
             <div class="ly-opts">
@@ -277,25 +277,25 @@
         <div id="ly-result" hidden>
           <div class="ly-titles">
             <b>제목</b><span id="ly-title-chips" class="ly-chips"></span>
-            <input id="ly-title" maxlength="120" aria-label="곡 제목" autocomplete="off">
+            <input id="ly-title" maxlength="120" aria-label="곡 제목" autocomplete="off"><button type="button" class="sd-copy" data-ly-copy="ly-title" aria-label="제목 복사" title="제목 복사"><svg viewBox="0 0 24 24" width="14" height="14" aria-hidden="true"><rect x="9" y="9" width="11" height="11" rx="2" fill="none" stroke="currentColor" stroke-width="2"/><path d="M5 15V5a2 2 0 0 1 2-2h8" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg></button>
           </div>
           <div id="ly-structure" class="ly-structure muted"></div>
           <div class="ly-m-cols">
-            <label><b>영어 가사</b> <small class="muted">Suno 가사 칸에 그대로 들어갑니다. 고친 내용은 이 버전에 저장돼요.</small>
+            <label><span class="ly-lbl"><b>영어 가사</b><button type="button" class="sd-copy" data-ly-copy="ly-ai-en" aria-label="영어 가사 복사" title="영어 가사 복사"><svg viewBox="0 0 24 24" width="14" height="14" aria-hidden="true"><rect x="9" y="9" width="11" height="11" rx="2" fill="none" stroke="currentColor" stroke-width="2"/><path d="M5 15V5a2 2 0 0 1 2-2h8" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg></button></span> <small class="muted">Suno 가사 칸에 그대로 들어갑니다. 고친 내용은 이 버전에 저장돼요.</small>
               <textarea id="ly-ai-en" rows="24" spellcheck="false" aria-label="생성한 영어 가사"></textarea></label>
-            <label><b>한글 가사</b> <small class="muted">보관용 한글 뜻입니다.</small>
+            <label><span class="ly-lbl"><b>한글 가사</b><button type="button" class="sd-copy" data-ly-copy="ly-ai-ko" aria-label="한글 가사 복사" title="한글 가사 복사"><svg viewBox="0 0 24 24" width="14" height="14" aria-hidden="true"><rect x="9" y="9" width="11" height="11" rx="2" fill="none" stroke="currentColor" stroke-width="2"/><path d="M5 15V5a2 2 0 0 1 2-2h8" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg></button></span> <small class="muted">보관용 한글 뜻입니다.</small>
               <textarea id="ly-ai-ko" rows="24" aria-label="생성한 한글 가사"></textarea></label>
           </div>
         </div>
         <div id="ly-manual" class="ly-manual" hidden>
           <div class="ly-titles">
             <b>제목</b>
-            <input id="ly-m-title" maxlength="120" aria-label="곡 제목(직접 입력)" placeholder="예: Stay a While" autocomplete="off">
+            <input id="ly-m-title" maxlength="120" aria-label="곡 제목(직접 입력)" placeholder="예: Stay a While" autocomplete="off"><button type="button" class="sd-copy" data-ly-copy="ly-m-title" aria-label="제목 복사" title="제목 복사"><svg viewBox="0 0 24 24" width="14" height="14" aria-hidden="true"><rect x="9" y="9" width="11" height="11" rx="2" fill="none" stroke="currentColor" stroke-width="2"/><path d="M5 15V5a2 2 0 0 1 2-2h8" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg></button>
           </div>
           <div class="ly-m-cols">
-            <label><b>영어 가사</b> <small class="muted">Suno 가사 칸에 그대로 들어갑니다. [Verse 1] 같은 태그도 함께 쓸 수 있어요.</small>
+            <label><span class="ly-lbl"><b>영어 가사</b><button type="button" class="sd-copy" data-ly-copy="ly-m-en" aria-label="영어 가사 복사" title="영어 가사 복사"><svg viewBox="0 0 24 24" width="14" height="14" aria-hidden="true"><rect x="9" y="9" width="11" height="11" rx="2" fill="none" stroke="currentColor" stroke-width="2"/><path d="M5 15V5a2 2 0 0 1 2-2h8" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg></button></span> <small class="muted">Suno 가사 칸에 그대로 들어갑니다. [Verse 1] 같은 태그도 함께 쓸 수 있어요.</small>
               <textarea id="ly-m-en" rows="18" spellcheck="false" placeholder="[Verse 1]&#10;Rain is tapping on the glass&#10;..."></textarea></label>
-            <label><b>한글 가사</b> <small class="muted">보관용 한글 뜻입니다.</small>
+            <label><span class="ly-lbl"><b>한글 가사</b><button type="button" class="sd-copy" data-ly-copy="ly-m-ko" aria-label="한글 가사 복사" title="한글 가사 복사"><svg viewBox="0 0 24 24" width="14" height="14" aria-hidden="true"><rect x="9" y="9" width="11" height="11" rx="2" fill="none" stroke="currentColor" stroke-width="2"/><path d="M5 15V5a2 2 0 0 1 2-2h8" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg></button></span> <small class="muted">보관용 한글 뜻입니다.</small>
               <textarea id="ly-m-ko" rows="18" placeholder="[Verse 1]&#10;빗방울이 유리창을 두드려&#10;..."></textarea></label>
           </div>
         </div>
@@ -381,7 +381,7 @@
   <script src="upload.js?v=20261108i"></script>
   <script src="suno.js?v=20261111c"></script>
   <script src="songs.js?v=20261107d"></script>
-  <script src="lyrics.js?v=20261111a"></script>
+  <script src="lyrics.js?v=20261112a"></script>
   <script src="ref.js?v=20261109a"></script>
 </body>
 </html>
