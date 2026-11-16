@@ -4,7 +4,7 @@ const ANALYSIS_SCRIPTS = [
   'https://cdn.jsdelivr.net/npm/onnxruntime-web@1.19.2/dist/ort.min.js',
   'https://cdn.jsdelivr.net/npm/essentia.js@0.1.3/dist/essentia-wasm.web.js',
   'https://cdn.jsdelivr.net/npm/essentia.js@0.1.3/dist/essentia.js-core.umd.js',
-  'analyzer.js?v=20261029c',
+  'analyzer.js?v=20261116i',
 ];
 
 const up = {
@@ -102,6 +102,15 @@ const fmtTime = (sec) => { const t = Math.round(sec); return `${Math.floor(t / 6
 const genreLabel = (g) => g.replace('---', ' · ');
 const esc = (t) => t.replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' })[c]);
 
+// 가사 구조(추정): 곡의 반복·소리 변화로 나눈 구간을 Intro → Verse 1 → … 칩으로. 칩에 마우스를 올리면 시간과 마디 수
+const fmtT = (t) => `${Math.floor(t / 60)}:${String(Math.round(t % 60)).padStart(2, '0')}`;
+function structHtml(res) {
+  if (res.partial) return '<span class="muted">곡 일부를 녹음해서 판단하지 않았습니다</span>';
+  const secs = Analyzer.songStructure(res);
+  if (!secs.length) return '<span class="muted">구간을 나눌 만큼 뚜렷한 변화를 찾지 못했습니다</span>';
+  return `<div class="ly-struct">${secs.map((s, i) => `${i ? '<span class="arr">→</span>' : ''}<span class="sec${/Chorus/.test(s.name) && !/Pre/.test(s.name) ? ' chorus' : ''}${/Intro|Outro|Interlude/.test(s.name) ? ' inst' : ''}" title="${s.name} · ${fmtT(s.start)}–${fmtT(s.end)} · ${s.bars}마디">${structShort(s.name)}</span>`).join('')}</div>`;
+}
+
 function renderResult() {
   const { res, mix, semis, intro, feel, hints } = last;
   // 추정한 선택값 칩(한글 이름, 말풍선에 출력 영어)
@@ -136,6 +145,7 @@ function renderResult() {
       <div class="r-row"><span class="r-label">리듬</span><div class="chips">${optChips('feel', feel)}${last.web ? webMark : ''}</div></div>
       <div class="r-row"><span class="r-label">분위기</span><div class="chips">${optChips('mood', hints.mood)}${optChips('energy', [hints.energy])}${last.web ? webMark : ''}</div></div>
       <div class="r-row"><span class="r-label">편곡</span><div class="chips">${optChips('arr', hints.arr)}${hints.outro ? optChips('outro', [hints.outro]) : ''}</div></div>
+      <div class="r-row"><span class="r-label">가사 구조 <small class="muted">추정</small></span>${structHtml(res)}</div>
       <div class="r-row"><span class="r-label">사운드</span><div class="chips">${optChips('mix', hints.mix)}</div></div>
       <div class="r-row"><span class="r-label">인식된 악기</span><div class="chips">${detected}</div></div>
       <div class="r-row"><span class="r-label">켜진 악기</span><div class="chips">${picked}</div></div>
@@ -145,7 +155,7 @@ function renderResult() {
         : intro ? `<span class="chip on" style="--c:${catById[byId[intro.id].cat].color}" title="앞 6초에서 가장 두드러진 악기">${byId[intro.id].ko}</span>`
         : '<span class="muted">뚜렷한 악기가 없습니다</span>'}</div></div>
       ${unsupported.length ? `<p class="muted r-note">${unsupported.join(', ')}은(는) 믹서에 없는 악기라 제외했습니다.</p>` : ''}
-      <p class="muted r-note">분석으로 추정한 값입니다.${res.partial ? ' 곡 일부를 녹음해서 페이드아웃·브레이크다운·점점 고조는 판단하지 않았습니다.' : ''} Suno 스타일은 Suno Style Builder 탭의 [곡 분석 불러오기]로 이 값을 가져와 보컬·Concept과 함께 만듭니다.</p>
+      <p class="muted r-note">분석으로 추정한 값입니다.${res.partial ? ' 곡 일부를 녹음해서 페이드아웃·브레이크다운·점점 고조는 판단하지 않았습니다.' : ''} Suno 스타일은 Suno Style Builder 탭의 [곡 분석 불러오기]로 이 값을 가져와 보컬·Theme과 함께 만듭니다(가사 구조는 8번에 들어갑니다).</p>
     </div>`;
   up.result.hidden = false;
   // ② 원곡 정보는 처음부터 ①과 함께 보인다. 이미 찾은 웹 결과가 있으면 ③ 선택 상태를 새 결과에 맞춰 다시 그린다

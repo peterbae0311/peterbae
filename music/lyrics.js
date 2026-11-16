@@ -88,10 +88,30 @@ function planSong(sec, bpm) {
   }
   return plan;
 }
-// 가사를 공유하는 섹션별 줄 수(가장 긴 자리 기준, 2마디에 한 줄)
-function uniqueSections(plan) {
+// 곡 분석 가사 구조: Suno Style Builder 8번에 [곡 분석 불러오기]로 들어간 구조(칩이 켜져 있을 때)를 그대로 가사 구성으로 쓴다.
+// 반복되는 후렴(Chorus·Final Chorus)·프리코러스는 같은 가사, 인트로·간주는 가사 없음. 가사 구간은 2마디에 한 줄이라 짝수 마디로 맞춘다
+function analyzedPlan() {
+  const it = (typeof sb !== 'undefined' ? sb.custom?.['8'] ?? [] : []).find((x) => x.auto === 'structure' && !x.off && x.secs?.length);
+  if (!it) return null;
+  return it.secs.map((s) => {
+    const key = /^(Intro|Interlude|Instrumental|Post-Chorus)/i.test(s.name) ? null
+      : /Chorus$/i.test(s.name) && !/Pre/i.test(s.name) ? 'Chorus'
+      : /Pre-?Chorus/i.test(s.name) ? 'Pre-Chorus' : s.name;
+    return { name: s.name, bars: key ? Math.max(2, s.bars) : Math.max(1, s.bars), key };
+  });
+}
+// 가사 구성: 곡 분석 구조가 있으면 그것, 없으면 곡 길이·BPM으로 정한 기본 구성
+const lyricsPlan = (bpm) => analyzedPlan() ?? planSong(lenSec(), bpm);
+
+// 가사 한 줄을 부르는 마디 수: 느린 곡(90 BPM 미만)은 1마디가 길어(71 BPM이면 3.4초) 1마디에 한 줄, 그 밖은 2마디에 한 줄
+const barsPerLine = (bpm) => (bpm < 90 ? 1 : 2);
+// 구간별 가사 줄 수 상한. 곡 분석 구간이 길게 잡혀도(후렴 뒤 간주까지 포함 등) 가사가 지나치게 늘지 않게 하고, 남는 마디는 연주로 둔다
+const LINE_CAP = (key) => (/^Verse/i.test(key) ? 8 : /Pre-?Chorus/i.test(key) ? 6 : /^Chorus/i.test(key) ? 8 : /^Bridge/i.test(key) ? 6 : /^Outro/i.test(key) ? 4 : 8);
+const sectionLines = (bars, bpm, key) => Math.min(LINE_CAP(key), Math.max(1, Math.round(bars / barsPerLine(bpm))));
+// 가사를 공유하는 섹션별 줄 수(가장 긴 자리 기준)
+function uniqueSections(plan, bpm) {
   const map = new Map();
-  plan.forEach((s) => { if (s.key) map.set(s.key, Math.max(map.get(s.key) ?? 0, s.bars / 2)); });
+  plan.forEach((s) => { if (s.key) map.set(s.key, Math.max(map.get(s.key) ?? 0, sectionLines(s.bars, bpm, s.key))); });
   return [...map].map(([name, lines]) => ({ name, lines }));
 }
 const fmtLen = (sec) => `${Math.floor(sec / 60)}:${String(Math.round(sec % 60)).padStart(2, '0')}`;
@@ -131,14 +151,50 @@ function pullStyle(quiet = false) {
   renderPlan();
   if (!quiet) flash(`스타일과 BPM ${sb.bpm}${sec ? `, 곡 길이 ${fmtLen(sec)}` : ''}을 가져왔습니다.${sec ? '' : ' 스타일에 곡 길이가 없어 곡 길이는 그대로 두었습니다.'}`, 'ok');
 }
+/* 가사 구조 표시: [{ name, bars? }] → 'Intro(4) → Verse 1(8) → Chorus(16) …' 칩. 후렴은 강조, 가사 없는 구간은 흐리게 */
+const STRUCT_INST = /^(Intro|Outro|Instrumental|Break|Interlude|Solo|End)/i;
+const structShort = (name) => name.replace(/^Pre-?Chorus/i, 'Pre').replace(/^Final Chorus/i, 'Final').replace(/^Instrumental/i, 'Inst.');
+function renderStruct(el, secs, label = '가사 구조') {
+  if (!secs.length) { el.replaceChildren(); return; }
+  const parts = [Object.assign(document.createElement('b'), { textContent: label })];
+  secs.forEach((s, i) => {
+    if (i) parts.push(Object.assign(document.createElement('span'), { className: 'arr', textContent: '→' }));
+    // 한 줄에 들어가게 긴 이름은 줄여 쓰고(마우스를 올리면 전체 이름), 마디 수는 작은 숫자로
+    const c = Object.assign(document.createElement('span'), { className: 'sec', textContent: structShort(s.name), title: s.bars ? `${s.name} · ${s.bars}마디` : s.name });
+    if (s.bars) c.append(Object.assign(document.createElement('sub'), { textContent: s.bars }));
+    if (/chorus|hook|drop/i.test(s.name) && !/pre/i.test(s.name)) c.classList.add('chorus');
+    if (STRUCT_INST.test(s.name) || s.inst) c.classList.add('inst');
+    parts.push(c);
+  });
+  el.replaceChildren(...parts);
+}
+// 가사 글의 [Verse 1 – 8 Bars] · [Chorus: …] 같은 태그에서 구조를 읽는다([End]·[Instrumental] 같은 지시 태그는 앞 구간에 딸린 것으로 본다)
+function structFromText(text) {
+  const secs = [];
+  for (const line of text.split('\n')) {
+    // 이름에 '-'가 들어갈 수 있다(Pre-Chorus). 뒤의 '– 8 Bars'·': 설명'은 떼어 낸다
+    const m = line.trim().match(/^\[([^\]:–]+?)(?:\s*[–-]\s*(\d+)\s*Bars?)?(?:\s*:[^\]]*)?\]$/i);
+    if (!m) continue;
+    const name = m[1].trim();
+    if (/^(End|Instrumental|Fade|Strong final|Final hit)/i.test(name)) continue;
+    secs.push({ name, bars: m[2] ? +m[2] : 0 });
+  }
+  return secs;
+}
+
 function renderPlan() {
   const bpm = +ly.bpm.value || 120;
   const sync = $('#ly-bpm-sync');
   sync.hidden = !sb.bpm || +sb.bpm === bpm;
   sync.textContent = `Style Builder BPM(${sb.bpm})과 달라요 · 맞추기`;
-  const plan = planSong(lenSec(), bpm);
+  const fromSong = !!analyzedPlan();
+  const plan = lyricsPlan(bpm);
   const bars = totalBars(plan);
-  ly.plan.textContent = `${bars}마디 · 예상 ${fmtLen(bars * 240 / bpm)} (${ly.len.value ? '' : `곡 길이 기본 ${fmtLen(LEN_DEFAULT)} 기준 · `}Suno는 ±15초 정도 달라질 수 있어요)`;
+  ly.plan.textContent = `${bars}마디 · 예상 ${fmtLen(bars * 240 / bpm)} (${fromSong ? '곡 분석 구조 기준 — 곡 길이는 쓰지 않아요 · '
+    : ly.len.value ? '' : `곡 길이 기본 ${fmtLen(LEN_DEFAULT)} 기준 · `}Suno는 ±15초 정도 달라질 수 있어요)`;
+  renderStruct($('#ly-plan-struct'), plan.map((s) => ({ name: s.name, bars: s.bars, inst: !s.key })), fromSong ? '가사 구조 (곡 분석)' : '가사 구조');
+  ly.len.disabled = fromSong;
+  ly.len.title = fromSong ? 'Suno Style Builder 8번의 곡 분석 가사 구조를 쓰는 중이라 곡 길이는 쓰지 않습니다(8번 구조 칩을 끄면 다시 씁니다)' : '';
 }
 
 /* ---------------- 생성 ---------------- */
@@ -153,12 +209,12 @@ async function generateLyrics() {
   const style = ly.style.value.trim();
   if (!style) return flash('스타일이 비어 있습니다. [Style Builder에서 가져오기]를 누르거나 직접 붙여 넣어 주세요.', 'warn');
   const bpm = Math.max(60, Math.min(180, Math.round(+ly.bpm.value) || 120));
-  const plan = planSong(lenSec(), bpm);
-  const sections = uniqueSections(plan);
+  const plan = lyricsPlan(bpm);
+  const sections = uniqueSections(plan, bpm);
   const theme = ly.theme.value.trim();
   const payload = {
     style, theme, sections,
-    length: `about ${fmtLen(totalBars(plan) * 240 / bpm)} at ${bpm} BPM (2 bars per lyric line)`,
+    length: `about ${fmtLen(totalBars(plan) * 240 / bpm)} at ${bpm} BPM (${barsPerLine(bpm) === 1 ? '1 bar' : '2 bars'} per lyric line)`,
     plan: planText(plan),
     ending: plannedEnding(),
     banned: banned.slice(0, 80),
@@ -267,6 +323,7 @@ function renderMode() {
   checkBanned();
 }
 function renderManualFoot() {
+  renderStruct($('#ly-m-struct'), structFromText(lyState.manual.en));
   const count = (t) => t.split('\n').filter((l) => l.trim() && !/^\s*\[.*\]\s*$/.test(l)).length; // 태그 줄([Verse 1] 등)은 빼고 센다
   ly.foot.hidden = false;
   ly.length.textContent = `영어 ${count(lyState.manual.en)}줄 · 한글 ${count(lyState.manual.ko)}줄`;
@@ -292,7 +349,8 @@ function renderLyrics() {
   }));
   ly.title.value = v.title;
 
-  ly.structure.textContent = `구성: ${v.plan.map((s) => `${s.name} ${s.bars}`).join(' · ')} (마디)`;
+  // 만든 가사의 구조(직접 고쳤으면 고친 글의 태그 기준)
+  renderStruct(ly.structure, structFromText(verText(v, 'en')));
   // 생성한 가사를 [섹션 – N Bars] 형식의 글로 펼쳐 '직접 입력'과 같은 두 칸에 보여 준다. 고치면 이 버전에 저장된다
   ly.aiEn.value = verText(v, 'en');
   ly.aiKo.value = verText(v, 'ko');
@@ -345,7 +403,13 @@ function lyricsText(v, lang) {
   v.plan.forEach((s) => {
     out.push(`[${s.name} – ${s.bars} Bars]`);
     if (!s.key) out.push('[Instrumental]');
-    else (v.lyrics[s.key] ?? []).slice(0, s.bars / 2).forEach((l) => out.push(lang === 'ko' ? l.ko : l.en));
+    else {
+      // 그 자리의 마디 수만큼(짧은 자리는 앞쪽 줄만). 줄 수 상한으로 마디가 4마디 이상 남으면 그 뒤는 연주로 표시
+      const bpl = barsPerLine(v.bpm || 120);
+      const lines = (v.lyrics[s.key] ?? []).slice(0, Math.min(LINE_CAP(s.key), Math.max(1, Math.round(s.bars / bpl))));
+      lines.forEach((l) => out.push(lang === 'ko' ? l.ko : l.en));
+      if (s.bars - lines.length * bpl >= 4) out.push('[Instrumental]');
+    }
     out.push('');
   });
   out.push('[End]');
@@ -432,7 +496,7 @@ ly.title.oninput = () => { const v = curVer(); if (v) { v.title = ly.title.value
     if (!v) return;
     v.text = { en: verText(v, 'en'), ko: verText(v, 'ko'), [lang]: ly[el].value };
     saveLy();
-    if (lang === 'en') checkBanned();
+    if (lang === 'en') { checkBanned(); renderStruct(ly.structure, structFromText(ly.aiEn.value)); } // 태그를 고치면 구조도 바로
   };
 });
 $('#ly-copy-en').onclick = () => copyLyrics('en');

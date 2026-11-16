@@ -1104,13 +1104,20 @@ function fromSong() {
   // 불러온 값과 부딪치는 제외 항목은 따로 알리지 않고 아래 알림에 합친다(경고가 바로 덮여 사라지지 않게)
   const freed = resolveConflicts(true);
   commit();
+  // 가사 구조(추정)를 8번 직접 추가로 넣는다(이전 곡에서 넣은 구조는 바꾼다). 칩을 눌러 끄거나 ×로 지울 수 있다
+  const secs = res.partial ? [] : Analyzer.songStructure(res);
+  const others = (sb.custom['8'] ?? []).filter((x) => x.auto !== 'structure');
+  const structEn = secs.length ? `song structure: ${secs.map((x) => x.name.replace(/\s*\d+$/, '').toLowerCase()).join(', ')}` : '';
+  sb.custom = { ...sb.custom, 8: structEn ? [...others, { en: structEn, ko: `곡 분석 가사 구조: ${secs.map((x) => x.name).join(' → ')}`, auto: 'structure', secs: secs.map((x) => ({ name: x.name, bars: x.bars })) }] : others };
+  if (!sb.custom['8'].length) delete sb.custom['8'];
+  commit();
   // 웹에서 찾은 원곡의 주제·리듬·분위기가 있으면 Theme 칸과 제목·가사 탭의 주제·메모에 넣는다
   const w = typeof webInfo !== 'undefined' ? webInfo : null;
   const themed = !!w?.found && themeFromWeb(w);
   if (themed && typeof setLyricsTheme === 'function') {
     setLyricsTheme([w.themeKo && `주제: ${w.themeKo.slice(0, 190)}`, w.rhythmKo && `리듬: ${w.rhythmKo.slice(0, 190)}`, w.moodKo && `분위기: ${w.moodKo.slice(0, 190)}`].filter(Boolean).join('\n'));
   }
-  flash(`"${res.name}" 분석 결과를 불러왔습니다.${added ? ` 4번 장르에 없던 '${g.main.name}'을(를) ${g.main.cat} 탭에 새로 추가했습니다.` : ''}${freed.length ? ` 제외 항목에서 해제: ${freed.join(' · ')}.` : ''}${voice && !sb.vocal ? ' 보컬이 감지되었으니 10번에서 보컬 종류를 골라 주세요.' : ''}${themed ? ' 원곡의 주제·리듬·분위기를 Theme과 제목·가사 탭의 주제·메모에 넣었습니다.' : ' 원곡 정보(②)를 찾지 않아 Theme은 그대로 두었습니다.'}`, 'ok');
+  flash(`"${res.name}" 분석 결과를 불러왔습니다.${added ? ` 4번 장르에 없던 '${g.main.name}'을(를) ${g.main.cat} 탭에 새로 추가했습니다.` : ''}${freed.length ? ` 제외 항목에서 해제: ${freed.join(' · ')}.` : ''}${voice && !sb.vocal ? ' 보컬이 감지되었으니 10번에서 보컬 종류를 골라 주세요.' : ''}${structEn ? ' 가사 구조를 8번에 넣었습니다.' : ''}${themed ? ' 원곡의 주제·리듬·분위기를 Theme과 제목·가사 탭의 주제·메모에 넣었습니다.' : ' 원곡 정보(②)를 찾지 않아 Theme은 그대로 두었습니다.'}`, 'ok');
 }
 
 // 고른 주 악기 + 반주 악기를 믹서로 들어보기(장르를 골랐으면 그 장르의 코드 진행으로)

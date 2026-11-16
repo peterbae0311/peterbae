@@ -35,6 +35,9 @@ is written in Korean. Only "ko" is Korean.
 Write lyrics for the given style, theme and song plan, following every RULE below. The plan lists every section in play
 order with bar counts; you write only the sections in the template, with exactly the given number of lines each.
 Repeated sections (e.g. later choruses) reuse what you write, so write each section once.
+STRUCTURE: the song plan is the required lyric structure (it may come from a reference song). Follow its section order
+exactly and write lyrics that fit each section's role and length. Never add a section that is not in the plan
+(no extra Bridge, Post-Chorus or Outro) and never skip or merge one.
 Before answering, run the SELF-CHECK silently, fix anything that fails, and output only the fixed result.
 
 RULES
@@ -57,7 +60,8 @@ RULES
 - Chorus: it MUST contain at least one memorable hook line, repeated at least twice within the chorus.
   This rule overrides any rule about reducing repetition.
 - Rhyme loosely with similar sounds (slant rhyme). If a rhyme would break grammar or meaning, drop the rhyme.
-- LINE LENGTH (hard limit): each line is sung in about two bars, so no line may exceed 10 words.
+- LINE LENGTH (hard limit): each line is sung in one line slot (1 bar for slow songs, 2 bars otherwise — see
+  Target length; about 3-5 seconds), so no line may exceed 10 words.
   Most lines should be 4-8 words; a 2-3 word line is welcome for contrast. Split long thoughts across two lines.
 
 4. Lyrics, not arrangement
@@ -127,7 +131,7 @@ export async function POST(request: NextRequest) {
   const body = await request.json().catch(() => null);
   const style = str(body?.style, 1200);
   const theme = str(body?.theme, 600); // 웹에서 찾은 원곡 리듬·분위기 설명(2줄)까지 들어올 수 있다
-  const length = str(body?.length, 120); // 예: "about 2:55 at 121 BPM (2 bars per lyric line)"
+  const length = str(body?.length, 120); // 예: "about 2:55 at 121 BPM (2 bars per lyric line)" — 90 BPM 미만은 1 bar
   const plan = str(body?.plan, 600); // 예: "Intro 4 bars (instrumental) > Verse 1 8 > … > Final Chorus 16 (same lyrics as Chorus)"
   const ending = str(body?.ending, 120);
   // 화면의 금지 표현 목록(트렌디하지 않은 단어·클리셰 등). 사용자가 더하고 뺀다

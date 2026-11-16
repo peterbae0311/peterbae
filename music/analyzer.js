@@ -158,6 +158,11 @@ const Analyzer = (() => {
     onProgress?.(0.96, '도입부 분석 중');
     await tick();
     const intro = await runModels(models, melPatches(essentia, lo.signal.subarray(0, INTRO_SECONDS * 16000)));
+    onProgress?.(0.98, '곡 구조 분석 중');
+    await tick();
+    // 두 배로 잡힌 템포면 마디가 반으로 쪼개지므로 보정한 템포로 마디를 센다
+    const tempoForBars = slowTempoFix({ bpm: normalizeBpm(rhythm.bpm), genres }) ? normalizeBpm(rhythm.bpm) / 2 : normalizeBpm(rhythm.bpm);
+    const bars = barFeatures(lo.signal, 16000, tempoForBars);
 
     onProgress?.(1, '완료');
     return {
@@ -168,6 +173,7 @@ const Analyzer = (() => {
       key: key.key, scale: key.scale, keyStrength: key.strength,
       instruments, genres, introInstruments: intro.instruments,
       envelope: loudnessEnvelope(hi.signal, 44100), width: hi.width,
+      bars,
     };
   }
 
@@ -360,6 +366,243 @@ const Analyzer = (() => {
     return false;
   }
 
+  /* ---------------- 가사 구조 추정 ----------------
+   * 곡 전체(16kHz)를 마디 단위로 잘라 마디마다 '화음 색(크로마 12)'과 '소리 색(대역 에너지 20)'·크기를 잰다.
+   *  1) 경계: 마디끼리 닮은 정도 표(자기 유사 행렬)에서 앞뒤가 확 달라지는 지점(체커보드 노벨티)을 찾는다(구간은 4마디 이상)
+   *  2) 이름: 구간끼리 마디 대 마디로 비교해 같은 소리가 반복되는 묶음을 만들고,
+   *     여러 번 나오는 묶음 중 가장 큰 것은 후렴, 그 앞에 반복되는 것은 벌스, 후렴 바로 앞의 짧은 구간은 프리코러스,
+   *     처음·끝의 다른 구간은 인트로·아웃트로, 두 번째 후렴 뒤 한 번만 나오는 구간은 브리지로 본다
+   * 가사를 듣는 것이 아니라 소리의 반복·변화로 추정하므로 틀릴 수 있다(결과 화면에 '추정'으로 표시) */
+  function fft(re, im) {
+    const n = re.length;
+    for (let i = 1, j = 0; i < n; i++) {
+      let bit = n >> 1;
+      for (; j & bit; bit >>= 1) j ^= bit;
+      j ^= bit;
+      if (i < j) { [re[i], re[j]] = [re[j], re[i]]; [im[i], im[j]] = [im[j], im[i]]; }
+    }
+    for (let len = 2; len <= n; len <<= 1) {
+      const ang = (-2 * Math.PI) / len, wr = Math.cos(ang), wi = Math.sin(ang);
+      for (let i = 0; i < n; i += len) {
+        let cr = 1, ci = 0;
+        for (let k = 0; k < len / 2; k++) {
+          const a = i + k, b = a + len / 2;
+          const tr = re[b] * cr - im[b] * ci, ti = re[b] * ci + im[b] * cr;
+          re[b] = re[a] - tr; im[b] = im[a] - ti; re[a] += tr; im[a] += ti;
+          const ncr = cr * wr - ci * wi; ci = cr * wi + ci * wr; cr = ncr;
+        }
+      }
+    }
+  }
+
+  // 마디마다 [크로마 12 + 대역 20] 특징과 크기(dB). 마디 길이는 측정 템포의 4박
+  function barFeatures(sig, sr, bpm) {
+    const N = 2048, HOP = 1024, NB = 20;
+    const win = new Float32Array(N).map((_, i) => 0.5 - 0.5 * Math.cos((2 * Math.PI * i) / N));
+    const binHz = sr / N;
+    const pc = new Int8Array(N / 2).fill(-1);
+    for (let k = 1; k < N / 2; k++) {
+      const f = k * binHz;
+      if (f >= 80 && f <= 5000) pc[k] = ((Math.round(12 * Math.log2(f / 440)) % 12) + 12 + 9) % 12; // C=0
+    }
+    const band = new Int8Array(N / 2);
+    for (let k = 0; k < N / 2; k++) band[k] = Math.min(NB - 1, Math.floor((NB * Math.log(1 + (k * binHz) / 60)) / Math.log(1 + sr / 2 / 60)));
+    const nFrames = Math.floor((sig.length - N) / HOP);
+    const frames = [];
+    const re = new Float32Array(N), im = new Float32Array(N);
+    for (let f = 0; f < nFrames; f++) {
+      let e = 0;
+      for (let i = 0; i < N; i++) { const x = sig[f * HOP + i]; re[i] = x * win[i]; im[i] = 0; e += x * x; }
+      fft(re, im);
+      const chroma = new Float32Array(12), bands = new Float32Array(NB);
+      for (let k = 1; k < N / 2; k++) {
+        const m = re[k] * re[k] + im[k] * im[k];
+        if (pc[k] >= 0) chroma[pc[k]] += Math.sqrt(m);
+        bands[band[k]] += m;
+      }
+      frames.push({ chroma, bands, db: 10 * Math.log10(e / N + 1e-12) });
+    }
+    // 앞의 무음은 건너뛰고 첫 소리부터 마디를 센다
+    let first = 0;
+    while (first < frames.length && frames[first].db < -50) first++;
+    const barFrames = ((240 / (bpm || 120)) * sr) / HOP;
+    const bars = [];
+    for (let b = 0; ; b++) {
+      const a = Math.round(first + b * barFrames), z = Math.round(first + (b + 1) * barFrames);
+      if (z > frames.length) break;
+      const ch = new Float32Array(12), bd = new Float32Array(NB);
+      let db = 0;
+      for (let f = a; f < z; f++) {
+        frames[f].chroma.forEach((v, i) => (ch[i] += v));
+        frames[f].bands.forEach((v, i) => (bd[i] += v));
+        db += frames[f].db;
+      }
+      const cn = Math.hypot(...ch) || 1;
+      bars.push({ t: (a * HOP) / sr, chroma: Array.from(ch, (v) => v / cn), bands: Array.from(bd, (v) => Math.log10(v / (z - a) + 1e-9)), db: db / (z - a) });
+    }
+    return bars;
+  }
+
+  /* 반복 덩어리 방식: 대중가요는 '벌스 → (프리코러스) → 후렴' 덩어리가 통째로 두 번 반복되는 경우가 많다.
+   * 마디 i와 i+L이 닮은 상태가 10마디 이상 이어지는 간격 L을 찾아 두 덩어리를 맞춰 놓고(경계가 어긋나지 않게),
+   * 두 덩어리에서 함께 소리가 바뀌는 지점으로 안을 벌스·프리코러스·후렴으로 나눈다. 못 찾으면 null(아래 구간 방식) */
+  function repeatStructure(S, nov, bars, r) {
+    const n = bars.length;
+    let best = null;
+    for (let L = 12; L <= n - 10; L++) {
+      const rr = Array.from({ length: n - L }, (_, i) => S[i][i + L]);
+      const sm = rr.map((_, i) => avg(rr.slice(Math.max(0, i - 1), i + 2)));
+      let i = 0;
+      while (i < sm.length) {
+        if (sm[i] < 0.6) { i++; continue; }
+        let j = i;
+        while (j + 1 < sm.length && sm[j + 1] >= 0.6) j++;
+        const len = Math.min(j - i + 1, L); // 두 덩어리가 겹치지 않게
+        const mean = avg(rr.slice(i, i + len));
+        if (len >= 10 && mean >= 0.65 && i <= n * 0.3 && (!best || len * mean > best.len * best.mean)) best = { L, p: i, len, mean };
+        i = j + 1;
+      }
+    }
+    if (!best) return null;
+    const { L, p, len } = best;
+    // 덩어리 안 경계: 두 번 다 소리가 바뀌는 곳(노벨티 합). 3마디 이상 떨어진 큰 봉우리 2개까지
+    const c = Array.from({ length: len }, (_, k) => nov[p + k] + (nov[p + L + k] ?? 0));
+    const inner = c.slice(3, len - 2);
+    const cm = avg(inner), cs = Math.sqrt(avg(inner.map((v) => (v - cm) ** 2)));
+    const cand = [];
+    for (let k = 3; k < len - 2; k++) if (c[k] >= c[k - 1] && c[k] >= (c[k + 1] ?? -1) && c[k] > cm + 0.5 * cs) cand.push(k);
+    cand.sort((a, b) => c[b] - c[a]);
+    const cuts = [];
+    for (const k of cand) if (cuts.length < 2 && cuts.every((x) => Math.abs(x - k) >= 3)) cuts.push(k);
+    cuts.sort((a, b) => a - b);
+    const edges = [0, ...cuts, len];
+    const parts = edges.slice(0, -1).map((a, i) => ({ a, z: edges[i + 1] }));
+    const partDb = (pt) => avg([...bars.slice(p + pt.a, p + pt.z), ...bars.slice(p + L + pt.a, p + L + pt.z)].map((b) => b.db));
+    // 후렴: 첫 조각을 뺀 나머지 중 가장 큰 조각(보통 마지막). 그 앞은 벌스 → 프리코러스, 뒤는 포스트코러스
+    let ch = parts.length - 1;
+    if (parts.length > 1) parts.slice(1).forEach((pt, i) => { if (partDb(pt) > partDb(parts[ch]) + 1) ch = i + 1; });
+    const names = (vn) => parts.map((_, i) => (parts.length === 1 ? (partDb(parts[0]) >= avg(bars.map((b) => b.db)) ? 'Chorus' : `Verse ${vn}`)
+      : i === ch ? 'Chorus' : i > ch ? 'Post-Chorus' : i === 0 ? `Verse ${vn}` : 'Pre-Chorus'));
+    const out = [];
+    const sec = (name, a, z) => { if (z > a) out.push({ name, a, z }); };
+    if (p > 6) {
+      let k = 2;
+      for (let i = 2; i <= Math.min(8, p - 2); i++) if (nov[i] > nov[k]) k = i;
+      sec('Intro', 0, k);
+      sec(names(1)[0].startsWith('Verse') ? 'Verse 1' : 'Interlude', k, p);
+    } else sec('Intro', 0, p);
+    names(1).forEach((nm, i) => sec(nm, p + parts[i].a, p + parts[i].z));
+    sec('Interlude', p + len, p + L); // 두 덩어리 사이(간주)
+    names(2).forEach((nm, i) => sec(nm, p + L + parts[i].a, p + L + parts[i].z));
+    // 두 번째 덩어리 뒤: 후렴과 닮은 마디(0.7 이상)가 4마디 넘게 이어지면 후렴, 그 앞은 브리지, 뒤는 아웃트로
+    const restA = p + L + len;
+    if (n - restA > 0) {
+      const chorusBars = [];
+      for (let k = parts[ch].a; k < parts[ch].z; k++) chorusBars.push(p + k);
+      const like = Array.from({ length: n - restA }, (_, k) => Math.max(...chorusBars.map((cb) => S[restA + k][cb])) >= 0.7);
+      let s0 = -1, s1 = -1;
+      for (let k = 0; k < like.length; k++) {
+        if (!like[k]) continue;
+        let e = k;
+        while (e + 1 < like.length && like[e + 1]) e++;
+        if (e - k + 1 >= 4 && (s0 < 0 || e - k > s1 - s0)) { s0 = k; s1 = e; }
+        k = e;
+      }
+      if (n - restA <= 6 && s0 < 0) sec('Outro', restA, n);
+      else if (s0 < 0) { sec('Bridge', restA, Math.max(restA, n - 4)); sec('Outro', Math.max(restA, n - 4), n); }
+      else { sec('Bridge', restA, restA + s0); sec('Chorus', restA + s0, restA + s1 + 1); sec('Outro', restA + s1 + 1, n); }
+    }
+    return out.map((x) => ({ name: x.name, start: bars[x.a].t, end: x.z < n ? bars[x.z].t : r.duration, bars: x.z - x.a }));
+  }
+
+  function songStructure(r) {
+    const bars = r.bars;
+    if (r.partial || !bars || bars.length < 24) return [];
+    const n = bars.length;
+    // 대역 값은 곡 전체 평균·편차로 맞춘 뒤 길이 1로(크로마와 같은 무게)
+    const NB = bars[0].bands.length;
+    const mu = Array.from({ length: NB }, (_, i) => avg(bars.map((b) => b.bands[i])));
+    const sd = Array.from({ length: NB }, (_, i) => Math.sqrt(avg(bars.map((b) => (b.bands[i] - mu[i]) ** 2))) || 1);
+    const feat = bars.map((b) => {
+      const t = b.bands.map((v, i) => (v - mu[i]) / sd[i]);
+      const tn = Math.hypot(...t) || 1;
+      return [...b.chroma, ...t.map((v) => v / tn)];
+    });
+    const sim = (i, j) => feat[i].reduce((s, v, k) => s + v * feat[j][k], 0) / 2; // -1~1
+    const S = Array.from({ length: n }, (_, i) => Array.from({ length: n }, (_, j) => sim(i, j)));
+    // 체커보드 노벨티(반폭 4마디): 앞 4마디끼리·뒤 4마디끼리는 닮고 앞뒤는 다를수록 크다
+    const K = 4;
+    const nov = new Array(n).fill(0);
+    for (let i = K; i <= n - K; i++) {
+      let v = 0;
+      for (let a = -K; a < K; a++) for (let b = -K; b < K; b++) v += ((a < 0) === (b < 0) ? 1 : -1) * S[i + a][i + b];
+      nov[i] = v / (4 * K * K);
+    }
+    const rep = repeatStructure(S, nov, bars, r);
+    if (rep) return finishStructure(rep);
+    // 경계: 4마디 이상 떨어진 노벨티 봉우리(평균보다 뚜렷한 것). 8마디 경계에 가까우면 그쪽으로 붙인다
+    const m = avg(nov.slice(K, n - K)), s2 = Math.sqrt(avg(nov.slice(K, n - K).map((v) => (v - m) ** 2)));
+    let peaks = [];
+    for (let i = K; i <= n - K; i++) if (nov[i] > m + 0.4 * s2 && nov[i] >= nov[i - 1] && nov[i] >= (nov[i + 1] ?? -1)) peaks.push(i);
+    peaks.sort((a, b) => nov[b] - nov[a]);
+    const cuts = [];
+    for (const p of peaks) if (cuts.every((c) => Math.abs(c - p) >= 4)) cuts.push(p);
+    cuts.sort((a, b) => a - b);
+    const edges = [0, ...cuts, n];
+    let segs = edges.slice(0, -1).map((a, i) => ({ a, z: edges[i + 1] }));
+    // 구간끼리 마디 대 마디로 비교(같은 위치끼리 닮은 정도의 평균) → 0.55 이상이면 같은 묶음
+    const segSim = (x, y) => {
+      const L = Math.min(x.z - x.a, y.z - y.a);
+      let v = 0;
+      for (let k = 0; k < L; k++) v += S[x.a + k][y.a + k];
+      return v / L;
+    };
+    let label = 0;
+    segs.forEach((sg, i) => {
+      if (sg.g !== undefined) return;
+      sg.g = label;
+      for (let j = i + 1; j < segs.length; j++) if (segs[j].g === undefined && segSim(sg, segs[j]) >= 0.55) segs[j].g = label;
+      label++;
+    });
+    const db = (sg) => avg(bars.slice(sg.a, sg.z).map((b) => b.db));
+    const groups = [...new Set(segs.map((s) => s.g))].map((g) => {
+      const list = segs.filter((s) => s.g === g);
+      return { g, count: list.length, db: avg(list.map(db)), first: list[0].a };
+    });
+    const repeated = groups.filter((x) => x.count >= 2);
+    const chorusG = repeated.sort((a, b) => b.db - a.db)[0]?.g;
+    const firstChorus = segs.find((s) => s.g === chorusG)?.a ?? n;
+    const verseG = groups.filter((x) => x.count >= 2 && x.g !== chorusG && x.first < firstChorus).sort((a, b) => a.first - b.first)[0]?.g;
+    let verse = 0, chorusSeen = 0;
+    const out = segs.map((sg, i) => {
+      let name;
+      const len = sg.z - sg.a;
+      if (sg.g === chorusG) { chorusSeen++; name = 'Chorus'; }
+      else if (i === 0) name = 'Intro';
+      else if (i === segs.length - 1) name = 'Outro';
+      // 후렴이 두 번 나온 뒤 다시 나오는 벌스 비슷한 구간은 대개 브리지(벌스는 보통 두 번)
+      else if (sg.g === verseG) name = chorusSeen >= 2 && verse >= 2 ? 'Bridge' : `Verse ${++verse}`;
+      else if (segs[i + 1]?.g === chorusG && len <= 8) name = 'Pre-Chorus';
+      else if (chorusSeen >= 2) name = 'Bridge';
+      else if (chorusSeen === 0) name = `Verse ${++verse}`;
+      else name = 'Interlude';
+      return { name, start: bars[sg.a].t, end: sg.z < n ? bars[sg.z].t : r.duration, bars: len };
+    });
+    return finishStructure(out);
+  }
+
+  // 같은 이름이 이어지면 합치고(예: 후렴이 8마디씩 두 조각), 후렴이 두 번 이상이면 마지막을 Final Chorus로
+  function finishStructure(out) {
+    const merged = [];
+    for (const x of out) {
+      const p = merged[merged.length - 1];
+      if (p && p.name === x.name) { p.end = x.end; p.bars += x.bars; } else merged.push({ ...x });
+    }
+    const lc = merged.map((x) => x.name).lastIndexOf('Chorus');
+    if (merged.filter((x) => x.name === 'Chorus').length >= 2 && lc >= 0) merged[lc].name = 'Final Chorus';
+    return merged;
+  }
+
   function styleHints(result, mixer) {
     const r = result;
     const lv = levels(r.envelope);
@@ -431,12 +674,19 @@ const Analyzer = (() => {
   }
 
   /* ---------------- 느린 곡의 두 배 템포 보정 ----------------
-   * 박 간격으로 템포를 재면 느린 발라드의 촘촘한 8분음표를 한 박으로 보고 두 배(예: 68 → 136)로 잡기 쉽다.
-   * 느린 장르 비중이 크고 댄스 장르가 거의 없는데 120 BPM 이상이면 절반으로 본다.
-   * 느린 곡 표본 없이 정한 보수적인 기준이라(빠른 곡 4곡에서 오작동 없음만 확인) 결과 화면의 [½]·[×2]로 언제든 고칠 수 있다 */
-  const SLOW_GENRE = /Ballad|Easy Listening|Lounge|Chanson|Soft Rock|Ambient|Downtempo|Neo Soul|Smooth Jazz|Bossa|Folk|Acoustic/;
-  const DANCE_GENRE = /House|Techno|Trance|Disco|Eurodance|Dance-pop|Drum n Bass|Hip Hop|Trap|Electro|Hardstyle|Breakbeat|Funk|Hi NRG|Italo/;
-  const slowTempoFix = (result) => result.bpm >= 120 && genreSum(result, SLOW_GENRE) >= 0.3 && genreSum(result, DANCE_GENRE) < 0.15;
+   * 박 간격으로 템포를 재면 느린 곡의 촘촘한 8분음표를 한 박으로 보고 두 배(예: 71 → 142)로 잡기 쉽다. 둘 중 하나면 절반으로 본다.
+   *  1) 135 BPM 이상인데 원래 빠른 장르(드럼앤베이스·펑크·메탈·테크노·트랩 등)가 거의 없다
+   *     — 2026-11-16 12곡 시험: 잘못 잡힌 2곡(꿈꾸던 어른이 되었나요 142 → 실제 약 71, Sparkle in Your Eyes 155 → 78)만
+   *       135 이상이었고 제대로 잡힌 10곡은 모두 131 이하였다
+   *  2) 120 BPM 이상이고 느린 장르(발라드·이지리스닝·네오소울 등) 비중이 크며 댄스 장르가 거의 없다
+   * 장르 이름은 '대분류---세부'라 세부 장르만 본다(예전에는 'Electro'가 'Electronic---Downtempo'에도 걸려 2)가 막혔다).
+   * 틀리면 결과 화면의 [½]·[×2]로 언제든 고칠 수 있다 */
+  const SLOW_GENRE = /Ballad|Easy Listening|Lounge|Chanson|Soft Rock|Ambient|Downtempo|Neo Soul|Smooth Jazz|Bossa|Folk|Acoustic|Chillwave|Dream Pop/;
+  const DANCE_GENRE = /House|Techno|Trance|Disco|Eurodance|Dance-pop|Drum n Bass|Hip Hop|Trap|^Electro$|Electro House|Hardstyle|Breakbeat|Funk|Hi NRG|Italo/;
+  const FAST_GENRE = /Drum n Bass|Jungle|Hardcore|Hardstyle|Gabber|Punk|Metal|Thrash|Grindcore|Speedcore|Breakcore|Footwork|Juke|Techno|Trance|Dubstep|Trap|Ska|Bluegrass|Polka|Rockabilly|Surf|^Swing$|Bebop|Hi NRG|Eurobeat/;
+  const subSum = (result, re) => result.genres.slice(0, 15).reduce((s, [c, v]) => (re.test(c.split('---').pop()) ? s + v : s), 0);
+  const slowTempoFix = (result) => (result.bpm >= 135 && subSum(result, FAST_GENRE) < 0.15)
+    || (result.bpm >= 120 && subSum(result, SLOW_GENRE) >= 0.3 && subSum(result, DANCE_GENRE) < 0.15);
 
-  return { analyze, toMixer, introPick, rhythmFeels, styleHints, slowTempoFix, keyShift, warmup: () => Promise.all([loadEssentia(), loadModels()]) };
+  return { analyze, toMixer, introPick, rhythmFeels, styleHints, songStructure, slowTempoFix, keyShift, warmup: () => Promise.all([loadEssentia(), loadModels()]) };
 })();
