@@ -177,6 +177,58 @@ const Analyzer = (() => {
     };
   }
 
+  /* ---------------- 원곡 멜로디 추출 ----------------
+   * 곡의 한 구간(보통 첫 후렴)에서 가장 두드러진 음높이(보컬·주선율)를 Melodia(PredominantPitchMelodia)로 따라가
+   * 음표로 바꾼다. 반주가 섞인 곡에서도 '가장 크게 들리는 선율'을 찾지만, 리버브가 많거나 악기가 겹치면 음이 틀릴 수 있다.
+   *  - 2.9ms마다 음높이(Hz) → MIDI 음, 5프레임 중앙값으로 떨림을 줄인다
+   *  - 반음 0.6 넘게 바뀌거나 소리가 끊기면 새 음표. 90ms보다 짧은 음은 버린다(장식음·잡음)
+   *  - 박자에 맞춰 16분음표 칸으로 반올림한다(구간 시작을 0으로) */
+  async function extractMelody(file, start, dur, bpm) {
+    const essentia = await loadEssentia();
+    const sr = 44100;
+    const { signal } = await decodeMono(await file.arrayBuffer(), sr);
+    const a = Math.max(0, Math.floor(start * sr)), z = Math.min(signal.length, Math.floor((start + dur) * sr));
+    const v = essentia.arrayToVector(signal.subarray(a, z));
+    const eq = essentia.EqualLoudness(v).signal;
+    const r = essentia.PredominantPitchMelodia(eq, 10, 3, 2048, false, 0.8, 128, 1, 40, 20000, 100, 80, 20, 0.9, 0.9, 27.5625, 55, sr, 100, false, 0.2);
+    const hz = essentia.vectorToArray(r.pitch);
+    v.delete?.(); eq.delete?.();
+    const hop = 128 / sr;
+    const raw = Array.from(hz, (f) => (f > 0 ? 69 + 12 * Math.log2(f / 440) : 0));
+    const med = raw.map((m, i) => {
+      if (!m) return 0;
+      const w = raw.slice(Math.max(0, i - 2), i + 3).filter(Boolean).sort((x, y) => x - y);
+      return w[Math.floor(w.length / 2)];
+    });
+    const notes = [];
+    let cur = null;
+    const close = (i) => {
+      if (cur && (i - cur.i0) * hop >= 0.09) {
+        const ms = med.slice(cur.i0, i).filter(Boolean).sort((x, y) => x - y);
+        notes.push({ midi: Math.round(ms[Math.floor(ms.length / 2)]), start: cur.i0 * hop, dur: (i - cur.i0) * hop });
+      }
+      cur = null;
+    };
+    med.forEach((m, i) => {
+      if (!m) { close(i); return; }
+      if (cur && Math.abs(m - cur.ref) > 0.6) close(i);
+      if (!cur) cur = { i0: i, ref: m };
+      else cur.ref = cur.ref * 0.9 + m * 0.1;
+    });
+    close(med.length);
+    // 16분음표 칸으로: 같은 칸에서 시작하면 긴 음만, 겹치면 앞 음을 줄인다
+    const step = 60 / (bpm || 120) / 4;
+    const q = [];
+    for (const n of notes) {
+      const s0 = Math.round(n.start / step), len = Math.max(1, Math.round(n.dur / step));
+      const prev = q[q.length - 1];
+      if (prev && prev.s0 === s0) { if (len > prev.len) Object.assign(prev, { midi: n.midi, len }); continue; }
+      if (prev && prev.s0 + prev.len > s0) prev.len = Math.max(1, s0 - prev.s0);
+      q.push({ midi: n.midi, s0, len });
+    }
+    return { notes: q, step, start, dur };
+  }
+
   /* ---------------- 인식 결과 → 믹서 악기 ---------------- */
 
   // 모델이 아는 40개 악기 중 믹서에 대응하는 악기가 없는 것
@@ -688,5 +740,5 @@ const Analyzer = (() => {
   const slowTempoFix = (result) => (result.bpm >= 135 && subSum(result, FAST_GENRE) < 0.15)
     || (result.bpm >= 120 && subSum(result, SLOW_GENRE) >= 0.3 && subSum(result, DANCE_GENRE) < 0.15);
 
-  return { analyze, toMixer, introPick, rhythmFeels, styleHints, songStructure, slowTempoFix, keyShift, warmup: () => Promise.all([loadEssentia(), loadModels()]) };
+  return { analyze, toMixer, introPick, rhythmFeels, styleHints, songStructure, extractMelody, slowTempoFix, keyShift, warmup: () => Promise.all([loadEssentia(), loadModels()]) };
 })();

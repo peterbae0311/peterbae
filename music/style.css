@@ -559,6 +559,15 @@ body.no-board #board { display: none; } /* 제목·가사·Suno 작곡·인기�
 .ly-struct .sec sub { font-size: 9.5px; margin-left: 2px; vertical-align: -1px; opacity: 0.75; }
 .ly-struct > b, .ly-struct small { white-space: nowrap; }
 .r-row > .ly-struct { flex: 1; min-width: 0; }
+/* 원곡 멜로디(추출) */
+.r-mel { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 6px; }
+.r-mel-bar { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; }
+.r-mel-bar select { padding: 4px 6px; font-size: 12.5px; border-radius: 8px; border: 1px solid var(--line); background: var(--field-bg); color: var(--text); }
+.r-mel-bar .ghost { padding: 4px 10px; font-size: 12.5px; }
+.mel-roll { width: 100%; max-width: 760px; height: auto; background: var(--panel-2); border: 1px solid var(--line); border-radius: 8px; }
+.mel-roll rect { fill: var(--accent); }
+.mel-roll .bar { stroke: var(--line); stroke-width: 1; }
+.r-mel-note { font-size: 11.5px; color: var(--warn-text); line-height: 1.5; }
 .ly-mode-row { display: flex; align-items: center; gap: 8px; margin-bottom: 14px; }
 .ly-mode button { padding: 5px 14px; font-size: 13px; }
 #panel-lyrics.manual .ly-ai-only { display: none; }

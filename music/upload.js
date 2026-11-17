@@ -4,7 +4,7 @@ const ANALYSIS_SCRIPTS = [
   'https://cdn.jsdelivr.net/npm/onnxruntime-web@1.19.2/dist/ort.min.js',
   'https://cdn.jsdelivr.net/npm/essentia.js@0.1.3/dist/essentia-wasm.web.js',
   'https://cdn.jsdelivr.net/npm/essentia.js@0.1.3/dist/essentia.js-core.umd.js',
-  'analyzer.js?v=20261116i',
+  'analyzer.js?v=20261117a',
 ];
 
 const up = {
@@ -64,7 +64,7 @@ async function handleFile(file, { partial = false, source = '' } = {}) {
     if (Analyzer.slowTempoFix(res)) Object.assign(res, { bpm: Math.round(res.bpm / 2), bpmFix: 'auto' });
     const mix = Analyzer.toMixer(res, MAX_ACTIVE);
     const semis = Analyzer.keyShift(res.key, res.scale);
-    last = { res, mix, semis, intro: Analyzer.introPick(res) };
+    last = { res, mix, semis, intro: Analyzer.introPick(res), file }; // file: 원곡 멜로디 추출에 다시 쓴다
     deriveFromBpm();
     // 분석 장르가 기존 세부 장르에 없으면 추천 조합·Style Builder에 새 장르로 추가한다
     const newGenre = genreFromAnalysis(last);
@@ -146,6 +146,7 @@ function renderResult() {
       <div class="r-row"><span class="r-label">분위기</span><div class="chips">${optChips('mood', hints.mood)}${optChips('energy', [hints.energy])}${last.web ? webMark : ''}</div></div>
       <div class="r-row"><span class="r-label">편곡</span><div class="chips">${optChips('arr', hints.arr)}${hints.outro ? optChips('outro', [hints.outro]) : ''}</div></div>
       <div class="r-row"><span class="r-label">가사 구조 <small class="muted">추정</small></span>${structHtml(res)}</div>
+      <div class="r-row"><span class="r-label">원곡 멜로디</span><div class="r-mel" id="r-mel"></div></div>
       <div class="r-row"><span class="r-label">사운드</span><div class="chips">${optChips('mix', hints.mix)}</div></div>
       <div class="r-row"><span class="r-label">인식된 악기</span><div class="chips">${detected}</div></div>
       <div class="r-row"><span class="r-label">켜진 악기</span><div class="chips">${picked}</div></div>
@@ -169,7 +170,109 @@ function renderResult() {
   $('#r-half').onclick = () => scaleBpm(0.5);
   $('#r-double').onclick = () => scaleBpm(2);
   // 원곡과 믹서가 겹쳐 들리지 않게 한쪽만 재생
-  $('audio', up.result).onplay = () => stopTransport();
+  $('audio', up.result).onplay = () => { stopTransport(); melPreviewStop(); };
+  renderMelodyRow();
+}
+
+/* ---------------- 원곡 멜로디 추출 ----------------
+ * 구간(가사 구조 추정에서 고름, 기본은 첫 후렴)의 가장 두드러진 선율(보통 보컬)을 Analyzer.extractMelody로 음표로 뽑는다.
+ * 음표 그림(가로: 16분음표 칸, 세로: 음높이)으로 보여 주고, [▶ 추출 멜로디]·[▶ 원곡 같은 구간]으로 귀로 비교한다.
+ * 추출 멜로디는 믹서 반주 없이 혼자 재생한다(믹서의 기본 코드 진행은 원곡 코드와 달라 부딪친다) */
+const MEL_MAX_SEC = 30; // 한 번에 뽑는 길이(길면 오래 걸림: 30초에 약 7초)
+let melPrev = null; // 재생 중인 추출 멜로디 { synth, timer }
+function melPreviewStop() {
+  if (!melPrev) return;
+  clearTimeout(melPrev.timer);
+  try { melPrev.synth.releaseAll(); melPrev.synth.dispose(); } catch {}
+  melPrev = null;
+  const b = $('#r-mel-play');
+  if (b) b.textContent = '▶ 추출 멜로디';
+}
+function melSections() {
+  const secs = last.res.partial ? [] : Analyzer.songStructure(last.res);
+  const sing = secs.filter((s) => !/^(Intro|Outro|Interlude|Instrumental|Post-Chorus)/.test(s.name));
+  // 구조를 못 찾았으면 곡 가운데 30초
+  if (!sing.length) {
+    const mid = Math.max(0, last.res.duration / 2 - MEL_MAX_SEC / 2);
+    return [{ name: '곡 가운데', start: mid, end: Math.min(last.res.duration, mid + MEL_MAX_SEC) }];
+  }
+  return sing;
+}
+// 음표 그림(SVG): 가장 낮은 음~높은 음을 세로로, 16분음표 칸을 가로로
+function melRollSvg(m) {
+  const notes = m.notes;
+  if (!notes.length) return '<span class="muted">뚜렷한 선율을 찾지 못했습니다</span>';
+  const lo = Math.min(...notes.map((n) => n.midi)) - 1, hi = Math.max(...notes.map((n) => n.midi)) + 1;
+  const steps = Math.max(...notes.map((n) => n.s0 + n.len)) + 1;
+  const W = 760, H = Math.min(150, Math.max(70, (hi - lo + 1) * 6)), cw = W / steps, rh = H / (hi - lo + 1);
+  const NAMES = ['C', 'C#', 'D', 'D#', 'E', 'F', 'F#', 'G', 'G#', 'A', 'A#', 'B'];
+  const bars = [];
+  for (let s = 0; s <= steps; s += 16) bars.push(`<line x1="${s * cw}" y1="0" x2="${s * cw}" y2="${H}" class="bar"/>`);
+  const rects = notes.map((n) => `<rect x="${n.s0 * cw}" y="${(hi - n.midi) * rh}" width="${Math.max(2, n.len * cw - 1)}" height="${Math.max(3, rh - 1)}" rx="1.5"><title>${NAMES[n.midi % 12]}${Math.floor(n.midi / 12) - 1}</title></rect>`);
+  return `<svg class="mel-roll" viewBox="0 0 ${W} ${H}" preserveAspectRatio="none" role="img" aria-label="추출한 멜로디 음표">${bars.join('')}${rects.join('')}</svg>`
+    + `<small class="muted">${notes.length}음 · ${NAMES[lo % 12]}${Math.floor(lo / 12) - 1}~${NAMES[hi % 12]}${Math.floor(hi / 12) - 1} · 세로줄은 마디</small>`;
+}
+function renderMelodyRow() {
+  const box = $('#r-mel');
+  if (!box) return;
+  const secs = melSections();
+  const pick = last.melSec ?? Math.max(0, secs.findIndex((s) => /Chorus/.test(s.name) && !/Pre/.test(s.name)));
+  const opts = secs.map((s, i) => `<option value="${i}"${i === pick ? ' selected' : ''}>${s.name} (${fmtT(s.start)}–${fmtT(Math.min(s.end, s.start + MEL_MAX_SEC))})</option>`).join('');
+  const m = last.melody;
+  box.innerHTML = `<div class="r-mel-bar">
+      <select id="r-mel-sec" aria-label="멜로디를 뽑을 구간">${opts}</select>
+      <button class="ghost" id="r-mel-go">${m ? '다시 추출' : '원곡 멜로디 추출'}</button>
+      ${m ? `<button class="ghost" id="r-mel-play">▶ 추출 멜로디</button><button class="ghost" id="r-mel-orig">▶ 원곡 ${m.name}</button>
+        <button class="ghost" id="r-mel-wav" title="추출 멜로디를 피아노 비슷한 소리로 녹음한 WAV(Suno Upload Audio → Cover용)">WAV 저장</button>
+        <button class="ghost" id="r-mel-mid" title="음표 데이터(MIDI) — GarageBand·FL Studio 등에서 고치거나 악기를 바꿀 때">MIDI 저장</button>` : ''}
+      <small class="muted" id="r-mel-status">${m ? `${m.name} ${fmtT(m.start)}–${fmtT(m.start + m.dur)}에서 뽑은 멜로디` : '구간을 고르면 그 구간의 보컬 등 가장 두드러진 선율을 음표로 뽑습니다(30초에 약 7초)'}</small>
+    </div>${m ? `${melRollSvg(m)}<small class="r-mel-note">⚠ 다른 사람 곡에서 뽑은 멜로디로 새 곡을 만들면 가사·편곡이 달라도 멜로디 표절이 되고, Suno 약관도 권리가 없는 오디오 업로드를 금지합니다. Suno 업로드는 직접 만든 곡에만 쓰세요.</small>` : ''}`;
+  $('#r-mel-sec').onchange = (e) => { last.melSec = +e.target.value; melPreviewStop(); $('audio', up.result)?.pause(); $('#r-mel-go').click(); };
+  $('#r-mel-go').onclick = async () => {
+    const sec = secs[+$('#r-mel-sec').value];
+    last.melSec = +$('#r-mel-sec').value;
+    const btn = $('#r-mel-go');
+    btn.disabled = true;
+    // 추출하는 동안에는 이전 구간 멜로디를 재생하지 못하게 한다
+    ['#r-mel-play', '#r-mel-orig'].forEach((id) => { const b = $(id); if (b) b.disabled = true; });
+    $('#r-mel-status').textContent = `${sec.name} 멜로디 추출 중…`;
+    try {
+      last.melody = await Analyzer.extractMelody(last.file, sec.start, Math.min(MEL_MAX_SEC, sec.end - sec.start), last.res.bpm);
+      last.melody.name = sec.name;
+      renderMelodyRow();
+    } catch (e) {
+      console.error(e);
+      btn.disabled = false;
+      $('#r-mel-status').textContent = `추출하지 못했습니다: ${e.message}`;
+    }
+  };
+  if (!m) return;
+  // ▶ 추출 멜로디: 믹서를 멈추고 부드러운 소리로 한 번 재생
+  $('#r-mel-play').onclick = async () => {
+    if (melPrev) return melPreviewStop();
+    await initAudio();
+    stopTransport();
+    $('audio', up.result)?.pause();
+    const synth = new Tone.PolySynth(Tone.Synth, { oscillator: { type: 'triangle' }, envelope: { attack: 0.02, decay: 0.2, sustain: 0.6, release: 0.3 } }).connect(master);
+    synth.volume.value = -4;
+    const t0 = Tone.now() + 0.1;
+    m.notes.forEach((n) => synth.triggerAttackRelease(Tone.Frequency(n.midi, 'midi').toFrequency(), n.len * m.step * 0.95, t0 + n.s0 * m.step, 0.8));
+    const total = Math.max(...m.notes.map((n) => n.s0 + n.len)) * m.step;
+    melPrev = { synth, timer: setTimeout(melPreviewStop, (total + 0.6) * 1000) };
+    $('#r-mel-play').textContent = '■ 멈춤';
+  };
+  $('#r-mel-wav').onclick = () => saveMelodyWav(m);
+  $('#r-mel-mid').onclick = () => saveMelodyMidi(m);
+  // ▶ 원곡 같은 구간: 원곡 플레이어를 그 구간 시작으로 옮겨 재생하고 구간이 끝나면 멈춘다
+  $('#r-mel-orig').onclick = () => {
+    melPreviewStop();
+    const audio = $('audio', up.result);
+    audio.currentTime = m.start;
+    audio.play();
+    const end = m.start + m.dur;
+    const stopAt = () => { if (audio.currentTime >= end) { audio.pause(); audio.removeEventListener('timeupdate', stopAt); } };
+    audio.addEventListener('timeupdate', stopAt);
+  };
 }
 
 // BPM에 따라 달라지는 추정(리듬의 '드라이빙', 에너지)을 다시 계산한다
@@ -588,3 +691,83 @@ si.find.onclick = async () => {
 
 // 결과가 있을 때 접어 둔 가져오기 칸(파일·링크)을 다시 연다
 $('#src-again').onclick = () => up.panel.classList.add('src-open');
+
+/* ---------------- 추출 멜로디 저장(WAV·MIDI) ---------------- */
+const melFileBase = (m) => `${(last?.res.name ?? 'melody').replace(/\.[a-z0-9]{2,4}$/i, '')} - ${m.name} melody`;
+function downloadBlob(blob, name) {
+  const a = Object.assign(document.createElement('a'), { href: URL.createObjectURL(blob), download: name });
+  document.body.append(a);
+  a.click();
+  a.remove();
+  setTimeout(() => URL.revokeObjectURL(a.href), 2000);
+}
+
+// WAV: 오프라인으로 렌더링(실시간 재생 없이 바로 만듦). 44.1kHz 모노 16비트, 음 사이 여운이 남는 부드러운 건반 소리
+async function saveMelodyWav(m) {
+  const btn = $('#r-mel-wav');
+  btn.disabled = true;
+  btn.textContent = '만드는 중…';
+  try {
+    const total = Math.max(...m.notes.map((n) => n.s0 + n.len)) * m.step + 1.5;
+    const buf = await Tone.Offline(() => {
+      const rev = new Tone.Reverb({ decay: 1.6, wet: 0.18 }).toDestination();
+      const synth = new Tone.PolySynth(Tone.FMSynth, {
+        harmonicity: 2, modulationIndex: 3, oscillator: { type: 'sine' },
+        envelope: { attack: 0.005, decay: 0.9, sustain: 0.25, release: 0.8 },
+        modulationEnvelope: { attack: 0.005, decay: 0.4, sustain: 0.1, release: 0.5 },
+      }).connect(rev);
+      synth.volume.value = -6;
+      m.notes.forEach((n) => synth.triggerAttackRelease(Tone.Frequency(n.midi, 'midi').toFrequency(), n.len * m.step * 0.95, 0.2 + n.s0 * m.step, 0.8));
+    }, total, 1, 44100);
+    const ch = buf.getChannelData(0);
+    const pcm = new DataView(new ArrayBuffer(44 + ch.length * 2));
+    const str = (o, t) => [...t].forEach((c, i) => pcm.setUint8(o + i, c.charCodeAt(0)));
+    str(0, 'RIFF'); pcm.setUint32(4, 36 + ch.length * 2, true); str(8, 'WAVE');
+    str(12, 'fmt '); pcm.setUint32(16, 16, true); pcm.setUint16(20, 1, true); pcm.setUint16(22, 1, true);
+    pcm.setUint32(24, 44100, true); pcm.setUint32(28, 88200, true); pcm.setUint16(32, 2, true); pcm.setUint16(34, 16, true);
+    str(36, 'data'); pcm.setUint32(40, ch.length * 2, true);
+    let peak = 1e-6; // 수십만 개라 Math.max(...배열)은 쓰지 않는다(호출 스택 초과)
+    for (let i = 0; i < ch.length; i++) peak = Math.max(peak, Math.abs(ch[i]));
+    const g = Math.min(1, 0.89 / peak); // -1dB 정도로 맞춘다
+    ch.forEach((x, i) => pcm.setInt16(44 + i * 2, Math.max(-32768, Math.min(32767, Math.round(x * g * 32767))), true));
+    downloadBlob(new Blob([pcm], { type: 'audio/wav' }), `${melFileBase(m)}.wav`);
+    flash('멜로디 WAV를 저장했습니다. Suno에서 Create → Upload Audio로 올린 뒤 Cover하면 됩니다.', 'ok');
+  } catch (e) {
+    console.error(e);
+    flash(`WAV를 만들지 못했습니다: ${e.message}`, 'error');
+  } finally {
+    btn.disabled = false;
+    btn.textContent = 'WAV 저장';
+  }
+}
+
+// MIDI: 표준 MIDI 파일(형식 0) — 템포·4/4 박자표·음표(16분음표 = 120틱, 4분음표 480틱)
+function saveMelodyMidi(m) {
+  const PPQ = 480, T16 = PPQ / 4;
+  const bpm = Math.round(60 / (m.step * 4));
+  const vlq = (n) => { const out = [n & 0x7f]; while ((n >>= 7)) out.unshift((n & 0x7f) | 0x80); return out; };
+  const ev = [];
+  m.notes.forEach((n) => { ev.push({ t: n.s0 * T16, on: true, k: n.midi }); ev.push({ t: (n.s0 + n.len) * T16 - 1, on: false, k: n.midi }); });
+  ev.sort((a, b) => a.t - b.t || (a.on ? 1 : -1)); // 같은 시각이면 끄기를 먼저
+  const name = [...new TextEncoder().encode(melFileBase(m))].slice(0, 120);
+  const usPerQ = Math.round(60000000 / bpm);
+  const trk = [
+    0x00, 0xff, 0x03, ...vlq(name.length), ...name,
+    0x00, 0xff, 0x51, 0x03, (usPerQ >> 16) & 0xff, (usPerQ >> 8) & 0xff, usPerQ & 0xff,
+    0x00, 0xff, 0x58, 0x04, 4, 2, 24, 8,
+    0x00, 0xc0, 0x00, // 악기: 어쿠스틱 그랜드 피아노
+  ];
+  let prev = 0;
+  for (const e of ev) {
+    trk.push(...vlq(Math.max(0, e.t - prev)), e.on ? 0x90 : 0x80, e.k, e.on ? 96 : 0);
+    prev = e.t;
+  }
+  trk.push(0x00, 0xff, 0x2f, 0x00);
+  const u32 = (n) => [(n >>> 24) & 0xff, (n >>> 16) & 0xff, (n >>> 8) & 0xff, n & 0xff];
+  const bytes = new Uint8Array([
+    0x4d, 0x54, 0x68, 0x64, ...u32(6), 0, 0, 0, 1, (PPQ >> 8) & 0xff, PPQ & 0xff,
+    0x4d, 0x54, 0x72, 0x6b, ...u32(trk.length), ...trk,
+  ]);
+  downloadBlob(new Blob([bytes], { type: 'audio/midi' }), `${melFileBase(m)}.mid`);
+  flash(`멜로디 MIDI를 저장했습니다(${bpm} BPM, 4/4).`, 'ok');
+}
