@@ -1105,10 +1105,11 @@ function fromSong() {
   const freed = resolveConflicts(true);
   commit();
   // 가사 구조(추정)를 8번 직접 추가로 넣는다(이전 곡에서 넣은 구조는 바꾼다). 칩을 눌러 끄거나 ×로 지울 수 있다
-  const secs = res.partial ? [] : Analyzer.songStructure(res);
+  // 구간별 노래 흐름을 분석해 두었으면 그 설명(ko·en)도 함께 넘긴다
+  const secs = res.partial ? [] : (last.delivery ?? Analyzer.songStructure(res));
   const others = (sb.custom['8'] ?? []).filter((x) => x.auto !== 'structure');
   const structEn = secs.length ? `song structure: ${secs.map((x) => x.name.replace(/\s*\d+$/, '').toLowerCase()).join(', ')}` : '';
-  sb.custom = { ...sb.custom, 8: structEn ? [...others, { en: structEn, ko: `곡 분석 가사 구조: ${secs.map((x) => x.name).join(' → ')}`, auto: 'structure', secs: secs.map((x) => ({ name: x.name, bars: x.bars })) }] : others };
+  sb.custom = { ...sb.custom, 8: structEn ? [...others, { en: structEn, ko: `곡 분석 가사 구조: ${secs.map((x) => x.name).join(' → ')}`, auto: 'structure', secs: secs.map((x) => ({ name: x.name, bars: x.bars, ...(x.en ? { ko: x.ko, en: x.en } : {}) })) }] : others };
   if (!sb.custom['8'].length) delete sb.custom['8'];
   commit();
   // 웹에서 찾은 원곡의 주제·리듬·분위기가 있으면 Theme 칸과 제목·가사 탭의 주제·메모에 넣는다

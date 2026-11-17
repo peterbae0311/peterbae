@@ -183,7 +183,8 @@ const Analyzer = (() => {
    *  - 2.9ms마다 음높이(Hz) → MIDI 음, 5프레임 중앙값으로 떨림을 줄인다
    *  - 반음 0.6 넘게 바뀌거나 소리가 끊기면 새 음표. 90ms보다 짧은 음은 버린다(장식음·잡음)
    *  - 박자에 맞춰 16분음표 칸으로 반올림한다(구간 시작을 0으로) */
-  async function extractMelody(file, start, dur, bpm) {
+  // 음높이 추적: start초부터 dur초 동안 2.9ms마다 MIDI 음(소리 없으면 0), 5프레임 중앙값으로 떨림을 줄인다
+  async function pitchTrack(file, start, dur) {
     const essentia = await loadEssentia();
     const sr = 44100;
     const { signal } = await decodeMono(await file.arrayBuffer(), sr);
@@ -193,13 +194,17 @@ const Analyzer = (() => {
     const r = essentia.PredominantPitchMelodia(eq, 10, 3, 2048, false, 0.8, 128, 1, 40, 20000, 100, 80, 20, 0.9, 0.9, 27.5625, 55, sr, 100, false, 0.2);
     const hz = essentia.vectorToArray(r.pitch);
     v.delete?.(); eq.delete?.();
-    const hop = 128 / sr;
     const raw = Array.from(hz, (f) => (f > 0 ? 69 + 12 * Math.log2(f / 440) : 0));
     const med = raw.map((m, i) => {
       if (!m) return 0;
       const w = raw.slice(Math.max(0, i - 2), i + 3).filter(Boolean).sort((x, y) => x - y);
       return w[Math.floor(w.length / 2)];
     });
+    return { med, hop: 128 / sr, start: a / sr };
+  }
+
+  async function extractMelody(file, start, dur, bpm) {
+    const { med, hop } = await pitchTrack(file, start, dur);
     const notes = [];
     let cur = null;
     const close = (i) => {
@@ -227,6 +232,70 @@ const Analyzer = (() => {
       q.push({ midi: n.midi, s0, len });
     }
     return { notes: q, step, start, dur };
+  }
+
+
+  /* ---------------- 구간별 노래 흐름 ----------------
+   * 곡 전체 음높이(pitchTrack)와 마디별 크기(r.bars)로 구간마다 '어떻게 부르는지'를 한글·영어 문장으로 만든다.
+   * 구간을 앞·중간·끝 셋으로 나눠 음높이·크기 흐름을 보고, 곡 분위기(단조·감성 계열이면 애절·쓸쓸)를 얹는다.
+   * 값은 곡 안에서의 상대 비교(곡 노래 구간의 중앙값 기준)라 곡마다 기준이 맞춰진다. 소리로 해석한 것이라 실제 느낌과 다를 수 있다 */
+  const pct = (arr, p) => { const a = arr.filter(Boolean).sort((x, y) => x - y); return a.length ? a[Math.min(a.length - 1, Math.floor(a.length * p))] : 0; };
+  function sectionDelivery(r, secs, track, sad) {
+    const pitchIn = (t0, t1) => {
+      const a = Math.max(0, Math.floor((t0 - track.start) / track.hop)), z = Math.min(track.med.length, Math.floor((t1 - track.start) / track.hop));
+      return track.med.slice(a, z);
+    };
+    const dbIn = (t0, t1) => avg(r.bars.filter((b) => b.t >= t0 && b.t < t1).map((b) => b.db));
+    const singing = secs.filter((x) => !/^(Intro|Outro|Interlude|Instrumental|Post-Chorus)/.test(x.name));
+    const allP = singing.flatMap((x) => pitchIn(x.start, x.end));
+    const songMed = pct(allP, 0.5), songHi = pct(allP, 0.9);
+    const songDb = pct(singing.map((x) => dbIn(x.start, x.end)), 0.5);
+    let chorusDb = null;
+    return secs.map((x) => {
+      const span = x.end - x.start;
+      const th = [0, 1, 2].map((k) => {
+        const t0 = x.start + (span * k) / 3, t1 = x.start + (span * (k + 1)) / 3;
+        const p = pitchIn(t0, t1);
+        return { p: pct(p, 0.5), hi: pct(p, 0.9), db: dbIn(t0, t1), voiced: p.filter(Boolean).length / Math.max(1, p.length) };
+      });
+      const P = pct(pitchIn(x.start, x.end), 0.5) - songMed;
+      const L = dbIn(x.start, x.end) - songDb;
+      const rise = th[2].p - th[0].p >= 2 || th[2].db - th[0].db >= 2;
+      const ko = [], en = [];
+      const add = (k, e) => { ko.push(k); en.push(e); };
+      const name = x.name;
+      if (/^Intro/.test(name)) add('악기로 분위기를 여는 도입', 'instrumental opening that sets the mood');
+      else if (/^(Interlude|Instrumental|Post-Chorus)/.test(name)) add('노래를 쉬어 가는 간주', 'instrumental break');
+      else if (/^Outro/.test(name)) add('여운을 남기며 마무리', 'lingering, fading ending');
+      else if (/Chorus$/.test(name) && !/Pre/.test(name)) {
+        const fin = /^Final/.test(name);
+        if (fin && chorusDb !== null && L - chorusDb >= 1) add('가장 크게', 'the biggest, fullest chorus');
+        // 앞: 낮게 시작하면 애절·부드럽게, 높게 시작하면 처음부터 힘차게
+        if (th[0].p && th[0].p <= songMed + 0.5) add(sad ? '초반은 낮고 애절하게' : '초반은 낮고 부드럽게', sad ? 'low and yearning start' : 'low, gentle start');
+        else add('처음부터 힘차게', 'powerful from the first line');
+        // 중간: 곡 최고음 근처면 고음 폭발
+        if (Math.max(th[1].hi, th[1].p) >= songHi - 1) add('중간에서 고음으로 감정 폭발', 'soaring high notes and an emotional peak in the middle');
+        else if (th[1].p - th[0].p >= 1.5) add('중간으로 갈수록 고조', 'building intensity in the middle');
+        // 끝: 중간보다 내려가면 하강
+        if (th[2].p && th[2].p <= th[1].p - 1.5) add(sad ? '마지막은 쓸쓸하고 아름다운 하강 멜로디' : '마지막은 부드럽게 내려앉는 멜로디', sad ? 'wistful, beautiful falling melody at the end' : 'gently falling melody at the end');
+        else add('끝까지 힘 있게', 'strong to the end');
+        if (!fin) chorusDb = L;
+      } else if (/Pre-?Chorus/.test(name)) {
+        if (rise) add('서서히 감정 상승', 'gradual emotional build-up');
+        else add('후렴을 향해 긴장감 유지', 'steady tension leading into the chorus');
+      } else if (/^Bridge/.test(name)) {
+        if (L <= -1.5) add('악기를 덜어 낸 고요한 분위기', 'stripped-back, intimate mood');
+        else add('새로운 분위기로 전환', 'a fresh turn in mood');
+        if (rise) add('점점 고조', 'building up');
+      } else {
+        // 벌스 등: 크기·음높이로 말투를 정한다
+        if (L <= -1 && P <= 0) add('담담하고 절제된 목소리', 'restrained, understated vocals');
+        else if (L >= 1.5) add('힘 있는 목소리', 'strong, confident vocals');
+        else add('이야기하듯 자연스럽게', 'natural, conversational vocals');
+        if (rise) add('뒤로 갈수록 조금씩 고조', 'slowly building toward the end');
+      }
+      return { ...x, ko: ko.join(', '), en: en.join(', ') };
+    });
   }
 
   /* ---------------- 인식 결과 → 믹서 악기 ---------------- */
@@ -740,5 +809,5 @@ const Analyzer = (() => {
   const slowTempoFix = (result) => (result.bpm >= 135 && subSum(result, FAST_GENRE) < 0.15)
     || (result.bpm >= 120 && subSum(result, SLOW_GENRE) >= 0.3 && subSum(result, DANCE_GENRE) < 0.15);
 
-  return { analyze, toMixer, introPick, rhythmFeels, styleHints, songStructure, extractMelody, slowTempoFix, keyShift, warmup: () => Promise.all([loadEssentia(), loadModels()]) };
+  return { analyze, toMixer, introPick, rhythmFeels, styleHints, songStructure, extractMelody, pitchTrack, sectionDelivery, slowTempoFix, keyShift, warmup: () => Promise.all([loadEssentia(), loadModels()]) };
 })();

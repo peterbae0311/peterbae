@@ -97,7 +97,7 @@ function analyzedPlan() {
     const key = /^(Intro|Interlude|Instrumental|Post-Chorus)/i.test(s.name) ? null
       : /Chorus$/i.test(s.name) && !/Pre/i.test(s.name) ? 'Chorus'
       : /Pre-?Chorus/i.test(s.name) ? 'Pre-Chorus' : s.name;
-    return { name: s.name, bars: key ? Math.max(2, s.bars) : Math.max(1, s.bars), key };
+    return { name: s.name, bars: key ? Math.max(2, s.bars) : Math.max(1, s.bars), key, ...(s.en ? { ko: s.ko, en: s.en } : {}) };
   });
 }
 // 가사 구성: 곡 분석 구조가 있으면 그것, 없으면 곡 길이·BPM으로 정한 기본 구성
@@ -160,7 +160,7 @@ function renderStruct(el, secs, label = '가사 구조') {
   secs.forEach((s, i) => {
     if (i) parts.push(Object.assign(document.createElement('span'), { className: 'arr', textContent: '→' }));
     // 한 줄에 들어가게 긴 이름은 줄여 쓰고(마우스를 올리면 전체 이름), 마디 수는 작은 숫자로
-    const c = Object.assign(document.createElement('span'), { className: 'sec', textContent: structShort(s.name), title: s.bars ? `${s.name} · ${s.bars}마디` : s.name });
+    const c = Object.assign(document.createElement('span'), { className: 'sec', textContent: structShort(s.name), title: `${s.name}${s.bars ? ` · ${s.bars}마디` : ''}${s.ko ? ` · ${s.ko}` : ''}` });
     if (s.bars) c.append(Object.assign(document.createElement('sub'), { textContent: s.bars }));
     if (/chorus|hook|drop/i.test(s.name) && !/pre/i.test(s.name)) c.classList.add('chorus');
     if (STRUCT_INST.test(s.name) || s.inst) c.classList.add('inst');
@@ -192,7 +192,7 @@ function renderPlan() {
   const bars = totalBars(plan);
   ly.plan.textContent = `${bars}마디 · 예상 ${fmtLen(bars * 240 / bpm)} (${fromSong ? '곡 분석 구조 기준 — 곡 길이는 쓰지 않아요 · '
     : ly.len.value ? '' : `곡 길이 기본 ${fmtLen(LEN_DEFAULT)} 기준 · `}Suno는 ±15초 정도 달라질 수 있어요)`;
-  renderStruct($('#ly-plan-struct'), plan.map((s) => ({ name: s.name, bars: s.bars, inst: !s.key })), fromSong ? '가사 구조 (곡 분석)' : '가사 구조');
+  renderStruct($('#ly-plan-struct'), plan.map((s) => ({ name: s.name, bars: s.bars, inst: !s.key, ko: s.ko })), fromSong ? '가사 구조 (곡 분석)' : '가사 구조');
   ly.len.disabled = fromSong;
   ly.len.title = fromSong ? 'Suno Style Builder 8번의 곡 분석 가사 구조를 쓰는 중이라 곡 길이는 쓰지 않습니다(8번 구조 칩을 끄면 다시 씁니다)' : '';
 }
@@ -201,7 +201,8 @@ function renderPlan() {
 // 한글·한자·가나: 영어 가사·제목에 섞이면 안 되는 글자(주제가 한글이면 모델이 가끔 그대로 쓴다)
 const NON_EN = /[\u1100-\u11FF\u3040-\u30FF\u3130-\u318F\u3400-\u9FFF\uAC00-\uD7AF\uF900-\uFAFF]/;
 // 모델에 넘기는 전체 구성: "Intro 4 bars (instrumental) > Verse 1 8 bars > … > Final Chorus 16 bars (same lyrics as Chorus)"
-const planText = (plan) => plan.map((s) => `${s.name} ${s.bars} bars${!s.key ? ' (instrumental)' : s.key !== s.name ? ` (same lyrics as ${s.key})` : ''}`).join(' > ');
+// 구간별 노래 흐름(곡 분석)이 있으면 [대괄호] 안에 부르는 방식을 붙인다(예: Chorus 18 bars [low and yearning start, …])
+const planText = (plan) => plan.map((s) => `${s.name} ${s.bars} bars${!s.key ? ' (instrumental)' : s.key !== s.name ? ` (same lyrics as ${s.key})` : ''}${s.en ? ` [${s.en}]` : ''}`).join(' > ');
 // Style Builder에서 고른 끝맺음(영어 문장). '선택 안 함'이면 비워 둔다
 const plannedEnding = () => (typeof OUTRO_EN !== 'undefined' && sb.outro ? OUTRO_EN[sb.outro] ?? '' : '');
 
@@ -401,7 +402,7 @@ function renderBanned() {
 function lyricsText(v, lang) {
   const out = [];
   v.plan.forEach((s) => {
-    out.push(`[${s.name} – ${s.bars} Bars]`);
+    out.push(`[${s.name} – ${s.bars} Bars${s.en ? `: ${s.en}` : ''}]`); // 노래 흐름이 있으면 Suno 태그에 함께
     if (!s.key) out.push('[Instrumental]');
     else {
       // 그 자리의 마디 수만큼(짧은 자리는 앞쪽 줄만). 줄 수 상한으로 마디가 4마디 이상 남으면 그 뒤는 연주로 표시

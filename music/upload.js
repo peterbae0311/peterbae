@@ -4,7 +4,7 @@ const ANALYSIS_SCRIPTS = [
   'https://cdn.jsdelivr.net/npm/onnxruntime-web@1.19.2/dist/ort.min.js',
   'https://cdn.jsdelivr.net/npm/essentia.js@0.1.3/dist/essentia-wasm.web.js',
   'https://cdn.jsdelivr.net/npm/essentia.js@0.1.3/dist/essentia.js-core.umd.js',
-  'analyzer.js?v=20261117a',
+  'analyzer.js?v=20261117b',
 ];
 
 const up = {
@@ -141,13 +141,21 @@ function renderResult() {
       <button class="primary" id="r-apply" title="분석한 악기·BPM·코드 진행으로 되돌려 다시 재생">이 조합 다시 켜기</button>
     </div>
     <div class="r-mid">
+      <section class="r-grp"><h4 class="r-grp-h">곡 성격</h4>
       <div class="r-row"><span class="r-label">장르</span><div class="chips">${genres}</div></div>
       <div class="r-row"><span class="r-label">리듬</span><div class="chips">${optChips('feel', feel)}${last.web ? webMark : ''}</div></div>
       <div class="r-row"><span class="r-label">분위기</span><div class="chips">${optChips('mood', hints.mood)}${optChips('energy', [hints.energy])}${last.web ? webMark : ''}</div></div>
       <div class="r-row"><span class="r-label">편곡</span><div class="chips">${optChips('arr', hints.arr)}${hints.outro ? optChips('outro', [hints.outro]) : ''}</div></div>
-      <div class="r-row"><span class="r-label">가사 구조 <small class="muted">추정</small></span>${structHtml(res)}</div>
-      <div class="r-row"><span class="r-label">원곡 멜로디</span><div class="r-mel" id="r-mel"></div></div>
       <div class="r-row"><span class="r-label">사운드</span><div class="chips">${optChips('mix', hints.mix)}</div></div>
+      </section>
+      <section class="r-grp"><h4 class="r-grp-h">곡 구조 <small class="muted">추정</small></h4>
+      <div class="r-row"><span class="r-label">가사 구조</span>${structHtml(res)}</div>
+      <div class="r-row"><span class="r-label">노래 흐름</span><div class="r-deliv" id="r-deliv"></div></div>
+      </section>
+      <section class="r-grp"><h4 class="r-grp-h">원곡 멜로디</h4>
+      <div class="r-row"><span class="r-label">구간 멜로디</span><div class="r-mel" id="r-mel"></div></div>
+      </section>
+      <section class="r-grp"><h4 class="r-grp-h">악기</h4>
       <div class="r-row"><span class="r-label">인식된 악기</span><div class="chips">${detected}</div></div>
       <div class="r-row"><span class="r-label">켜진 악기</span><div class="chips">${picked}</div></div>
       <div class="r-row"><span class="r-label">도입부 악기</span><div class="chips">${
@@ -156,7 +164,8 @@ function renderResult() {
         : intro ? `<span class="chip on" style="--c:${catById[byId[intro.id].cat].color}" title="앞 6초에서 가장 두드러진 악기">${byId[intro.id].ko}</span>`
         : '<span class="muted">뚜렷한 악기가 없습니다</span>'}</div></div>
       ${unsupported.length ? `<p class="muted r-note">${unsupported.join(', ')}은(는) 믹서에 없는 악기라 제외했습니다.</p>` : ''}
-      <p class="muted r-note">분석으로 추정한 값입니다.${res.partial ? ' 곡 일부를 녹음해서 페이드아웃·브레이크다운·점점 고조는 판단하지 않았습니다.' : ''} Suno 스타일은 Suno Style Builder 탭의 [곡 분석 불러오기]로 이 값을 가져와 보컬·Theme과 함께 만듭니다(가사 구조는 8번에 들어갑니다).</p>
+      </section>
+      <p class="muted r-note">분석으로 추정한 값입니다.${res.partial ? ' 곡 일부를 녹음해서 페이드아웃·브레이크다운·점점 고조는 판단하지 않았습니다.' : ''} Suno 스타일은 Suno Style Builder 탭의 [곡 분석 불러오기]로 이 값을 가져와 보컬·Theme과 함께 만듭니다(가사 구조는 8번, 노래 흐름은 가사 태그에 들어갑니다).</p>
     </div>`;
   up.result.hidden = false;
   // ② 원곡 정보는 처음부터 ①과 함께 보인다. 이미 찾은 웹 결과가 있으면 ③ 선택 상태를 새 결과에 맞춰 다시 그린다
@@ -172,6 +181,41 @@ function renderResult() {
   // 원곡과 믹서가 겹쳐 들리지 않게 한쪽만 재생
   $('audio', up.result).onplay = () => { stopTransport(); melPreviewStop(); };
   renderMelodyRow();
+  renderDelivery();
+}
+
+/* ---------------- 구간별 노래 흐름 ----------------
+ * 곡 전체 음높이를 따라가(약 30~40초) 구간마다 어떻게 부르는지(담담하게·서서히 상승·고음 폭발·하강 멜로디 등)를 보여 준다.
+ * 결과(last.delivery)는 [곡 분석 불러오기] 때 8번 구조와 함께 넘어가 가사 태그 [Verse 1 – 8 Bars: …]와 가사 생성 지시에 쓰인다 */
+function renderDelivery() {
+  const box = $('#r-deliv');
+  if (!box) return;
+  if (last.res.partial) { box.innerHTML = '<span class="muted">곡 일부를 녹음해서 판단하지 않았습니다</span>'; return; }
+  const d = last.delivery;
+  if (!d) {
+    box.innerHTML = `<div class="r-mel-bar"><button class="ghost" id="r-deliv-go">구간별 노래 흐름 분석</button>
+      <small class="muted" id="r-deliv-status">곡 전체 멜로디를 따라가 구간마다 어떻게 부르는지 정리합니다(약 30~40초)</small></div>`;
+    $('#r-deliv-go').onclick = async () => {
+      const btn = $('#r-deliv-go');
+      btn.disabled = true;
+      $('#r-deliv-status').textContent = '곡 전체 멜로디를 따라가는 중… (약 30~40초)';
+      try {
+        const secs = Analyzer.songStructure(last.res);
+        if (!secs.length) throw new Error('가사 구조를 찾지 못했습니다');
+        const track = await Analyzer.pitchTrack(last.file, 0, last.res.duration);
+        const sad = last.res.scale === 'minor' || (last.hints?.mood ?? []).some((m) => ['melancholic', 'emotional', 'yearning', 'lonely', 'wistful', 'poignant', 'bittersweet', 'dreamy'].includes(m));
+        last.delivery = Analyzer.sectionDelivery(last.res, secs, track, sad);
+        renderDelivery();
+      } catch (e) {
+        console.error(e);
+        btn.disabled = false;
+        $('#r-deliv-status').textContent = `분석하지 못했습니다: ${e.message}`;
+      }
+    };
+    return;
+  }
+  box.innerHTML = `<ol class="r-deliv-list">${d.map((x) => `<li><span class="sec${/Chorus/.test(x.name) && !/Pre/.test(x.name) ? ' chorus' : ''}${/^(Intro|Outro|Interlude)/.test(x.name) ? ' inst' : ''}">${x.name}</span>
+      <span class="r-deliv-ko">${x.ko}</span><small class="muted" title="Suno 가사 태그에 들어가는 영어 설명">${x.en}</small></li>`).join('')}</ol>`;
 }
 
 /* ---------------- 원곡 멜로디 추출 ----------------
