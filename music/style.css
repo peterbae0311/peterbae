@@ -593,6 +593,7 @@ body.no-board #board { display: none; } /* 제목·가사·Suno 작곡·인기�
 .mel-roll rect { fill: var(--accent); }
 .mel-roll .bar { stroke: var(--line); stroke-width: 1; }
 .r-mel-note { font-size: 11.5px; color: var(--warn-text); line-height: 1.5; }
+.r-mel-opt { display: inline-flex; align-items: center; gap: 4px; font-size: 12px; color: var(--muted); cursor: pointer; }
 .ly-mode-row { display: flex; align-items: center; gap: 8px; margin-bottom: 14px; }
 .ly-mode button { padding: 5px 14px; font-size: 13px; }
 #panel-lyrics.manual .ly-ai-only { display: none; }

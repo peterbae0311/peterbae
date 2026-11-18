@@ -271,6 +271,8 @@ function renderMelodyRow() {
       <button class="ghost" id="r-mel-go">${m ? '다시 추출' : '원곡 멜로디 추출'}</button>
       ${m ? `<button class="ghost" id="r-mel-play">▶ 추출 멜로디</button><button class="ghost" id="r-mel-orig">▶ 원곡 ${m.name}</button>
         <button class="ghost" id="r-mel-wav" title="추출 멜로디를 피아노 비슷한 소리로 녹음한 WAV(Suno Upload Audio → Cover용)">WAV 저장</button>
+        <label class="r-mel-opt" title="첫 음 바로 앞부터 마지막 음 뒤까지만 저장합니다(앞쪽 인트로·끝의 무음을 뺌)"><input type="checkbox" id="r-mel-trim"${wavOpt.trim ? ' checked' : ''}> 앞뒤 무음 자르기</label>
+        <label class="r-mel-opt" title="멜로디 아래에 작은 4박 클릭을 깔아 Suno가 템포를 잡게 합니다(마디 첫 박은 조금 크게)"><input type="checkbox" id="r-mel-click"${wavOpt.click ? ' checked' : ''}> 박자 클릭 넣기</label>
         <button class="ghost" id="r-mel-mid" title="음표 데이터(MIDI) — GarageBand·FL Studio 등에서 고치거나 악기를 바꿀 때">MIDI 저장</button>` : ''}
       <small class="muted" id="r-mel-status">${m ? `${m.name} ${fmtT(m.start)}–${fmtT(m.start + m.dur)}에서 뽑은 멜로디` : '구간을 고르면 그 구간의 보컬 등 가장 두드러진 선율을 음표로 뽑습니다(30초에 약 7초)'}</small>
     </div>${m ? `${melRollSvg(m)}<small class="r-mel-note">⚠ 다른 사람 곡에서 뽑은 멜로디로 새 곡을 만들면 가사·편곡이 달라도 멜로디 표절이 되고, Suno 약관도 권리가 없는 오디오 업로드를 금지합니다. Suno 업로드는 직접 만든 곡에만 쓰세요.</small>` : ''}`;
@@ -313,6 +315,8 @@ function renderMelodyRow() {
     $('#r-mel-play').textContent = '■ 멈춤';
   };
   $('#r-mel-wav').onclick = () => saveMelodyWav(m);
+  $('#r-mel-trim').onchange = (e) => { wavOpt.trim = e.target.checked; saveWavOpt(); };
+  $('#r-mel-click').onchange = (e) => { wavOpt.click = e.target.checked; saveWavOpt(); };
   $('#r-mel-mid').onclick = () => saveMelodyMidi(m);
   // ▶ 원곡 같은 구간: 원곡 플레이어를 그 구간 시작으로 옮겨 재생하고 구간이 끝나면 멈춘다
   $('#r-mel-orig').onclick = () => {
@@ -754,12 +758,24 @@ function downloadBlob(blob, name) {
 }
 
 // WAV: 오프라인으로 렌더링(실시간 재생 없이 바로 만듦). 44.1kHz 모노 16비트, 음 사이 여운이 남는 부드러운 건반 소리
+// WAV 옵션(기억함): 앞뒤 무음 자르기(기본 켬) · 박자 클릭 넣기(기본 끔)
+const WAV_OPT_KEY = 'music.melody.wavOpt';
+let wavOpt = { trim: true, click: false };
+try { Object.assign(wavOpt, JSON.parse(localStorage.getItem(WAV_OPT_KEY) || '{}')); } catch {}
+const saveWavOpt = () => { try { localStorage.setItem(WAV_OPT_KEY, JSON.stringify(wavOpt)); } catch {} };
+
 async function saveMelodyWav(m) {
   const btn = $('#r-mel-wav');
   btn.disabled = true;
   btn.textContent = '만드는 중…';
   try {
-    const total = Math.max(...m.notes.map((n) => n.s0 + n.len)) * m.step + 1.5;
+    const lastStep = Math.max(...m.notes.map((n) => n.s0 + n.len));
+    const firstStep = Math.min(...m.notes.map((n) => n.s0));
+    // 자르기: 클릭을 넣으면 첫 음이 든 마디의 첫 박부터(박자가 맞게), 아니면 첫 음 바로 앞부터. 끝은 마지막 음 + 여운 1초
+    const from = !wavOpt.trim ? 0 : wavOpt.click ? Math.floor(firstStep / 16) * 16 : firstStep;
+    const lead = wavOpt.trim && !wavOpt.click ? 0.2 : 0;
+    const total = (lastStep - from) * m.step + lead + (wavOpt.trim ? 1.0 : 1.5);
+    const t = (step) => lead + (step - from) * m.step;
     const buf = await Tone.Offline(() => {
       const rev = new Tone.Reverb({ decay: 1.6, wet: 0.18 }).toDestination();
       const synth = new Tone.PolySynth(Tone.FMSynth, {
@@ -768,7 +784,17 @@ async function saveMelodyWav(m) {
         modulationEnvelope: { attack: 0.005, decay: 0.4, sustain: 0.1, release: 0.5 },
       }).connect(rev);
       synth.volume.value = -6;
-      m.notes.forEach((n) => synth.triggerAttackRelease(Tone.Frequency(n.midi, 'midi').toFrequency(), n.len * m.step * 0.95, 0.2 + n.s0 * m.step, 0.8));
+      m.notes.forEach((n) => synth.triggerAttackRelease(Tone.Frequency(n.midi, 'midi').toFrequency(), n.len * m.step * 0.95, (wavOpt.trim ? t(n.s0) : 0.2 + n.s0 * m.step), 0.8));
+      // 박자 클릭: 4분음표마다 짧은 '똑' 소리. 마디 첫 박(16칸마다)은 높고 조금 크게
+      if (wavOpt.click) {
+        const click = new Tone.Synth({ oscillator: { type: 'sine' }, envelope: { attack: 0.001, decay: 0.04, sustain: 0, release: 0.02 } }).toDestination();
+        click.volume.value = -20;
+        const startStep = wavOpt.trim ? from : 0;
+        for (let st = startStep; st <= lastStep; st += 4) {
+          const accent = st % 16 === 0;
+          click.triggerAttackRelease(accent ? 1760 : 1320, 0.03, wavOpt.trim ? t(st) : 0.2 + st * m.step, accent ? 1 : 0.6);
+        }
+      }
     }, total, 1, 44100);
     const ch = buf.getChannelData(0);
     const pcm = new DataView(new ArrayBuffer(44 + ch.length * 2));
@@ -782,7 +808,7 @@ async function saveMelodyWav(m) {
     const g = Math.min(1, 0.89 / peak); // -1dB 정도로 맞춘다
     ch.forEach((x, i) => pcm.setInt16(44 + i * 2, Math.max(-32768, Math.min(32767, Math.round(x * g * 32767))), true));
     downloadBlob(new Blob([pcm], { type: 'audio/wav' }), `${melFileBase(m)}.wav`);
-    flash('멜로디 WAV를 저장했습니다. Suno에서 Create → Upload Audio로 올린 뒤 Cover하면 됩니다.', 'ok');
+    flash(`멜로디 WAV를 저장했습니다(${fmtT(total)}${wavOpt.trim ? ' · 앞뒤 무음 자름' : ''}${wavOpt.click ? ' · 박자 클릭' : ''}). Suno에서 Create → Upload Audio로 올린 뒤 Cover하면 됩니다.`, 'ok');
   } catch (e) {
     console.error(e);
     flash(`WAV를 만들지 못했습니다: ${e.message}`, 'error');
