@@ -894,6 +894,85 @@ const styleLines = (s, steps = SB_STEPS) => steps
   .filter(([, v]) => v.length)
   .map(([st, v]) => `${st.n}.${st.title} : ${v.join(', ')}`);
 
+/* ---------------- 한글 내용 ----------------
+ * 영어 스타일과 같은 항목 순서로, 고른 값의 한글 이름을 모은다(서버 번역 없이 바로). 직접 추가 값은 한글로 적은 원문이 있으면 그것,
+ * Theme은 '주제: …' 같은 한글 줄, 곡 분석 장르처럼 한글 이름이 없는 값은 영어 그대로 */
+const optKo = (key, en) => SB_STEPS.flatMap((st) => st.groups).find((g) => g.key === key)?.options?.find((o) => o.en === en)?.ko ?? en;
+// 곡 분석에서 온 인트로(예: 'drum fill and upright bass')는 선택지에 없어서 악기 이름을 한글로 바꿔 보인다
+const introKo = (v) => {
+  const known = optKo('intro', v);
+  if (known !== v) return known;
+  const term = (t) => byId[Object.keys(SUNO_TERM).find((id) => SUNO_TERM[id] === t)]?.ko ?? t;
+  return v.split(' and ').map((p) => (p === 'drum fill' ? '드럼 필' : term(p))).join(' + ');
+};
+function stepValuesKo(n, s = sb) {
+  const ko = (key, arr) => arr.filter(Boolean).map((v) => optKo(key, v));
+  const custom = (s.custom?.[n] ?? []).filter((x) => !x.off).map((x) => x.ko || x.en);
+  const inst = (id) => byId[id]?.ko ?? id;
+  switch (n) {
+    case 1: return [s.intro && `인트로: ${introKo(s.intro)}`, s.outro && `아웃트로: ${optKo('outro', s.outro)}`, ...custom];
+    case 2: return [s.main && inst(s.main), ...custom];
+    case 3: return [`${s.bpm} BPM`, ...ko('feel', s.feel), ...custom];
+    case 4: return [s.genre, s.genreCustom && `분석: ${s.genreCustom}`, ...custom];
+    case 5: return [...s.support.map(inst), ...custom];
+    case 6: return [...ko('mood', s.mood), s.energy && `에너지 ${optKo('energy', s.energy)}`, ...custom];
+    case 7: return [s.key && optKo('key', s.key), ...ko('harmony', s.harmony), ...custom];
+    case 8: return [...ko('arr', s.arr), ...custom];
+    case 9: return [...ko('mix', s.mix), ...custom];
+    case 10: return s.vocal === 'instrumental' ? ['연주곡', ...custom] : [[...ko('tone', s.tone), s.vocal && optKo('vocal', s.vocal)].filter(Boolean).join(' '), s.lang && optKo('lang', s.lang), ...custom];
+    default: return [];
+  }
+}
+function styleKo(s = sb) {
+  const theme = concept.split('\n').map((l) => l.trim()).filter((l) => l && HANGUL.test(l));
+  const lines = theme.length ? [`Theme : ${theme.join(' / ')}`] : conceptParts().length ? [`Theme : ${conceptParts().join(' / ')}`] : [];
+  SB_STEPS.filter((st) => st.n !== 11).forEach((st) => {
+    const v = stepValuesKo(st.n, s).filter(Boolean);
+    if (v.length) lines.push(`${st.n}.${st.ko} : ${v.join(', ')}`);
+  });
+  const excl = exclKo(s);
+  if (excl.length) lines.push(`제외 : ${excl.join(', ')}`);
+  return lines.join('\n');
+}
+const exclKo = (s) => [...new Set([...s.excl.map((x) => optKo('excl', x)), ...(s.custom?.[11] ?? []).filter((x) => !x.off).map((x) => x.ko || x.en), ...(s.vocal === 'instrumental' ? ['보컬'] : [])])];
+
+// 조사: 마지막 글자 받침에 맞춰 이/가, 으로/로를 고른다(한글이 아니면 '이(가)'처럼 둘 다)
+function josa(word, withB, withoutB) {
+  const c = word.trim().slice(-1).charCodeAt(0) - 0xac00;
+  if (c < 0 || c > 11171) return `${word}${withB}(${withoutB})`.replace('으로(로)', '(으)로');
+  const b = c % 28;
+  if (withB === '으로' && (b === 0 || b === 8)) return `${word}로`; // 받침 없음·ㄹ받침
+  return `${word}${b ? withB : withoutB}`;
+}
+// 문장형(한글): 영어 문장형과 같은 순서로 — 분위기·장르·빠르기 → 시작 → 악기 → 화성 → 편곡 → 사운드 → 보컬 → 끝맺음
+function styleKoProse(s = sb) {
+  const v = (n) => stepValuesKo(n, s).filter(Boolean);
+  const custom = (n) => (s.custom?.[n] ?? []).filter((x) => !x.off).map((x) => x.ko || x.en);
+  const out = [];
+  const theme = concept.split('\n').map((l) => l.trim()).filter((l) => l && HANGUL.test(l));
+  if (theme.length) out.push(`${theme.join(' / ')}.`);
+  else if (conceptParts().length) out.push(`${conceptParts().join('. ')}.`);
+  const mood = s.mood.map((m) => optKo('mood', m));
+  const genre = [s.genre, s.genreCustom, ...custom(4)].filter(Boolean).join('·');
+  const head = [mood.length ? `${mood.join('·')} 분위기` : '', s.energy ? `에너지 ${optKo('energy', s.energy)}` : '', ...custom(6)].filter(Boolean).join(', ');
+  const tempo = [`${s.bpm} BPM`, ...s.feel.map((f) => `${optKo('feel', f)} 리듬`), ...custom(3)].join(', ');
+  out.push(`${[head, genre && `${genre} 곡`].filter(Boolean).join('의 ') || '곡'}, ${tempo}.`);
+  if (s.intro) out.push(`${josa(introKo(s.intro), '으로', '로')} 바로 시작.`);
+  const mains = [s.main && (byId[s.main]?.ko ?? s.main), ...custom(2)].filter(Boolean);
+  const support = [...s.support.map((id) => byId[id]?.ko ?? id), ...custom(5)];
+  if (mains.length) out.push(`${josa(mains.join('·'), '이', '가')} 곡을 이끌고${support.length ? ` ${josa(support.join('·'), '이', '가')} 받쳐 줌` : ''}.`);
+  else if (support.length) out.push(`${support.join('·')} 편성.`);
+  if (v(7).length) out.push(`${v(7).join(', ')}.`);
+  if (v(8).length) out.push(`${v(8).join(', ')}.`);
+  if (v(9).length) out.push(`${v(9).join(', ')}.`);
+  if (v(10).length) out.push(s.vocal === 'instrumental' ? '보컬 없는 연주곡.' : `${v(10).join(', ')} 보컬.`);
+  if (s.outro) out.push(`${josa(optKo('outro', s.outro), '으로', '로')} 마무리.`);
+  custom(1).forEach((c) => out.push(`${c}.`));
+  const excl = exclKo(s);
+  if (excl.length) out.push(`제외: ${excl.join(', ')}.`);
+  return out.join(' ');
+}
+
 /* ---------------- 문장형 출력 ----------------
  * 같은 선택값을 Suno가 읽기 좋은 영어 문장으로 쓴다. 앞쪽 단어일수록 영향이 커서 분위기·장르·BPM·리듬을 첫 문장에 모으고,
  * 항목 이름(1.Intro 등)은 지시가 아니라 단어로 읽히므로 넣지 않는다 */
@@ -955,6 +1034,9 @@ const styleState = () => JSON.stringify({ sb, concept });
 let styleOut = { list: '', prose: '', excl: '' };
 function showStyle() {
   $('#sb-style').value = styleOut[styleFmt] ?? '';
+  // 한글도 목록형·문장형 토글을 따른다(예전 저장값은 문자열 하나)
+  const ko = styleOut.ko;
+  $('#sb-style-ko').value = styleOut[styleFmt] ? (typeof ko === 'string' ? ko : ko?.[styleFmt] ?? '') : '';
   $('#sb-excl').value = styleOut.excl ?? '';
   $('#sb-fmt').querySelectorAll('[data-fmt]').forEach((x) => x.setAttribute('aria-selected', String(x.dataset.fmt === styleFmt)));
   renderStyleCount();
@@ -1004,7 +1086,7 @@ function generateStyle() {
   const conceptLine = (ps) => (ps.length ? [`Theme : ${ps.map((p) => `${p}.`).join(' ')}`] : []);
   const list = fitStyle((s, ps) => [...conceptLine(ps), ...styleLines(s, steps)].join('\n'), sb, parts);
   const prose = fitStyle((s, ps) => styleProse(s, ps, { withExcl: false }), sb, parts);
-  styleOut = { list: list.text, prose: prose.text, cut: { list: list.cut, prose: prose.cut }, excl: excludeWords(sb).join(', ') };
+  styleOut = { list: list.text, prose: prose.text, cut: { list: list.cut, prose: prose.cut }, excl: excludeWords(sb).join(', '), ko: { list: styleKo(), prose: styleKoProse() } };
   styleSnapshot = styleState();
   try { localStorage.setItem('music.suno.styleOut', JSON.stringify(styleOut)); localStorage.setItem('music.suno.styleSnap', styleSnapshot); } catch {}
   showStyle();
@@ -1159,6 +1241,7 @@ $('#sb-reset').onclick = () => {
 };
 $('#sb-gen').onclick = generateStyle;
 $('#sb-copy-style').onclick = () => copyOut('sb-style', 'Style of Music');
+$('#sb-copy-ko').onclick = () => copyOut('sb-style-ko', '스타일(한글)');
 $('#sb-copy-excl').onclick = () => copyOut('sb-excl', 'Exclude Styles');
 $('#sb-clear-style').onclick = clearStyle;
 try {

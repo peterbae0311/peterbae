@@ -474,6 +474,9 @@ body.has-solo .card.active:not(.soloed) .solo { color: var(--text); }
 #sb-style-count:empty { display: none; }
 .sb-where { font-size: 12px; color: var(--subtle); }
 #sb-style { min-height: 300px; }
+/* Style of Music 한글(뜻 확인용) */
+.sb-ko-head { margin-top: 10px; }
+#sb-style-ko { min-height: 230px; background: var(--panel-2); }
 .sb-field textarea {
   width: 100%; resize: vertical; background: var(--field-bg); color: var(--text); border: 1px solid var(--line); border-radius: 8px;
   padding: 9px 10px; font: 12.5px/1.55 ui-monospace, 'Cascadia Mono', Consolas, monospace;
