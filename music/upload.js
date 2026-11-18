@@ -4,7 +4,7 @@ const ANALYSIS_SCRIPTS = [
   'https://cdn.jsdelivr.net/npm/onnxruntime-web@1.19.2/dist/ort.min.js',
   'https://cdn.jsdelivr.net/npm/essentia.js@0.1.3/dist/essentia-wasm.web.js',
   'https://cdn.jsdelivr.net/npm/essentia.js@0.1.3/dist/essentia.js-core.umd.js',
-  'analyzer.js?v=20261117b',
+  'analyzer.js?v=20261118a',
 ];
 
 const up = {
@@ -202,7 +202,8 @@ function renderDelivery() {
       try {
         const secs = Analyzer.songStructure(last.res);
         if (!secs.length) throw new Error('가사 구조를 찾지 못했습니다');
-        const track = await Analyzer.pitchTrack(last.file, 0, last.res.duration);
+        // 곡 전체 음높이: 원곡 멜로디 '곡 전체'에서 이미 땄으면 그대로(서로 다시 쓴다)
+        const track = last.track ?? (last.track = await Analyzer.pitchTrack(last.file, 0, last.res.duration));
         const sad = last.res.scale === 'minor' || (last.hints?.mood ?? []).some((m) => ['melancholic', 'emotional', 'yearning', 'lonely', 'wistful', 'poignant', 'bittersweet', 'dreamy'].includes(m));
         last.delivery = Analyzer.sectionDelivery(last.res, secs, track, sad);
         renderDelivery();
@@ -240,7 +241,8 @@ function melSections() {
     const mid = Math.max(0, last.res.duration / 2 - MEL_MAX_SEC / 2);
     return [{ name: '곡 가운데', start: mid, end: Math.min(last.res.duration, mid + MEL_MAX_SEC) }];
   }
-  return sing;
+  // 곡 전체: 맨 앞에 둔다(길어서 약 40~50초. 노래 흐름 분석을 해 두었으면 그 결과를 써서 바로)
+  return [{ name: '곡 전체', start: 0, end: last.res.duration, full: true }, ...sing];
 }
 // 음표 그림(SVG): 가장 낮은 음~높은 음을 세로로, 16분음표 칸을 가로로
 function melRollSvg(m) {
@@ -248,12 +250,13 @@ function melRollSvg(m) {
   if (!notes.length) return '<span class="muted">뚜렷한 선율을 찾지 못했습니다</span>';
   const lo = Math.min(...notes.map((n) => n.midi)) - 1, hi = Math.max(...notes.map((n) => n.midi)) + 1;
   const steps = Math.max(...notes.map((n) => n.s0 + n.len)) + 1;
-  const W = 760, H = Math.min(150, Math.max(70, (hi - lo + 1) * 6)), cw = W / steps, rh = H / (hi - lo + 1);
+  // 길면(곡 전체) 16분음표 한 칸에 3px로 넓게 그리고 옆으로 밀어 본다
+  const W = Math.max(760, steps * 3), H = Math.min(150, Math.max(70, (hi - lo + 1) * 6)), cw = W / steps, rh = H / (hi - lo + 1);
   const NAMES = ['C', 'C#', 'D', 'D#', 'E', 'F', 'F#', 'G', 'G#', 'A', 'A#', 'B'];
   const bars = [];
   for (let s = 0; s <= steps; s += 16) bars.push(`<line x1="${s * cw}" y1="0" x2="${s * cw}" y2="${H}" class="bar"/>`);
   const rects = notes.map((n) => `<rect x="${n.s0 * cw}" y="${(hi - n.midi) * rh}" width="${Math.max(2, n.len * cw - 1)}" height="${Math.max(3, rh - 1)}" rx="1.5"><title>${NAMES[n.midi % 12]}${Math.floor(n.midi / 12) - 1}</title></rect>`);
-  return `<svg class="mel-roll" viewBox="0 0 ${W} ${H}" preserveAspectRatio="none" role="img" aria-label="추출한 멜로디 음표">${bars.join('')}${rects.join('')}</svg>`
+  return `<div class="mel-roll-wrap"><svg class="mel-roll" viewBox="0 0 ${W} ${H}" style="${W > 760 ? `width:${W}px;max-width:none` : ''}" preserveAspectRatio="none" role="img" aria-label="추출한 멜로디 음표">${bars.join('')}${rects.join('')}</svg></div>`
     + `<small class="muted">${notes.length}음 · ${NAMES[lo % 12]}${Math.floor(lo / 12) - 1}~${NAMES[hi % 12]}${Math.floor(hi / 12) - 1} · 세로줄은 마디</small>`;
 }
 function renderMelodyRow() {
@@ -261,7 +264,7 @@ function renderMelodyRow() {
   if (!box) return;
   const secs = melSections();
   const pick = last.melSec ?? Math.max(0, secs.findIndex((s) => /Chorus/.test(s.name) && !/Pre/.test(s.name)));
-  const opts = secs.map((s, i) => `<option value="${i}"${i === pick ? ' selected' : ''}>${s.name} (${fmtT(s.start)}–${fmtT(Math.min(s.end, s.start + MEL_MAX_SEC))})</option>`).join('');
+  const opts = secs.map((s, i) => `<option value="${i}"${i === pick ? ' selected' : ''}>${s.name} (${fmtT(s.start)}–${fmtT(s.full ? s.end : Math.min(s.end, s.start + MEL_MAX_SEC))})</option>`).join('');
   const m = last.melody;
   box.innerHTML = `<div class="r-mel-bar">
       <select id="r-mel-sec" aria-label="멜로디를 뽑을 구간">${opts}</select>
@@ -281,7 +284,11 @@ function renderMelodyRow() {
     ['#r-mel-play', '#r-mel-orig'].forEach((id) => { const b = $(id); if (b) b.disabled = true; });
     $('#r-mel-status').textContent = `${sec.name} 멜로디 추출 중…`;
     try {
-      last.melody = await Analyzer.extractMelody(last.file, sec.start, Math.min(MEL_MAX_SEC, sec.end - sec.start), last.res.bpm);
+      if (sec.full && !last.track) {
+        $('#r-mel-status').textContent = '곡 전체 멜로디 추출 중… (약 40~50초)';
+        last.track = await Analyzer.pitchTrack(last.file, 0, last.res.duration); // 노래 흐름 분석도 이걸 다시 쓴다
+      }
+      last.melody = await Analyzer.extractMelody(last.file, sec.start, sec.full ? sec.end - sec.start : Math.min(MEL_MAX_SEC, sec.end - sec.start), last.res.bpm, last.track);
       last.melody.name = sec.name;
       renderMelodyRow();
     } catch (e) {

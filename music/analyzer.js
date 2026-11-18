@@ -203,8 +203,13 @@ const Analyzer = (() => {
     return { med, hop: 128 / sr, start: a / sr };
   }
 
-  async function extractMelody(file, start, dur, bpm) {
-    const { med, hop } = await pitchTrack(file, start, dur);
+  // track: 이미 따 둔 음높이(예: 노래 흐름 분석의 곡 전체)가 있으면 그 구간만 잘라 쓴다(다시 따지 않아 빠름)
+  async function extractMelody(file, start, dur, bpm, track = null) {
+    let med, hop;
+    if (track) {
+      hop = track.hop;
+      med = track.med.slice(Math.max(0, Math.round((start - track.start) / hop)), Math.round((start + dur - track.start) / hop));
+    } else ({ med, hop } = await pitchTrack(file, start, dur));
     const notes = [];
     let cur = null;
     const close = (i) => {
