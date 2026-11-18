@@ -416,6 +416,14 @@ body.has-solo .card.active:not(.soloed) .solo { color: var(--text); }
 .sb-row { display: grid; grid-template-columns: 170px minmax(0, 1fr); gap: 12px; padding: 9px 0; border-top: 1px solid var(--line); }
 .sb-row:first-child { border-top: 0; padding-top: 0; }
 /* Theme: 자유 입력 칸(1번 위) */
+/* Theme 아코디언(이름을 누르면 펼치기/접기) */
+.sb-fold { background: none; border: 0; padding: 4px 0 0; margin: 0; text-align: left; cursor: pointer; color: inherit; font: inherit; align-self: start; }
+.sb-fold b { display: flex; align-items: center; gap: 7px; }
+.sb-fold:hover b { color: var(--accent); }
+.sb-fold .chev { width: 7px; height: 7px; margin: 0; transform: rotate(45deg) translateY(-2px); }
+.sb-row.folded .sb-fold .chev { transform: rotate(-45deg); }
+.sb-row.folded > .sb-body { display: none; }
+
 .sb-concept textarea {
   width: 100%; resize: vertical; background: var(--field-bg); color: var(--text); border: 1px solid var(--line); border-radius: 8px;
   padding: 9px 10px; font: 12.5px/1.55 ui-monospace, 'Cascadia Mono', Consolas, monospace;

@@ -786,7 +786,8 @@ function conceptParts(text = concept) {
 // renderSb가 행을 매번 새로 그려도 입력 중인 내용이 사라지지 않게 Theme 행은 한 번만 만들어 재사용한다
 const conceptRow = document.createElement('div');
 conceptRow.className = 'sb-row sb-concept';
-conceptRow.innerHTML = `<div class="sb-label"><b>Theme</b><small>주제 · 스타일 맨 앞에 들어감</small></div>
+conceptRow.innerHTML = `<button type="button" class="sb-label sb-fold" aria-expanded="false" title="눌러서 Theme 펼치기/접기">
+    <b><span class="chev" aria-hidden="true"></span>Theme</b><small>주제 · 스타일 맨 앞에 들어감</small></button>
   <div class="sb-body">
     <textarea id="sb-concept" rows="6" spellcheck="false" aria-label="곡 주제(Theme)"></textarea>
     <div class="sb-concept-foot">
@@ -820,6 +821,22 @@ function setConcept(text) {
   renderStyleCount();
 }
 conceptBox.oninput = () => setConcept(conceptBox.value);
+
+/* Theme 아코디언: 1~11번 선택이 먼저 보이게 페이지를 열 때마다 접힌 상태로 시작한다(펼친 상태는 기억하지 않음).
+ */
+let themeOpen = false;
+try { localStorage.removeItem('music.suno.themeOpen'); } catch {} // 예전에 기억해 둔 펼침 상태는 지운다
+function renderThemeFold() {
+  const btn = $('.sb-fold', conceptRow);
+  conceptRow.classList.toggle('folded', !themeOpen);
+  btn.setAttribute('aria-expanded', String(themeOpen));
+  if (themeOpen) fitConcept();
+}
+$('.sb-fold', conceptRow).onclick = () => {
+  themeOpen = !themeOpen;
+  renderThemeFold();
+};
+renderThemeFold();
 
 /* 원곡 정보(웹) → Theme. 이전 곡에서 넣은 '주제/리듬/분위기:' 줄과 그 아래 ':' 영어 줄만 바꾸고 직접 적은 줄은 둔다 */
 const THEME_LABEL = /^(주제|리듬|분위기): /;
