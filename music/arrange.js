@@ -90,7 +90,9 @@ function flowApply(sec, barIn, time) {
   const L = flowLayer(sec, barIn);
   const on = Object.entries(state).filter(([, s]) => s.active);
   const audible = on.filter(([id]) => L.roles.includes(flowRole(id)));
-  const keep = new Set((audible.length ? audible : on.filter(([id]) => flowRole(id) === 'harmony')).map(([id]) => id));
+  // 그 구간에 맞는 악기가 하나도 없으면(예: 드럼만 켜고 인트로·아웃트로) 다 끄지 않고 켜진 악기를 그대로 들려준다.
+  // 예전에는 화성 악기만 남기려다 아무것도 안 남아 그 마디가 통째로 무음이 됐다(드럼만 켜면 Cmaj7·G7 아웃트로가 조용함)
+  const keep = new Set((audible.length ? audible : on).map(([id]) => id));
   on.forEach(([id, s]) => { s.channel.mute = !keep.has(id); });
   flowNow = { ids: [...keep], melody: !!mel && (L.melody || !on.length), roles: L.roles };
   if (mel) {
