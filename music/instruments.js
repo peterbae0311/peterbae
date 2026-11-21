@@ -654,11 +654,17 @@ const INSTRUMENTS = [
       const s = new Tone.PolySynth(Tone.Synth, {
         // 2겹·리버브 3.5초: 3겹·6초는 로즈 등과 겹치면 오디오 처리가 실시간을 못 따라가 '지직' 잡음이 났다
         // (측정: 컨템포러리 재즈 0.80배속 → 0.96배속). 코러스가 넓이를 채워 줘서 소리 차이는 작다.
-        oscillator: { type: 'fatsawtooth', count: 2, spread: 30 },
-        envelope: { attack: 1.0, decay: 0.5, sustain: 0.8, release: 2.5 },
-        volume: -8,
+        // 2026-11-21 '소리가 이상하다' 수정:
+        //  - 어택 1초는 140 BPM 한 마디(1.7초)의 대부분이라 마디마다 부풀었다 꺼지는 펌핑으로 들렸다 → 0.35초
+        //  - 릴리스 2.5초는 앞 코드 꼬리가 다음 코드와 겹쳐 탁하게 섞였다 → 1.2초
+        //  - 코러스(1.5Hz·깊이 0.6·원음 없이 100%)가 음정을 크게 흔들어 뱃멀미하듯 들렸다 → 0.5Hz·0.25·반만 섞기
+        oscillator: { type: 'fatsawtooth', count: 2, spread: 20 },
+        envelope: { attack: 0.35, decay: 0.6, sustain: 0.75, release: 1.2 },
+        volume: -3, // 효과를 줄인 만큼 조금 키운다(다른 반주 악기와 비슷한 크기로)
       });
-      s.chain(new Tone.Filter(1400, 'lowpass'), new Tone.Chorus(1.5, 3.5, 0.6).start(), rev(3.5, 0.5), out);
+      const chorus = new Tone.Chorus(0.5, 3, 0.25).start();
+      chorus.wet.value = 0.5;
+      s.chain(new Tone.Filter({ frequency: 1700, type: 'lowpass', rolloff: -24 }), chorus, rev(3.0, 0.4), out);
       return { ready: Promise.resolve(), play: (time, ev) => s.triggerAttackRelease(PROG[ev.bar].chord, '1m', time, 0.6), stop: (time) => s.releaseAll(time) };
     },
     events: () => [0, 1, 2, 3].map((bar) => ({ time: `${bar}:0:0`, bar })),
