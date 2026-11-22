@@ -22,6 +22,8 @@ const ly = {
 let lyState = { style: '', len: 175, bpm: 0, theme: '', sing: 'ko', versions: [], cur: -1, mode: 'ai', manual: { title: '', en: '', ko: '' } };
 try { Object.assign(lyState, JSON.parse(localStorage.getItem(LY_KEY) || '{}')); } catch {}
 lyState.manual = { title: '', en: '', ko: '', ...lyState.manual };
+// 탭을 열 때는 늘 [AI 생성]부터(직접 입력 내용은 그대로 남아 있어 [직접 입력]을 누르면 보인다)
+lyState.mode = 'ai';
 // 주제·메모가 EN·KO 두 칸으로 나뉘기 전 저장값: 한글 줄은 KO 칸으로 옮긴다
 if (lyState.themeKo == null) {
   const lines = (lyState.theme ?? '').split('\n');
