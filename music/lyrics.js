@@ -360,7 +360,14 @@ function renderMode() {
   checkBanned();
 }
 function renderManualFoot() {
-  renderStruct($('#ly-m-struct'), structFromText(lyState.manual.en));
+  // 가사 언어: 고른 언어 칸이 Suno 가사(왼쪽), 다른 칸은 뜻풀이
+  const ko = lyState.sing === 'ko';
+  ly.manual.classList.toggle('sing-ko', ko);
+  const SUNO = 'Suno 가사 칸에 그대로 들어갑니다. [Verse 1] 같은 태그도 함께 쓸 수 있어요.';
+  $('#ly-m-en-note').textContent = ko ? '보관용 영어 뜻입니다.' : SUNO;
+  $('#ly-m-ko-note').textContent = ko ? SUNO : '보관용 한글 뜻입니다.';
+  $('#ly-copy-ko').textContent = ko ? '영어 뜻 복사' : '한글 뜻 복사';
+  renderStruct($('#ly-m-struct'), structFromText(lyState.manual[ko ? 'ko' : 'en'] || lyState.manual.en));
   const count = (t) => t.split('\n').filter((l) => l.trim() && !/^\s*\[.*\]\s*$/.test(l)).length; // 태그 줄([Verse 1] 등)은 빼고 센다
   ly.foot.hidden = false;
   ly.length.textContent = `영어 ${count(lyState.manual.en)}줄 · 한글 ${count(lyState.manual.ko)}줄`;
@@ -466,7 +473,7 @@ const verSing = (v) => (v?.sing === 'ko' ? 'ko' : 'en');
 
 // role: 'sung'(Suno 가사) | 'meaning'(뜻풀이). 부를 언어에 따라 영어·한글 칸 중 하나를 고른다
 async function copyLyrics(role) {
-  const sing = isManual() ? 'en' : verSing(curVer());
+  const sing = isManual() ? (lyState.sing === 'ko' ? 'ko' : 'en') : verSing(curVer());
   const lang = role === 'sung' ? sing : sing === 'ko' ? 'en' : 'ko';
   let text;
   if (isManual()) {
@@ -484,7 +491,7 @@ function saveToSongs() {
   if (isManual()) {
     const { title, en, ko } = lyState.manual;
     if (!title.trim()) return flash('제목을 입력해 주세요.', 'warn');
-    if (!en.trim()) return flash('영어 가사를 입력해 주세요.', 'warn');
+    if (!(lyState.sing === 'ko' ? ko : en).trim()) return flash(lyState.sing === 'ko' ? '한글 가사를 입력해 주세요.' : '영어 가사를 입력해 주세요.', 'warn');
     // 직접 쓴 가사는 길이를 알 수 없어 재생시간은 비워 둔다(Suno에서 만든 뒤 채우면 됨)
     openSong(null, {
       titleEn: title.trim(), titleKo: title.trim(), lyricsEn: en.trim(), lyricsKo: ko.trim(),
@@ -563,7 +570,7 @@ ly.title.oninput = () => { const v = curVer(); if (v) { v.title = ly.title.value
 $('#ly-copy-en').onclick = () => copyLyrics('sung');
 $('#ly-copy-ko').onclick = () => copyLyrics('meaning');
 ly.sing.value = lyState.sing === 'en' ? 'en' : 'ko';
-ly.sing.onchange = () => { lyState.sing = ly.sing.value; lyState.singSet = true; saveLy(); };
+ly.sing.onchange = () => { lyState.sing = ly.sing.value; lyState.singSet = true; saveLy(); if (isManual()) { renderManualFoot(); checkBanned(); } };
 $('#ly-save').onclick = saveToSongs;
 ly.mode.onclick = (e) => {
   const b = e.target.closest('[data-mode]');
@@ -576,7 +583,7 @@ ly.mTitle.value = lyState.manual.title;
 ly.mEn.value = lyState.manual.en;
 ly.mKo.value = lyState.manual.ko;
 [['mTitle', 'title'], ['mEn', 'en'], ['mKo', 'ko']].forEach(([el, key]) => {
-  ly[el].oninput = () => { lyState.manual[key] = ly[el].value; saveLy(); if (key !== 'title') renderManualFoot(); if (key === 'en') checkBanned(); };
+  ly[el].oninput = () => { lyState.manual[key] = ly[el].value; saveLy(); if (key !== 'title') { renderManualFoot(); checkBanned(); } };
 });
 // 금지 표현 추가(Enter)·기본 목록으로
 $('#ly-banned-input').onkeydown = (e) => {

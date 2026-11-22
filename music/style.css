@@ -611,7 +611,7 @@ body.no-board #board { display: none; } /* 제목·가사·Suno 작곡·인기�
 .ly-manual { margin-top: 18px; border-top: 1px solid var(--line); padding-top: 14px; display: flex; flex-direction: column; gap: 10px; }
 .ly-m-cols { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 12px; }
 /* 한국어로 부르는 가사: 한글(노래 가사)을 왼쪽, 영어(뜻)를 오른쪽에 */
-#ly-result.sing-ko .ly-m-cols > label:first-child { order: 2; }
+#ly-result.sing-ko .ly-m-cols > label:first-child, #ly-manual.sing-ko .ly-m-cols > label:first-child { order: 2; }
 .ly-m-cols label { display: flex; flex-direction: column; gap: 5px; font-size: 13.5px; }
 .ly-m-cols small { font-size: 11.5px; }
 .ly-m-cols textarea {

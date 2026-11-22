@@ -24,7 +24,7 @@
   <link rel="stylesheet" crossorigin
         href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/static/pretendard.css">
   <!-- 파일을 고치면 ?v= 값을 올려 브라우저 캐시에 남은 예전 파일을 쓰지 않게 한다 -->
-  <link rel="stylesheet" href="style.css?v=20261122i">
+  <link rel="stylesheet" href="style.css?v=20261122j">
 </head>
 <body>
   <header class="hero">
@@ -248,7 +248,7 @@
         </div>
         <!-- 언어 / 곡 길이 / BPM / 가사 구조를 한 줄에 -->
         <div class="ly-opts ly-plan-row">
-          <label class="ly-ai-only" title="Suno가 부를 가사의 언어. 이 언어로 먼저 쓰고(원곡 음절 수도 이 언어로 맞춤), 다른 언어는 뜻풀이로 함께 만듭니다">가사 언어 <select id="ly-sing"><option value="ko" selected>한국어</option><option value="en">영어</option></select></label>
+          <label title="Suno가 부를 가사의 언어. 이 언어로 먼저 쓰고(원곡 음절 수도 이 언어로 맞춤), 다른 언어는 뜻풀이로 함께 만듭니다">가사 언어 <select id="ly-sing"><option value="ko" selected>한국어</option><option value="en">영어</option></select></label>
           <label>곡 길이 <select id="ly-len"></select></label>
           <label>BPM <input id="ly-bpm" type="number" min="60" max="180" step="1"></label>
           <button type="button" class="ghost ly-bpm-sync" id="ly-bpm-sync" hidden></button>
@@ -316,9 +316,9 @@
             <input id="ly-m-title" maxlength="120" aria-label="곡 제목(직접 입력)" placeholder="예: Stay a While" autocomplete="off"><button type="button" class="sd-copy" data-ly-copy="ly-m-title" aria-label="제목 복사" title="제목 복사"><svg viewBox="0 0 24 24" width="14" height="14" aria-hidden="true"><rect x="9" y="9" width="11" height="11" rx="2" fill="none" stroke="currentColor" stroke-width="2"/><path d="M5 15V5a2 2 0 0 1 2-2h8" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg></button>
           </div>
           <div class="ly-m-cols">
-            <label><span class="ly-lbl"><b>영어 가사</b><button type="button" class="sd-copy" data-ly-copy="ly-m-en" aria-label="영어 가사 복사" title="영어 가사 복사"><svg viewBox="0 0 24 24" width="14" height="14" aria-hidden="true"><rect x="9" y="9" width="11" height="11" rx="2" fill="none" stroke="currentColor" stroke-width="2"/><path d="M5 15V5a2 2 0 0 1 2-2h8" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg></button></span> <small class="muted">Suno 가사 칸에 그대로 들어갑니다. [Verse 1] 같은 태그도 함께 쓸 수 있어요.</small>
+            <label><span class="ly-lbl"><b>영어 가사</b><button type="button" class="sd-copy" data-ly-copy="ly-m-en" aria-label="영어 가사 복사" title="영어 가사 복사"><svg viewBox="0 0 24 24" width="14" height="14" aria-hidden="true"><rect x="9" y="9" width="11" height="11" rx="2" fill="none" stroke="currentColor" stroke-width="2"/><path d="M5 15V5a2 2 0 0 1 2-2h8" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg></button></span> <small class="muted" id="ly-m-en-note">Suno 가사 칸에 그대로 들어갑니다. [Verse 1] 같은 태그도 함께 쓸 수 있어요.</small>
               <textarea id="ly-m-en" rows="18" spellcheck="false" placeholder="[Verse 1]&#10;Rain is tapping on the glass&#10;..."></textarea></label>
-            <label><span class="ly-lbl"><b>한글 가사</b><button type="button" class="sd-copy" data-ly-copy="ly-m-ko" aria-label="한글 가사 복사" title="한글 가사 복사"><svg viewBox="0 0 24 24" width="14" height="14" aria-hidden="true"><rect x="9" y="9" width="11" height="11" rx="2" fill="none" stroke="currentColor" stroke-width="2"/><path d="M5 15V5a2 2 0 0 1 2-2h8" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg></button></span> <small class="muted">보관용 한글 뜻입니다.</small>
+            <label><span class="ly-lbl"><b>한글 가사</b><button type="button" class="sd-copy" data-ly-copy="ly-m-ko" aria-label="한글 가사 복사" title="한글 가사 복사"><svg viewBox="0 0 24 24" width="14" height="14" aria-hidden="true"><rect x="9" y="9" width="11" height="11" rx="2" fill="none" stroke="currentColor" stroke-width="2"/><path d="M5 15V5a2 2 0 0 1 2-2h8" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg></button></span> <small class="muted" id="ly-m-ko-note">보관용 한글 뜻입니다.</small>
               <textarea id="ly-m-ko" rows="18" placeholder="[Verse 1]&#10;빗방울이 유리창을 두드려&#10;..."></textarea></label>
           </div>
         </div>
@@ -423,7 +423,7 @@
   <script src="upload.js?v=20261122h"></script>
   <script src="suno.js?v=20261122d"></script>
   <script src="songs.js?v=20261107d"></script>
-  <script src="lyrics.js?v=20261122d"></script>
+  <script src="lyrics.js?v=20261122e"></script>
   <script src="ref.js?v=20261109a"></script>
 </body>
 </html>
