@@ -24,7 +24,7 @@
   <link rel="stylesheet" crossorigin
         href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/static/pretendard.css">
   <!-- 파일을 고치면 ?v= 값을 올려 브라우저 캐시에 남은 예전 파일을 쓰지 않게 한다 -->
-  <link rel="stylesheet" href="style.css?v=20261122d">
+  <link rel="stylesheet" href="style.css?v=20261122i">
 </head>
 <body>
   <header class="hero">
@@ -238,38 +238,47 @@
         </div>
       </div>
       <div class="ppanel" role="tabpanel" id="panel-lyrics" aria-labelledby="tab-lyrics" hidden>
-        <p class="pdesc-static">스타일에 맞는 <b>영어 제목·가사</b>를 만들어 드려요. 이미 쓴 가사가 있으면 <b>[직접 입력]</b>을 선택하세요.</p>
+        <p class="pdesc-static">스타일에 맞는 <b>제목·가사</b>를 <b>가사 언어</b>(한국어·영어)로 만들어 드려요. 이미 쓴 가사가 있으면 <b>[직접 입력]</b>을 선택하세요.</p>
         <div class="ly-mode-row">
           <span class="fmt-tabs ly-mode" role="tablist" aria-label="가사 만드는 방법" id="ly-mode">
             <button type="button" role="tab" data-mode="ai" aria-selected="true">AI 생성</button><button type="button" role="tab" data-mode="manual" aria-selected="false">직접 입력</button>
           </span>
           <button type="button" class="ghost preset-reset" id="ly-reset" title="스타일·곡 길이·BPM·주제·메모를 처음 상태로 되돌립니다(만든 가사는 그대로)">초기화</button>
+          <button type="button" class="ghost preset-reset" id="ly-style-pull">Style Builder에서 가져오기</button>
         </div>
+        <!-- 언어 / 곡 길이 / BPM / 가사 구조를 한 줄에 -->
+        <div class="ly-opts ly-plan-row">
+          <label class="ly-ai-only" title="Suno가 부를 가사의 언어. 이 언어로 먼저 쓰고(원곡 음절 수도 이 언어로 맞춤), 다른 언어는 뜻풀이로 함께 만듭니다">가사 언어 <select id="ly-sing"><option value="ko" selected>한국어</option><option value="en">영어</option></select></label>
+          <label>곡 길이 <select id="ly-len"></select></label>
+          <label>BPM <input id="ly-bpm" type="number" min="60" max="180" step="1"></label>
+          <button type="button" class="ghost ly-bpm-sync" id="ly-bpm-sync" hidden></button>
+          <div id="ly-plan-struct" class="ly-struct ly-ai-only" title="곡 길이·BPM으로 정한 가사 구조(괄호는 마디 수). 가사 생성은 이 구조대로 만듭니다"></div>
+        </div>
+        <p id="ly-plan" class="muted ly-plan-note"></p>
         <div class="ly-top">
           <div class="ly-style">
-            <div class="ly-head"><b>스타일</b><button type="button" class="sd-copy" data-ly-copy="ly-style" aria-label="스타일 복사" title="스타일 복사"><svg viewBox="0 0 24 24" width="14" height="14" aria-hidden="true"><rect x="9" y="9" width="11" height="11" rx="2" fill="none" stroke="currentColor" stroke-width="2"/><path d="M5 15V5a2 2 0 0 1 2-2h8" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg></button><small id="ly-style-src" class="muted"></small>
-              <button class="ghost" id="ly-style-pull">Style Builder에서 가져오기</button></div>
-            <textarea id="ly-style" rows="4" spellcheck="false" aria-label="가사에 반영할 스타일"></textarea>
-            <div class="ly-opts">
-              <div class="ly-row">
-                <label>곡 길이 <select id="ly-len"></select></label>
-                <label>BPM <input id="ly-bpm" type="number" min="60" max="180" step="1"></label>
-                <span id="ly-plan" class="muted"></span>
-                <button type="button" class="ghost ly-bpm-sync" id="ly-bpm-sync" hidden></button>
+            <!-- 스타일(EN)·(KO), 주제·메모(EN)·(KO)를 각각 한 줄에 나란히 -->
+            <div class="ly-pair">
+              <div class="ly-field">
+                <div class="ly-head"><b>스타일(EN)</b><button type="button" class="sd-copy" data-ly-copy="ly-style" aria-label="스타일(EN) 복사" title="스타일(EN) 복사"><svg viewBox="0 0 24 24" width="14" height="14" aria-hidden="true"><rect x="9" y="9" width="11" height="11" rx="2" fill="none" stroke="currentColor" stroke-width="2"/><path d="M5 15V5a2 2 0 0 1 2-2h8" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg></button><small id="ly-style-src" class="muted"></small></div>
+                <textarea id="ly-style" rows="5" spellcheck="false" aria-label="가사에 반영할 스타일(영어)"></textarea>
               </div>
-              <div id="ly-plan-struct" class="ly-struct ly-ai-only" title="곡 길이·BPM으로 정한 가사 구조(괄호는 마디 수). 가사 생성은 이 구조대로 만듭니다"></div>
-              <label class="ly-theme ly-ai-only">주제·메모 (선택, 한글 가능)
-                <textarea id="ly-theme" rows="2" maxlength="600" placeholder="예: 가을 드라이브에서 다시 사랑에 빠지는 설렘"></textarea></label>
+              <div class="ly-field">
+                <div class="ly-head"><b>스타일(KO)</b><button type="button" class="sd-copy" data-ly-copy="ly-style-ko" aria-label="스타일(KO) 복사" title="스타일(KO) 복사"><svg viewBox="0 0 24 24" width="14" height="14" aria-hidden="true"><rect x="9" y="9" width="11" height="11" rx="2" fill="none" stroke="currentColor" stroke-width="2"/><path d="M5 15V5a2 2 0 0 1 2-2h8" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg></button><small class="muted">뜻 확인용 · AI에는 영어 스타일을 보내요</small></div>
+                <textarea id="ly-style-ko" rows="5" spellcheck="false" aria-label="스타일(한글)"></textarea>
+              </div>
             </div>
-            <div class="ly-row ly-gen-row ly-ai-only">
-              <button class="primary" id="ly-gen">가사 생성</button>
-              <span class="ly-ver" id="ly-ver-box" hidden>
-                <button class="ghost" id="ly-prev" aria-label="이전 버전">◀</button><span id="ly-ver"></span><button class="ghost" id="ly-next" aria-label="다음 버전">▶</button>
-              </span>
-              <span id="ly-status" class="muted" role="status"></span>
+            <div class="ly-pair ly-ai-only">
+              <div class="ly-field">
+                <div class="ly-head"><b>주제·메모(EN)</b><button type="button" class="sd-copy" data-ly-copy="ly-theme" aria-label="주제·메모(EN) 복사" title="주제·메모(EN) 복사"><svg viewBox="0 0 24 24" width="14" height="14" aria-hidden="true"><rect x="9" y="9" width="11" height="11" rx="2" fill="none" stroke="currentColor" stroke-width="2"/><path d="M5 15V5a2 2 0 0 1 2-2h8" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg></button><small class="muted">선택</small></div>
+                <textarea id="ly-theme" rows="3" maxlength="600" spellcheck="false" placeholder="e.g. Falling in love again on an autumn drive"></textarea>
+              </div>
+              <div class="ly-field">
+                <div class="ly-head"><b>주제·메모(KO)</b><button type="button" class="sd-copy" data-ly-copy="ly-theme-ko" aria-label="주제·메모(KO) 복사" title="주제·메모(KO) 복사"><svg viewBox="0 0 24 24" width="14" height="14" aria-hidden="true"><rect x="9" y="9" width="11" height="11" rx="2" fill="none" stroke="currentColor" stroke-width="2"/><path d="M5 15V5a2 2 0 0 1 2-2h8" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg></button><small class="muted">선택 · AI에 함께 전해요</small></div>
+                <textarea id="ly-theme-ko" rows="3" maxlength="600" placeholder="예: 가을 드라이브에서 다시 사랑에 빠지는 설렘"></textarea>
+              </div>
             </div>
-          </div>
-          <div class="ly-side">
+            <!-- 금지 표현: 주제·메모 아래 한 줄(전체 폭) -->
             <details class="ly-banned" id="ly-banned" open>
               <summary>금지 표현 <span id="ly-banned-n" class="muted"></span> <small class="muted">— AI에 쓰지 말라고 전하고, 가사에 들어가면 아래에 표시해요</small></summary>
               <div class="ly-banned-box">
@@ -278,6 +287,13 @@
                 <button type="button" class="ghost ly-banned-reset" id="ly-banned-reset" title="금지 표현을 처음 목록으로 되돌립니다">기본 목록으로</button>
               </div>
             </details>
+            <div class="ly-row ly-gen-row ly-ai-only">
+              <button class="primary" id="ly-gen">가사 생성</button>
+              <span class="ly-ver" id="ly-ver-box" hidden>
+                <button class="ghost" id="ly-prev" aria-label="이전 버전">◀</button><span id="ly-ver"></span><button class="ghost" id="ly-next" aria-label="다음 버전">▶</button>
+              </span>
+              <span id="ly-status" class="muted" role="status"></span>
+            </div>
           </div>
         </div>
         <div id="ly-result" hidden>
@@ -287,9 +303,9 @@
           </div>
           <div id="ly-structure" class="ly-structure muted"></div>
           <div class="ly-m-cols">
-            <label><span class="ly-lbl"><b>영어 가사</b><button type="button" class="sd-copy" data-ly-copy="ly-ai-en" aria-label="영어 가사 복사" title="영어 가사 복사"><svg viewBox="0 0 24 24" width="14" height="14" aria-hidden="true"><rect x="9" y="9" width="11" height="11" rx="2" fill="none" stroke="currentColor" stroke-width="2"/><path d="M5 15V5a2 2 0 0 1 2-2h8" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg></button></span> <small class="muted">Suno 가사 칸에 그대로 들어갑니다. 고친 내용은 이 버전에 저장돼요.</small>
+            <label><span class="ly-lbl"><b>영어 가사</b><button type="button" class="sd-copy" data-ly-copy="ly-ai-en" aria-label="영어 가사 복사" title="영어 가사 복사"><svg viewBox="0 0 24 24" width="14" height="14" aria-hidden="true"><rect x="9" y="9" width="11" height="11" rx="2" fill="none" stroke="currentColor" stroke-width="2"/><path d="M5 15V5a2 2 0 0 1 2-2h8" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg></button></span> <small class="muted" id="ly-en-note">Suno 가사 칸에 그대로 들어갑니다. 고친 내용은 이 버전에 저장돼요.</small>
               <textarea id="ly-ai-en" rows="24" spellcheck="false" aria-label="생성한 영어 가사"></textarea></label>
-            <label><span class="ly-lbl"><b>한글 가사</b><button type="button" class="sd-copy" data-ly-copy="ly-ai-ko" aria-label="한글 가사 복사" title="한글 가사 복사"><svg viewBox="0 0 24 24" width="14" height="14" aria-hidden="true"><rect x="9" y="9" width="11" height="11" rx="2" fill="none" stroke="currentColor" stroke-width="2"/><path d="M5 15V5a2 2 0 0 1 2-2h8" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg></button></span> <small class="muted">보관용 한글 뜻입니다.</small>
+            <label><span class="ly-lbl"><b>한글 가사</b><button type="button" class="sd-copy" data-ly-copy="ly-ai-ko" aria-label="한글 가사 복사" title="한글 가사 복사"><svg viewBox="0 0 24 24" width="14" height="14" aria-hidden="true"><rect x="9" y="9" width="11" height="11" rx="2" fill="none" stroke="currentColor" stroke-width="2"/><path d="M5 15V5a2 2 0 0 1 2-2h8" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg></button></span> <small class="muted" id="ly-ko-note">보관용 한글 뜻입니다.</small>
               <textarea id="ly-ai-ko" rows="24" aria-label="생성한 한글 가사"></textarea></label>
           </div>
         </div>
@@ -405,9 +421,9 @@
   <script src="melody.js?v=20261111g"></script>
   <script src="arrange.js?v=20261121a"></script>
   <script src="upload.js?v=20261122h"></script>
-  <script src="suno.js?v=20261122c"></script>
+  <script src="suno.js?v=20261122d"></script>
   <script src="songs.js?v=20261107d"></script>
-  <script src="lyrics.js?v=20261122a"></script>
+  <script src="lyrics.js?v=20261122d"></script>
   <script src="ref.js?v=20261109a"></script>
 </body>
 </html>

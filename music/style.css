@@ -518,7 +518,8 @@ body.no-board #board { display: none; } /* 제목·가사·Suno 작곡·인기�
 /* ---------- 제목·가사 ---------- */
 #panel-lyrics > .pdesc-static { margin-bottom: 14px; }
 /* 왼쪽: 스타일 → 곡 길이·BPM → 주제·메모 → [가사 생성] / 오른쪽: 금지 표현 */
-.ly-top { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 20px; align-items: start; }
+.ly-top { display: grid; grid-template-columns: minmax(0, 1fr); gap: 20px; align-items: start; }
+.ly-style > .ly-banned { margin-top: 14px; }
 .ly-style > .ly-opts { margin-top: 10px; }
 .ly-head { display: flex; align-items: center; gap: 8px; margin-bottom: 4px; }
 .ly-head b { font-size: 13.5px; white-space: nowrap; }
@@ -533,7 +534,17 @@ body.no-board #board { display: none; } /* 제목·가사·Suno 작곡·인기�
 .ly-row { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
 .ly-opts label { display: flex; align-items: center; gap: 6px; font-size: 12.5px; color: var(--muted); }
 .ly-opts #ly-bpm { width: 72px; }
+/* 제목·가사: AI 생성 아래 한 줄(언어 / 곡 길이 / BPM / 가사 구조) */
+.ly-opts.ly-plan-row { flex-direction: row; flex-wrap: wrap; align-items: center; gap: 8px 16px; }
+.ly-plan-row > .ly-struct { flex: 1 1 320px; min-width: 0; }
+.ly-plan-note { margin: 4px 0 14px; }
 .ly-theme { flex-direction: column; align-items: stretch !important; gap: 4px !important; }
+/* 제목·가사: EN·KO 두 칸을 한 줄에 */
+.ly-pair { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 12px; }
+.ly-pair + .ly-pair { margin-top: 12px; }
+.ly-field { display: flex; flex-direction: column; min-width: 0; }
+.ly-field textarea { width: 100%; resize: vertical; line-height: 1.5; }
+@media (max-width: 640px) { .ly-pair { grid-template-columns: 1fr; } }
 .ly-theme textarea { width: 100%; resize: vertical; line-height: 1.5; min-height: calc(2 * 1.5em + 14px); }
 /* 금지 표현 목록(접기)과 가사 검사 결과 */
 .ly-banned summary { cursor: pointer; font-size: 13px; font-weight: 600; }
@@ -599,6 +610,8 @@ body.no-board #board { display: none; } /* 제목·가사·Suno 작곡·인기�
 #panel-lyrics.manual .ly-ai-only { display: none; }
 .ly-manual { margin-top: 18px; border-top: 1px solid var(--line); padding-top: 14px; display: flex; flex-direction: column; gap: 10px; }
 .ly-m-cols { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 12px; }
+/* 한국어로 부르는 가사: 한글(노래 가사)을 왼쪽, 영어(뜻)를 오른쪽에 */
+#ly-result.sing-ko .ly-m-cols > label:first-child { order: 2; }
 .ly-m-cols label { display: flex; flex-direction: column; gap: 5px; font-size: 13.5px; }
 .ly-m-cols small { font-size: 11.5px; }
 .ly-m-cols textarea {

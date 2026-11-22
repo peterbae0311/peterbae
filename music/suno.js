@@ -1226,7 +1226,9 @@ function fromSong() {
   const themed = !!w?.found && themeFromWeb(w);
   if (themed && typeof setLyricsTheme === 'function') {
     setLyricsTheme([webUse(w, 'theme') && w.themeKo && `주제: ${w.themeKo.slice(0, 190)}`, webUse(w, 'rhythm') && w.rhythmKo && `리듬: ${w.rhythmKo.slice(0, 190)}`,
-      webUse(w, 'mood') && w.moodKo && `분위기: ${w.moodKo.slice(0, 190)}`].filter(Boolean).join('\n'));
+      webUse(w, 'mood') && w.moodKo && `분위기: ${w.moodKo.slice(0, 190)}`].filter(Boolean).join('\n'),
+    [webUse(w, 'theme') && w.themeEn && `Theme: ${w.themeEn.slice(0, 190)}`, webUse(w, 'rhythm') && w.rhythmEn && `Rhythm: ${w.rhythmEn.slice(0, 190)}`,
+      webUse(w, 'mood') && w.moodEn && `Mood: ${w.moodEn.slice(0, 190)}`].filter(Boolean).join('\n'));
   }
   flash(`"${res.name}" 분석 결과를 불러왔습니다.${added ? ` 4번 장르에 없던 '${g.main.name}'을(를) ${g.main.cat} 탭에 새로 추가했습니다.` : ''}${freed.length ? ` 제외 항목에서 해제: ${freed.join(' · ')}.` : ''}${voice && !sb.vocal ? ' 보컬이 감지되었으니 10번에서 보컬 종류를 골라 주세요.' : ''}${structEn ? ' 가사 구조를 8번에 넣었습니다.' : ''}${flowEn ? ' 노래 흐름을 10번에 넣었습니다.' : structEn ? ' 노래 흐름도 넣으려면 곡 분석에서 [구간별 노래 흐름 분석] 후 다시 불러오세요.' : ''}${themed ? ` 원곡의 ${[['theme', '주제'], ['rhythm', '리듬'], ['mood', '분위기']].filter(([k]) => webUse(w, k)).map(([, l]) => l).join('·')}을(를) Theme과 제목·가사 탭의 주제·메모에 넣었습니다.` : w?.found ? ' 원곡 정보에서 Theme에 넣을 항목을 고르지 않아 Theme은 그대로 두었습니다.' : ' 원곡 정보(②)를 찾지 않아 Theme은 그대로 두었습니다.'}`, 'ok');
 }

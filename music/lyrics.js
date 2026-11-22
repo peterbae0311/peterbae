@@ -9,17 +9,28 @@ const LY_MAX_VERSIONS = 10;
 const ly = {
   style: $('#ly-style'), stylePull: $('#ly-style-pull'), styleSrc: $('#ly-style-src'),
   len: $('#ly-len'), bpm: $('#ly-bpm'), plan: $('#ly-plan'), theme: $('#ly-theme'),
+  styleKo: $('#ly-style-ko'), themeKo: $('#ly-theme-ko'),
   gen: $('#ly-gen'), status: $('#ly-status'), verBox: $('#ly-ver-box'), ver: $('#ly-ver'),
   result: $('#ly-result'), titleChips: $('#ly-title-chips'), title: $('#ly-title'),
   structure: $('#ly-structure'), aiEn: $('#ly-ai-en'), aiKo: $('#ly-ai-ko'), length: $('#ly-length'),
   panel: $('#panel-lyrics'), mode: $('#ly-mode'), manual: $('#ly-manual'), foot: $('#ly-foot'),
-  mTitle: $('#ly-m-title'), mEn: $('#ly-m-en'), mKo: $('#ly-m-ko'),
+  mTitle: $('#ly-m-title'), mEn: $('#ly-m-en'), mKo: $('#ly-m-ko'), sing: $('#ly-sing'),
 };
 
 // 저장 상태: 입력값 + 버전 목록 + 보고 있는 버전 + 모드(ai | manual)와 직접 입력한 내용
-let lyState = { style: '', len: 175, bpm: 0, theme: '', versions: [], cur: -1, mode: 'ai', manual: { title: '', en: '', ko: '' } };
+// sing: Suno가 부를 언어(en | ko, 기본 ko). 이 언어로 먼저 쓰고 다른 언어는 뜻풀이
+let lyState = { style: '', len: 175, bpm: 0, theme: '', sing: 'ko', versions: [], cur: -1, mode: 'ai', manual: { title: '', en: '', ko: '' } };
 try { Object.assign(lyState, JSON.parse(localStorage.getItem(LY_KEY) || '{}')); } catch {}
 lyState.manual = { title: '', en: '', ko: '', ...lyState.manual };
+// 주제·메모가 EN·KO 두 칸으로 나뉘기 전 저장값: 한글 줄은 KO 칸으로 옮긴다
+if (lyState.themeKo == null) {
+  const lines = (lyState.theme ?? '').split('\n');
+  lyState.themeKo = lines.filter((l) => /[\uAC00-\uD7A3]/.test(l)).join('\n');
+  lyState.theme = lines.filter((l) => !/[\uAC00-\uD7A3]/.test(l)).join('\n');
+}
+lyState.styleKo ??= '';
+// 가사 언어 기본값은 한국어. 직접 고른 적이 없으면(예전 저장값의 기본 'en' 포함) 한국어로
+if (!lyState.singSet) lyState.sing = 'ko';
 const isManual = () => lyState.mode === 'manual';
 const saveLy = () => { try { localStorage.setItem(LY_KEY, JSON.stringify(lyState)); } catch {} };
 const curVer = () => lyState.versions[lyState.cur] ?? null;
@@ -160,6 +171,9 @@ function pullStyle(quiet = false) {
   lyState.cleared = false;
   ly.style.value = text;
   lyState.style = text;
+  // 한글 스타일: 가져온 영어와 같은 형식(문장형이 있으면 문장형)
+  const ko = styleOut.ko;
+  ly.styleKo.value = lyState.styleKo = typeof ko === 'string' ? ko : (styleOut.prose ? ko?.prose : ko?.list) ?? '';
   ly.bpm.value = lyState.bpm = sb.bpm;
   const sec = lengthFromStyle(text);
   if (sec) { lyState.len = sec; ly.len.value = String(sec); }
@@ -231,13 +245,15 @@ async function generateLyrics() {
   const bpm = Math.max(60, Math.min(180, Math.round(+ly.bpm.value) || 120));
   const plan = lyricsPlan(bpm);
   const sections = uniqueSections(plan, bpm);
-  const theme = ly.theme.value.trim();
+  // 주제·메모: 영어와 한글을 함께 보낸다(AI 지시는 한글 메모도 읽는다)
+  const theme = [ly.theme.value.trim(), ly.themeKo.value.trim()].filter(Boolean).join('\n').slice(0, 600);
   const payload = {
     style, theme, sections,
     length: `about ${fmtLen(totalBars(plan) * 240 / bpm)} at ${bpm} BPM (${barsPerLine(bpm) === 1 ? '1 bar' : '2 bars'} per lyric line)`,
     plan: planText(plan),
     ending: plannedEnding(),
     banned: banned.slice(0, 80),
+    sing: lyState.sing,
   };
   ly.gen.disabled = true;
   const t0 = performance.now();
@@ -247,12 +263,12 @@ async function generateLyrics() {
     for (let attempt = 1; attempt <= 2; attempt++) {
       const got = await requestLyrics(payload, t0, attempt);
       // 형식이 깨진 응답(무료 모델에서 가끔)도 한 번은 자동으로 다시 만든다
-      try { v = parseLyrics(got.text, sections); } catch (e) { if (attempt === 2) throw e; continue; }
+      try { v = parseLyrics(got.text, sections, lyState.sing); } catch (e) { if (attempt === 2) throw e; continue; }
       v.provider = got.provider;
       if (!Object.values(v.lyrics).flat().some((l) => NON_EN.test(l.en))) break;
       if (attempt === 2) flash('영어가 아닌 글자가 섞인 줄이 있습니다. 해당 줄을 고치거나 다시 생성해 주세요.', 'warn');
     }
-    Object.assign(v, { plan, bpm, style, theme, createdAt: Date.now() });
+    Object.assign(v, { plan, bpm, style, theme, sing: lyState.sing, createdAt: Date.now() });
     lyState.versions.push(v);
     if (lyState.versions.length > LY_MAX_VERSIONS) lyState.versions.shift();
     lyState.cur = lyState.versions.length - 1;
@@ -314,7 +330,7 @@ function firstJson(text) {
   return text.slice(a);
 }
 
-function parseLyrics(text, sections) {
+function parseLyrics(text, sections, sing = 'en') {
   let j;
   try { j = JSON.parse(firstJson(text)); } catch { throw new Error('응답 형식이 올바르지 않습니다. [가사 생성]을 다시 눌러 주세요.'); }
   const norm = (n) => String(n).toLowerCase().replace(/[^a-z0-9]/g, '');
@@ -327,7 +343,8 @@ function parseLyrics(text, sections) {
     lyrics[name] = arr.slice(0, lines).map((l) => ({ en: String(l.en ?? '').trim(), ko: String(l.ko ?? '').trim(), koSrc: String(l.ko ?? '').trim() }));
   }
   // 제목은 템플릿에서 { words, title } 꼴로 온다(예전 응답은 문자열)
-  const titles = (j.titles ?? []).map((t) => String(typeof t === 'object' && t ? t.title ?? '' : t).trim()).filter((t) => t && !NON_EN.test(t)).slice(0, 5);
+  // 영어로 부르는 곡은 영어 제목만, 한국어로 부르는 곡은 한글 제목도 받는다
+  const titles = (j.titles ?? []).map((t) => String(typeof t === 'object' && t ? t.title ?? '' : t).trim()).filter((t) => t && (sing === 'ko' || !NON_EN.test(t))).slice(0, 5);
   return { titles, title: titles[0] ?? '', lyrics };
 }
 
@@ -374,6 +391,12 @@ function renderLyrics() {
   // 생성한 가사를 [섹션 – N Bars] 형식의 글로 펼쳐 '직접 입력'과 같은 두 칸에 보여 준다. 고치면 이 버전에 저장된다
   ly.aiEn.value = verText(v, 'en');
   ly.aiKo.value = verText(v, 'ko');
+  // 부를 언어: 그 언어 칸이 Suno 가사(왼쪽), 다른 칸은 뜻풀이
+  const ko = verSing(v) === 'ko';
+  ly.result.classList.toggle('sing-ko', ko);
+  $('#ly-en-note').textContent = ko ? '보관용 영어 뜻입니다.' : 'Suno 가사 칸에 그대로 들어갑니다. 고친 내용은 이 버전에 저장돼요.';
+  $('#ly-ko-note').textContent = ko ? 'Suno 가사 칸에 그대로 들어갑니다. 고친 내용은 이 버전에 저장돼요.' : '보관용 한글 뜻입니다.';
+  $('#ly-copy-ko').textContent = ko ? '영어 뜻 복사' : '한글 뜻 복사';
   const bars = totalBars(v.plan);
   ly.length.textContent = `${bars}마디 · ${v.bpm} BPM · 예상 ${fmtLen(bars * 240 / v.bpm)}`;
   checkBanned();
@@ -438,8 +461,13 @@ function lyricsText(v, lang) {
 
 // 버전의 가사 글: 직접 고쳤으면 고친 글, 아니면 생성한 줄로 만든 글
 const verText = (v, lang) => v.text?.[lang] ?? lyricsText(v, lang);
+// 버전이 부르는 언어(예전 버전은 영어). 직접 입력은 영어 칸이 Suno 가사
+const verSing = (v) => (v?.sing === 'ko' ? 'ko' : 'en');
 
-async function copyLyrics(lang) {
+// role: 'sung'(Suno 가사) | 'meaning'(뜻풀이). 부를 언어에 따라 영어·한글 칸 중 하나를 고른다
+async function copyLyrics(role) {
+  const sing = isManual() ? 'en' : verSing(curVer());
+  const lang = role === 'sung' ? sing : sing === 'ko' ? 'en' : 'ko';
   let text;
   if (isManual()) {
     text = lyState.manual[lang].trim();
@@ -449,7 +477,7 @@ async function copyLyrics(lang) {
     if (!v) return;
     text = verText(v, lang);
   }
-  if (await copyText(text)) flash(lang === 'ko' ? '한글 뜻을 복사했습니다.' : 'Suno용 가사를 복사했습니다.', 'ok');
+  if (await copyText(text)) flash(role === 'sung' ? 'Suno용 가사를 복사했습니다.' : lang === 'ko' ? '한글 뜻을 복사했습니다.' : '영어 뜻을 복사했습니다.', 'ok');
 }
 
 function saveToSongs() {
@@ -484,15 +512,25 @@ fillLengths();
 ly.style.value = lyState.style;
 ly.bpm.value = lyState.bpm || sb.bpm;
 ly.theme.value = lyState.theme;
+ly.themeKo.value = lyState.themeKo;
+ly.styleKo.value = lyState.styleKo;
 ly.style.oninput = () => { lyState.style = ly.style.value; ly.styleSrc.textContent = '직접 수정함'; saveLy(); };
 ly.len.onchange = () => { lyState.len = +ly.len.value; saveLy(); renderPlan(); };
 ly.bpm.onchange = () => { lyState.bpm = Math.max(60, Math.min(180, Math.round(+ly.bpm.value) || 120)); ly.bpm.value = lyState.bpm; saveLy(); renderPlan(); };
 ly.theme.oninput = () => { lyState.theme = ly.theme.value; saveLy(); };
+ly.themeKo.oninput = () => { lyState.themeKo = ly.themeKo.value; saveLy(); };
+ly.styleKo.oninput = () => { lyState.styleKo = ly.styleKo.value; saveLy(); };
 // Style Builder [곡 분석 불러오기]가 웹에서 찾은 원곡의 리듬·분위기 설명을 주제·메모에 넣을 때 쓴다
-function setLyricsTheme(desc) {
-  // 직접 적어 둔 메모는 지우지 않는다. 이전 곡에서 자동으로 넣은 '주제/리듬/분위기: …' 줄만 새 설명으로 바꾼다
-  const mine = ly.theme.value.split('\n').filter((l) => !/^(주제|리듬|분위기): /.test(l)).join('\n').trim();
-  ly.theme.value = (mine ? `${mine}\n${desc}` : desc).slice(0, 600);
+// 곡 분석 원곡 정보 → 주제·메모(KO)에 '주제/리듬/분위기: …', (EN)에 'Theme/Rhythm/Mood: …'.
+// 직접 적어 둔 메모는 지우지 않고, 이전 곡에서 자동으로 넣은 줄만 새 설명으로 바꾼다
+function setLyricsTheme(descKo, descEn = '') {
+  const put = (el, desc, re) => {
+    const mine = el.value.split('\n').filter((l) => !re.test(l)).join('\n').trim();
+    el.value = [mine, desc].filter(Boolean).join('\n').slice(0, 600);
+  };
+  put(ly.themeKo, descKo, /^(주제|리듬|분위기): /);
+  put(ly.theme, descEn, /^(Theme|Rhythm|Mood): /);
+  lyState.themeKo = ly.themeKo.value;
   lyState.theme = ly.theme.value;
   saveLy();
 }
@@ -500,10 +538,13 @@ function setLyricsTheme(desc) {
 ly.stylePull.onclick = () => {
   pullStyle();
   const en = conceptParts();
-  if (!en.length || !(styleOut.prose || styleOut.list || '').trim()) return; // 스타일이 없으면 pullStyle의 안내를 그대로 보인다
+  const ko = concept.split('\n').map((l) => l.trim()).filter((l) => l && HANGUL.test(l));
+  if ((!en.length && !ko.length) || !(styleOut.prose || styleOut.list || '').trim()) return; // 스타일이 없으면 pullStyle의 안내를 그대로 보인다
+  // Theme의 영어 문장은 주제·메모(EN), 한글 줄은 (KO)로
   ly.theme.value = lyState.theme = en.map((p) => `${p}.`).join('\n').slice(0, 600);
+  ly.themeKo.value = lyState.themeKo = ko.join('\n').slice(0, 600);
   saveLy();
-  flash('스타일·BPM과 함께 Theme의 영어 문장을 주제·메모에 넣었습니다.', 'ok');
+  flash('스타일·BPM과 함께 Theme을 주제·메모(EN·KO)에 넣었습니다.', 'ok');
 };
 $('#ly-bpm-sync').onclick = () => { ly.bpm.value = lyState.bpm = sb.bpm; saveLy(); renderPlan(); };
 ly.gen.onclick = generateLyrics;
@@ -519,8 +560,10 @@ ly.title.oninput = () => { const v = curVer(); if (v) { v.title = ly.title.value
     if (lang === 'en') { checkBanned(); renderStruct(ly.structure, structFromText(ly.aiEn.value)); } // 태그를 고치면 구조도 바로
   };
 });
-$('#ly-copy-en').onclick = () => copyLyrics('en');
-$('#ly-copy-ko').onclick = () => copyLyrics('ko');
+$('#ly-copy-en').onclick = () => copyLyrics('sung');
+$('#ly-copy-ko').onclick = () => copyLyrics('meaning');
+ly.sing.value = lyState.sing === 'en' ? 'en' : 'ko';
+ly.sing.onchange = () => { lyState.sing = ly.sing.value; lyState.singSet = true; saveLy(); };
 $('#ly-save').onclick = saveToSongs;
 ly.mode.onclick = (e) => {
   const b = e.target.closest('[data-mode]');
@@ -567,10 +610,11 @@ autoPull();
 $('#ly-reset').onclick = () => {
   const m = lyState.manual;
   const n = lyState.versions.length;
-  const has = ly.style.value.trim() || ly.theme.value.trim() || n || m.title.trim() || m.en.trim() || m.ko.trim();
+  const has = ly.style.value.trim() || ly.theme.value.trim() || ly.themeKo.value.trim() || n || m.title.trim() || m.en.trim() || m.ko.trim();
   if (has && !confirm(`스타일·곡 길이·BPM·주제·메모와 제목·영어 가사·한글 가사${n ? `(AI로 만든 ${n}개 버전 포함)` : ''}를 모두 지울까요?`)) return;
   Object.assign(lyState, { style: '', len: 0, bpm: 0, theme: '', cleared: true, versions: [], cur: -1, manual: { title: '', en: '', ko: '' } });
-  ly.style.value = ly.theme.value = ly.bpm.value = ly.len.value = '';
+  ly.style.value = ly.theme.value = ly.bpm.value = ly.len.value = ly.styleKo.value = ly.themeKo.value = '';
+  lyState.styleKo = lyState.themeKo = '';
   ly.mTitle.value = ly.mEn.value = ly.mKo.value = '';
   ly.styleSrc.textContent = '';
   saveLy();

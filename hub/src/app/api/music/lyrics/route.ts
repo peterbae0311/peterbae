@@ -115,19 +115,41 @@ Fill in the JSON template given by the user and return ONLY that JSON, no Markdo
   a one-word title is a single word). Make the three titles different, modern and not cliché;
   the chorus hook or a key image is a good source.`;
 
+// 한국어로 부르는 곡: 한글이 노래 가사, 영어는 뜻풀이. 위 규칙을 한글 줄에 적용하게 덧붙인다
+const KO_MODE = `
+
+KOREAN MODE — this song is SUNG IN KOREAN. This section overrides any conflicting rule above.
+- "ko" is the sung lyric. Write every "ko" line first as an original Korean lyric; "en" is only a faithful English
+  translation of that line's meaning (not sung, no rhyme or length limit needed). The "en" LANGUAGE rule still holds.
+- Apply every RULE and SELF-CHECK item to the "ko" lines instead of "en":
+  - Everyday spoken Korean that people really say now: natural particles and endings, no translationese (번역투),
+    no stiff written style. Avoid old-fashioned or overly literary ballad clichés (e.g. 그대여, 내 맘속에, 영원히 함께,
+    눈물이 흘러, 운명) unless the theme asks for them.
+  - Keep one speech level (반말 or 존댓말) through the whole song, consistent with the speaker.
+  - Show feelings through concrete scenes, actions and objects in the verses; the chorus may state the core question or
+    message directly. The chorus hook line repeats at least twice.
+  - LINE LENGTH: count Hangul syllables (each Hangul character is one syllable). Most lines 6-12 syllables, never more
+    than 16. Split long thoughts across two lines.
+  - SYLLABLES: where a line has "syl", the "ko" line must have about that many Hangul syllables (within ±1) so it fits
+    the reference melody.
+  - Rhyme is optional; similar endings and repeated sounds are enough. Never break grammar or meaning for a rhyme.
+- titles: Korean titles in Hangul; "words" is the number of Korean words (어절).`;
+
 const str = (v: unknown, max: number) => (typeof v === 'string' ? v.trim().slice(0, max) : '');
 
 const titleWords = () => { const r = Math.random(); return r < 0.7 ? 1 : r < 0.9 ? 2 : 3; };
 
 // 빈칸 템플릿: 줄마다 번호를 달아 줄 수를 형식으로 고정한다(운은 강제하지 않아 운 글자는 달지 않는다)
 type Sec = { name: string; lines: number; syl?: number[] };
-function template(sections: Sec[]) {
+function template(sections: Sec[], ko = false) {
   return JSON.stringify({
     // 제목 단어 수: 1단어 70% · 2단어 20% · 3단어 10%(후보마다 따로 뽑음)
     titles: [titleWords(), titleWords(), titleWords()].map((words) => ({ words, title: '' })),
     sections: sections.map((s) => ({
       name: s.name,
-      lines: Array.from({ length: s.lines }, (_, i) => (s.syl?.[i] ? { n: i + 1, syl: s.syl[i], en: '', ko: '' } : { n: i + 1, en: '', ko: '' })),
+      // 한국어로 부르는 곡은 ko 칸을 먼저(먼저 쓰게)
+      lines: Array.from({ length: s.lines }, (_, i) => ({ n: i + 1, ...(s.syl?.[i] ? { syl: s.syl[i] } : {}),
+        ...(ko ? { ko: '', en: '' } : { en: '', ko: '' }) })),
     })),
   });
 }
@@ -158,6 +180,7 @@ export async function POST(request: NextRequest) {
     : [];
   if (!style) return NextResponse.json({ error: '스타일이 없습니다. Suno Style Builder에서 먼저 [생성]을 눌러 주세요.' }, { status: 400 });
   if (!sections.length) return NextResponse.json({ error: '곡 구조가 없습니다.' }, { status: 400 });
+  const ko = body?.sing === 'ko';
 
   const userPrompt = [
     `Style: ${style}`,
@@ -166,12 +189,13 @@ export async function POST(request: NextRequest) {
     plan ? `Song plan: ${plan}.` : '',
     ending ? `Planned ending: ${ending}.` : '',
     banned.length ? `Banned words and phrases (never use them or close variants anywhere in the lyrics or titles): ${banned.join(', ')}.` : '',
-    `Template:\n${template(sections)}`,
+    ko ? 'Sung language: Korean (write "ko" as the sung lyric, "en" as its English meaning).' : '',
+    `Template:\n${template(sections, ko)}`,
   ].filter(Boolean).join('\n');
 
   // Morfac → Groq → OpenRouter 순서로, 처음 응답하는 공급자를 쓴다(musicLlm.ts)
   const llm = await musicChat([
-    { role: 'system', content: SYSTEM_PROMPT },
+    { role: 'system', content: ko ? SYSTEM_PROMPT + KO_MODE : SYSTEM_PROMPT },
     { role: 'user', content: userPrompt },
   ], { maxTokens: 3500, temperature: 0.85, stream: true, timeoutMs: TIMEOUT_MS });
   if (!llm.ok) {
