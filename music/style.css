@@ -730,10 +730,13 @@ body.no-board #board { display: none; } /* 제목·가사·Suno 작곡·인기�
 .web-result h4 { margin: 0; font-size: 13.5px; }
 .web-result p { margin: 0; line-height: 1.55; }
 .web-result .chips { display: flex; flex-wrap: wrap; gap: 5px; align-items: center; }
-.web-result .w-label { font-size: 12px; color: var(--muted); min-width: 52px; }
+.web-result .w-label { font-size: 12px; font-weight: 700; color: var(--text); min-width: 52px; }
 .web-result ol { margin: 0; padding-left: 18px; font-size: 12px; }
 .web-result ol a { color: var(--accent); word-break: break-all; }
 .web-result .w-foot { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+.web-result .w-use { display: flex; gap: 14px; align-items: center; flex-wrap: wrap; font-size: 13px; }
+.web-result .w-chk { display: inline-flex; align-items: center; gap: 5px; cursor: pointer; }
+.web-result .w-chk input { margin: 0; accent-color: var(--accent); }
 .web-result .w-foot button { padding: 6px 12px; font-size: 12.5px; }
 
 /* 곡 분석 단계 제목: ① 곡 분석 ② 원곡 정보 확인 ③ 반영 여부 선택 */

@@ -143,8 +143,8 @@ function renderResult() {
     <div class="r-mid">
       <section class="r-grp"><h4 class="r-grp-h">곡 성격</h4>
       <div class="r-row"><span class="r-label">장르</span><div class="chips">${genres}</div></div>
-      <div class="r-row"><span class="r-label">리듬</span><div class="chips">${optChips('feel', feel)}${last.web ? webMark : ''}</div></div>
-      <div class="r-row"><span class="r-label">분위기</span><div class="chips">${optChips('mood', hints.mood)}${optChips('energy', [hints.energy])}${last.web ? webMark : ''}</div></div>
+      <div class="r-row"><span class="r-label">리듬</span><div class="chips">${optChips('feel', feel)}${last.web?.rhythm?.length ? webMark : ''}</div></div>
+      <div class="r-row"><span class="r-label">분위기</span><div class="chips">${optChips('mood', hints.mood)}${optChips('energy', [hints.energy])}${last.web?.mood?.length || last.web?.energy ? webMark : ''}</div></div>
       <div class="r-row"><span class="r-label">편곡</span><div class="chips">${optChips('arr', hints.arr)}${hints.outro ? optChips('outro', [hints.outro]) : ''}</div></div>
       <div class="r-row"><span class="r-label">사운드</span><div class="chips">${optChips('mix', hints.mix)}</div></div>
       </section>
@@ -937,6 +937,12 @@ function renderWeb() {
     return;
   }
   const chips = (key, vals) => vals.map((v) => `<span class="chip on">${OPTION_KO[key]?.[v] ?? esc(v)}</span>`).join('') || '<span class="muted">근거 없음</span>';
+  // ③ 반영할 항목(기본 모두 체크). 주제는 Style Builder [곡 분석 불러오기] 때 Theme·주제 메모에, 나머지는 위 분석 결과에 들어간다
+  w.use ??= { theme: true, rhythm: true, mood: true, energy: true };
+  const USE = [['theme', '주제', !!(w.themeKo || w.themeEn)], ['rhythm', '리듬', !!(w.rhythm.length || w.rhythmKo)],
+    ['mood', '분위기', !!(w.mood.length || w.moodKo)], ['energy', '에너지', !!w.energy]].filter(([, , has]) => has);
+  const useRow = USE.length ? `<div class="w-use"><span class="w-label">반영할 항목</span>${USE.map(([k, label]) =>
+    `<label class="w-chk"><input type="checkbox" data-use="${k}"${w.use[k] ? ' checked' : ''}> ${label}</label>`).join('')}</div>` : '';
   box.innerHTML = `
     <h4>웹에서 찾은 원곡 정보: ${esc(w.song)}${w.artist ? ` — ${esc(w.artist)}` : ''}</h4>
     ${w.themeKo ? `<p><b>주제</b> ${esc(w.themeKo)}</p>` : ''}
@@ -947,21 +953,39 @@ function renderWeb() {
     ${tagRow}
     <div class="w-step">
       <h3 class="step-h"><span class="step-n">3</span>반영 여부 선택</h3>
+      ${useRow}
       <div class="w-foot">${last?.web
         ? `<b class="w-state">✓ 웹 정보로 바꿨습니다</b><button class="ghost" id="web-undo">소리 분석 값으로 되돌리기</button>`
         : `<button class="primary" id="web-apply">웹 정보로 바꾸기</button><button class="ghost" id="web-keep">소리 분석 값 유지</button>${w.kept ? '<b class="w-state">✓ 소리 분석 값을 유지합니다</b>' : ''}`}
-        <small class="muted">바꾸면 위 분석 결과의 리듬·분위기·에너지와 Suno Style이 함께 바뀝니다.</small>
+        <small class="muted">바꾸면 위 분석 결과의 고른 항목(리듬·분위기·에너지)과 Suno Style이 함께 바뀝니다. 주제는 Suno Style Builder [곡 분석 불러오기] 때 Theme에 들어갑니다.</small>
       </div>
     </div>`;
+  // 고른 항목만 웹 값으로(고르지 않은 항목은 소리 분석 값 그대로)
+  const webSel = () => ({ rhythm: w.use.rhythm ? w.rhythm : [], mood: w.use.mood ? w.mood : [], energy: w.use.energy ? w.energy : '' });
+  const hasSel = (x) => x.rhythm.length || x.mood.length || x.energy;
+  box.querySelectorAll('[data-use]').forEach((c) => {
+    c.onchange = () => {
+      w.use[c.dataset.use] = c.checked;
+      if (!last?.web) return;
+      // 이미 바꿨으면 고른 항목으로 바로 다시 반영
+      const sel = webSel();
+      if (hasSel(sel)) last.web = sel; else delete last.web;
+      deriveFromBpm(); // 소리 분석 값으로 다시 구하고 고른 웹 값만 덮는다
+      renderResult();
+      renderWeb();
+    };
+  });
   const apply = $('#web-apply', box);
   if (apply) apply.onclick = () => {
     if (!last) return flash('먼저 곡을 분석해 주세요. 분석이 끝나면 이 값으로 바꿀 수 있습니다.', 'warn');
+    const sel = webSel();
+    if (!hasSel(sel)) return flash(w.use.theme ? '주제는 Suno Style Builder [곡 분석 불러오기] 때 Theme에 들어갑니다. 분석 결과를 바꾸려면 리듬·분위기·에너지 중 하나를 체크해 주세요.' : '반영할 항목을 하나 이상 체크해 주세요.', 'warn');
     w.kept = false;
-    last.web = { rhythm: w.rhythm, mood: w.mood, energy: w.energy };
+    last.web = sel;
     applyWebOverride();
     renderResult();
     renderWeb();
-    flash('웹에서 찾은 리듬·분위기로 바꿨습니다.', 'ok');
+    flash(`웹에서 찾은 ${[sel.rhythm.length && '리듬', sel.mood.length && '분위기', sel.energy && '에너지'].filter(Boolean).join('·')}(으)로 바꿨습니다.`, 'ok');
   };
   const keep = $('#web-keep', box);
   if (keep) keep.onclick = () => { w.kept = true; renderWeb(); };
