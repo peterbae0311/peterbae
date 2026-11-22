@@ -24,7 +24,7 @@
   <link rel="stylesheet" crossorigin
         href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/static/pretendard.css">
   <!-- 파일을 고치면 ?v= 값을 올려 브라우저 캐시에 남은 예전 파일을 쓰지 않게 한다 -->
-  <link rel="stylesheet" href="style.css?v=20261118f">
+  <link rel="stylesheet" href="style.css?v=20261122c">
 </head>
 <body>
   <header class="hero">
@@ -99,7 +99,7 @@
       <div class="ptabs" role="tablist" aria-label="조합 만들기 방법">
         <button class="ptab" role="tab" id="tab-presets" aria-controls="panel-presets">추천 조합 <span id="preset-current" class="cur"></span></button>
         <button class="ptab" role="tab" id="tab-ref" aria-controls="panel-ref">인기곡</button>
-        <button class="ptab" role="tab" id="tab-upload" aria-controls="panel-upload">곡으로 조합 만들기</button>
+        <button class="ptab" role="tab" id="tab-upload" aria-controls="panel-upload">곡 분석</button>
         <button class="ptab" role="tab" id="tab-suno" aria-controls="panel-suno">Suno Style Builder</button>
         <button class="ptab" role="tab" id="tab-lyrics" aria-controls="panel-lyrics">제목·가사</button>
         <button class="ptab" role="tab" id="tab-songs" aria-controls="panel-songs">Suno 작곡</button>
@@ -376,6 +376,25 @@
         </div>
       </form>
     </dialog>
+
+    <dialog id="lyr-dialog" class="song-dialog lyr-dialog" aria-labelledby="lyr-dialog-title">
+      <div class="lyr-wrap">
+        <div class="sd-head"><h2 id="lyr-dialog-title">가사 구조별 가사</h2><button type="button" class="ghost" id="lyr-close" aria-label="닫기">닫기</button></div>
+        <p class="lyr-struct muted"><b>가사 구조</b> <span id="lyr-struct"></span></p>
+        <div class="lyr-find">
+          <input id="lyr-q" placeholder="제목 가수 (멜론 검색)" aria-label="멜론 검색어" autocomplete="off">
+          <button type="button" class="ghost" id="lyr-melon">멜론에서 가져오기</button>
+          <select id="lyr-pick" aria-label="멜론 검색 결과" hidden></select>
+          <small class="muted" id="lyr-find-status"></small>
+        </div>
+        <div class="sd-body lyr-body">
+          <div class="sd-field"><span class="lb"><label for="lyr-src">원곡 가사 붙여넣기</label></span><textarea id="lyr-src" rows="18" placeholder="원곡 가사를 붙여넣으세요.&#10;빈 줄로 문단(구간)을 나눠 두면 더 정확해요."></textarea></div>
+          <div class="sd-field"><span class="lb"><label for="lyr-out">구조별 가사</label><button type="button" class="sd-copy" id="lyr-copy" aria-label="구조별 가사 복사" title="구조별 가사 복사"><svg viewBox="0 0 24 24" width="14" height="14" aria-hidden="true"><rect x="9" y="9" width="11" height="11" rx="2" fill="none" stroke="currentColor" stroke-width="2"/><path d="M5 15V5a2 2 0 0 1 2-2h8" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg></button></span><textarea id="lyr-out" rows="18" spellcheck="false"></textarea></div>
+        </div>
+        <p class="muted lyr-how" id="lyr-how"></p>
+        <p class="muted lyr-how">Suno Style Builder에서 [곡 분석 불러오기]를 하면 가사 생성이 이 구간별 <b>줄 수</b>와 줄마다의 <b>음절 수</b>를 따라 씁니다(원곡과 같은 형태).</p>
+      </div>
+    </dialog>
   </main>
 
   <div id="toast" class="toast" role="status" aria-live="polite"></div>
@@ -385,10 +404,10 @@
   <script src="app.js?v=20261112a"></script>
   <script src="melody.js?v=20261111g"></script>
   <script src="arrange.js?v=20261121a"></script>
-  <script src="upload.js?v=20261118c"></script>
-  <script src="suno.js?v=20261118h"></script>
+  <script src="upload.js?v=20261122f"></script>
+  <script src="suno.js?v=20261122b"></script>
   <script src="songs.js?v=20261107d"></script>
-  <script src="lyrics.js?v=20261117a"></script>
+  <script src="lyrics.js?v=20261122a"></script>
   <script src="ref.js?v=20261109a"></script>
 </body>
 </html>

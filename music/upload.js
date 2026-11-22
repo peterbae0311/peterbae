@@ -148,7 +148,7 @@ function renderResult() {
       <div class="r-row"><span class="r-label">편곡</span><div class="chips">${optChips('arr', hints.arr)}${hints.outro ? optChips('outro', [hints.outro]) : ''}</div></div>
       <div class="r-row"><span class="r-label">사운드</span><div class="chips">${optChips('mix', hints.mix)}</div></div>
       </section>
-      <section class="r-grp"><h4 class="r-grp-h">곡 구조 <small class="muted">추정</small></h4>
+      <section class="r-grp"><h4 class="r-grp-h">곡 구조 <small class="muted">추정</small>${!res.partial && Analyzer.songStructure(res).length ? '<button class="ghost sd-mini" id="r-lyr-btn" title="원곡 가사를 붙여넣으면 가사 구조에 맞춰 구간별로 나눠 보여 줍니다">가사</button>' : ''}</h4>
       <div class="r-row"><span class="r-label">가사 구조</span>${structHtml(res)}</div>
       <div class="r-row"><span class="r-label">노래 흐름</span><div class="r-deliv" id="r-deliv"></div></div>
       </section>
@@ -182,7 +182,251 @@ function renderResult() {
   $('audio', up.result).onplay = () => { stopTransport(); melPreviewStop(); };
   renderMelodyRow();
   renderDelivery();
+  const lb = $('#r-lyr-btn');
+  if (lb) lb.onclick = openLyrDialog;
 }
+
+/* ---------------- 가사 구조별 가사 (팝업) ----------------
+ * 곡 분석은 노랫말을 알아낼 수 없어, 원곡 가사를 붙여넣으면 분석한 가사 구조(노래 흐름이 있으면 그 설명도)에 맞춰
+ * [Verse 1 – 8 Bars: …] 태그 아래로 나눠 보여 준다. 붙여넣은 가사는 곡 파일 이름별로 이 브라우저에 기억한다 */
+const LYR_INST = /^(Intro|Outro|Interlude|Instrumental)/i;
+const lyrKey = () => `music.origLyrics.${last.file?.name ?? 'song'}`;
+const lyrOutKey = () => `music.origLyricsOut.${last.file?.name ?? 'song'}`;
+const lsGet = (k) => { try { return localStorage.getItem(k) ?? ''; } catch { return ''; } };
+const lsSet = (k, v) => { try { localStorage.setItem(k, v); } catch { /* 저장소를 못 쓰면 이번 화면에서만 */ } };
+
+// 노래로 부르는 음절 수(대략): 한글은 글자 수, 영어는 단어마다 모음 묶음 수
+const sylCount = (l) => (l.match(/[\uAC00-\uD7A3]/g) ?? []).length
+  + (l.match(/[A-Za-z]+/g) ?? []).reduce((n, w) => n + Math.max(1, (w.toLowerCase().replace(/e$/, '').match(/[aeiouy]+/g) ?? []).length), 0);
+
+// 구조별 가사 글 → [{ name, lines }] ([Instrumental]·[End]는 건너뛴다)
+function parseLyrOut(text) {
+  const out = [];
+  let cur = null;
+  text.split(/\r?\n/).forEach((raw) => {
+    const l = raw.trim();
+    const m = l.match(/^\[([^\]–:]+?)(?:\s*–\s*\d+\s*Bars)?(?::[^\]]*)?\]$/);
+    if (m) {
+      if (/^(Instrumental|End)$/i.test(m[1].trim())) return;
+      // 인트로·간주·아웃트로 태그는 가사 구간이 아니다(아래 줄은 버린다)
+      if (LYR_INST.test(m[1].trim())) { cur = null; return; }
+      cur = { name: m[1].trim(), lines: [] };
+      out.push(cur);
+    } else if (l && cur) cur.lines.push(l);
+  });
+  return out;
+}
+
+// 곡 분석 구간 순서에 맞춘 원곡 가사 정보(줄 수·줄별 음절 수·글). 원곡 가사를 넣지 않았으면 null
+function origLyricSecs() {
+  if (!last?.res || last.res.partial) return null;
+  const text = lsGet(lyrOutKey());
+  if (!text.trim()) return null;
+  const parsed = parseLyrOut(text);
+  if (!parsed.some((p) => p.lines.length)) return null;
+  let pi = 0;
+  return lyrSections().map((s) => {
+    if (LYR_INST.test(s.name)) return null;
+    const p = parsed[pi++];
+    return p?.lines.length ? { lines: p.lines.length, syl: p.lines.map(sylCount), text: p.lines.join('\n') } : null;
+  });
+}
+
+// 팝업에서 가사가 바뀌면 Style Builder 8번 곡 분석 구조(있을 때)에 바로 반영해 가사 생성이 같은 형태를 따르게 한다
+function syncOrigLyrics() {
+  if (typeof attachOrigLyrics === 'function') attachOrigLyrics();
+}
+
+// 붙여넣은 가사 → 노래 구간별 줄 묶음. 문단 수가 노래 구간 수와 같으면 문단 그대로, 다르면 마디 수 비율로 줄을 나눈다
+function splitLyrics(raw, secs, bpm) {
+  const vocal0 = secs.filter((s) => !LYR_INST.test(s.name));
+  const tagged = splitByTags(raw);
+  if (tagged && vocal0.length) {
+    // 원곡 가사에 [Verse 1]·[Pre Chorus] 같은 태그가 있으면 태그 이름으로 곡 분석 구간과 짝을 맞춘다(한 태그 안의 여러 문단은 한 구간)
+    const norm = (n) => n.toLowerCase().replace(/[^a-z]/g, '').replace(/^(final|last)/, '');
+    let ti = 0, miss = 0;
+    let groups = vocal0.map((s) => {
+      let j = ti;
+      while (j < tagged.length && norm(tagged[j].name) !== norm(s.name)) j++;
+      if (j >= tagged.length) { miss++; return []; }
+      ti = j + 1;
+      return tagged[j].lines;
+    });
+    // 이름이 안 맞아도 개수가 같으면 순서대로
+    if (miss && tagged.length === vocal0.length) { groups = tagged.map((t) => t.lines); miss = 0; }
+    return { groups, how: `원곡 가사의 구간 태그 ${tagged.length}개를 곡 분석 구간 ${vocal0.length}개에 이름으로 맞췄어요.${miss ? ` 짝을 못 찾은 구간 ${miss}개는 비워 두었어요.` : ''}` };
+  }
+  // [Verse]·(후렴) 같은 태그 줄과 # 제목 줄은 문단 구분으로만 쓴다
+  const text = raw.split(/\r?\n/).map((l) => l.trim()).map((l) => (/^\[.*\]$|^\(.*\)$|^#/.test(l) ? '' : l)).join('\n');
+  const paras = text.split(/\n\s*\n+/).map((p) => p.split('\n').filter(Boolean)).filter((p) => p.length);
+  const vocal = secs.filter((s) => !LYR_INST.test(s.name));
+  if (!paras.length || !vocal.length) return { groups: [], how: '' };
+  if (paras.length === vocal.length) return { groups: paras, how: `문단 ${paras.length}개가 노래 구간 ${vocal.length}개와 같아 문단 그대로 나눴어요.` };
+  const rep = splitByRepeats(paras, vocal);
+  if (rep) return { groups: rep, how: `태그가 없어 똑같이 반복되는 문단을 후렴·프리코러스로 보고 나눴어요(문단 ${paras.length}개 → 구간 ${vocal.length}개). 오른쪽에서 확인해 주세요.` };
+  const flat = paras.flat();
+  const bpl = bpm < 90 ? 1 : 2;
+  const want = vocal.map((s) => Math.max(1, s.bars / bpl));
+  const total = want.reduce((a, b) => a + b, 0);
+  let acc = 0, prev = 0;
+  const groups = want.map((w) => {
+    acc += w;
+    const end = Math.round((acc / total) * flat.length);
+    const g = flat.slice(prev, end);
+    prev = end;
+    return g;
+  });
+  return { groups, how: `문단 수(${paras.length})가 노래 구간 수(${vocal.length})와 달라 마디 수 비율로 줄을 나눴어요. 오른쪽에서 직접 고칠 수 있어요.` };
+}
+
+// 태그 없는 가사(멜론 등): 똑같이 반복되는 문단을 후렴·프리코러스로 본다.
+// 벌스·브리지는 반복되지 않는 문단을 이어서 모두, 후렴·프리코러스는 문단 하나, 마지막 구간은 남은 문단 전부.
+// 구간이 비거나 문단이 모자라면 null(마디 비율로 나눈다)
+function splitByRepeats(paras, vocal) {
+  const key = (p) => p.join('\n');
+  const cnt = new Map();
+  paras.forEach((p) => cnt.set(key(p), (cnt.get(key(p)) ?? 0) + 1));
+  const rep = paras.map((p) => cnt.get(key(p)) > 1);
+  if (!rep.some(Boolean)) return null;
+  const groups = [];
+  let i = 0;
+  for (let k = 0; k < vocal.length; k++) {
+    if (k === vocal.length - 1) { groups.push(paras.slice(i).flat()); i = paras.length; break; }
+    if (/Chorus/i.test(vocal[k].name)) { groups.push(paras[i] ? paras[i++] : []); continue; }
+    const g = [];
+    while (i < paras.length && !rep[i]) g.push(...paras[i++]);
+    if (!g.length && i < paras.length) g.push(...paras[i++]);
+    groups.push(g);
+  }
+  return groups.every((g) => g.length) ? groups : null;
+}
+
+// [태그]로 나뉜 가사 → [{ name, lines }]. 태그가 없으면 null. 인트로·간주 태그 아래 줄은 버린다
+function splitByTags(raw) {
+  const tagRe = /^\[([^\]]+)\]$/;
+  const lines = raw.split(/\r?\n/).map((l) => l.trim());
+  if (!lines.some((l) => tagRe.test(l))) return null;
+  const out = [];
+  let cur = null;
+  lines.forEach((l) => {
+    const m = l.match(tagRe);
+    if (m) {
+      const name = m[1].split(/[:–]/)[0].trim();
+      if (LYR_INST.test(name) || /^End$/i.test(name)) { cur = null; return; }
+      cur = { name, lines: [] };
+      out.push(cur);
+    } else if (l && cur && !/^#/.test(l)) cur.lines.push(l);
+  });
+  return out.length ? out : null;
+}
+
+function lyrSections() {
+  return last.res.partial ? [] : (last.delivery ?? Analyzer.songStructure(last.res));
+}
+
+function renderLyrOut() {
+  const secs = lyrSections();
+  const raw = $('#lyr-src').value;
+  const { groups, how } = splitLyrics(raw, secs, last.res.bpm);
+  let vi = 0;
+  const out = [];
+  secs.forEach((s) => {
+    out.push(`[${s.name} – ${s.bars} Bars${s.en ? `: ${s.en}` : ''}]`);
+    if (LYR_INST.test(s.name)) out.push('[Instrumental]');
+    else {
+      const g = groups[vi++] ?? [];
+      out.push(...(g.length ? g : ['']));
+    }
+    out.push('');
+  });
+  out.push('[End]');
+  $('#lyr-out').value = out.join('\n');
+  lsSet(lyrOutKey(), raw.trim() ? $('#lyr-out').value : '');
+  $('#lyr-how').textContent = raw.trim() ? how : '왼쪽에 원곡 가사를 붙여넣으면 구간별로 나눠 줍니다. 빈 줄로 문단을 나눠 두면 더 정확해요.';
+}
+
+/* 멜론에서 원곡 가사 가져오기(허브 /api/music/melon). 팝업을 열 때 가사가 비어 있으면 자동으로 찾는다 */
+async function melonApi(body) {
+  const r = await fetch('/api/music/melon', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
+  const d = await r.json().catch(() => null);
+  if (!r.ok || !d) throw new Error(d?.error || ([404, 405, 501].includes(r.status) ? 'NO_SERVER' : `HTTP ${r.status}`));
+  return d;
+}
+// 검색어: ② 원곡 정보에 적은 제목·가수, 없으면 파일 이름(확장자·앞 번호 뺀 것)
+const lyrQuery = () => {
+  const t = si.title.value.trim();
+  if (t) return `${t} ${si.artist.value.trim()}`.trim();
+  return (last.file?.name ?? '').replace(/\.[^.]+$/, '').replace(/^\d+[.\s_-]*/, '').trim();
+};
+const lyrStatus = (t) => { $('#lyr-find-status').textContent = t; };
+function fillMelon(pick) {
+  if (!pick) return lyrStatus('멜론에서 곡을 찾지 못했어요. 검색어(제목 가수)를 바꿔 보세요.');
+  if (!pick.lyrics) return lyrStatus(`"${pick.title}"은(는) 멜론에 가사가 없어요(성인 인증 곡 등).`);
+  $('#lyr-src').value = pick.lyrics;
+  $('#lyr-src').dispatchEvent(new Event('input'));
+  lyrStatus(`멜론: ${pick.title} – ${pick.artist} 가사를 넣었어요.`);
+}
+async function findMelon(body) {
+  const btn = $('#lyr-melon');
+  btn.disabled = true;
+  lyrStatus('멜론에서 찾는 중…');
+  try {
+    const d = await melonApi(body);
+    if (d.songs) {
+      const sel = $('#lyr-pick');
+      sel.innerHTML = d.songs.map((s) => `<option value="${s.id}">${esc(s.title)} – ${esc(s.artist)}</option>`).join('');
+      sel.hidden = d.songs.length < 2;
+    }
+    fillMelon(d.pick);
+  } catch (e) {
+    lyrStatus(e.message === 'NO_SERVER' ? '멜론 검색은 허브가 있는 배포 사이트에서만 돼요. 가사를 직접 붙여넣어 주세요.' : e.message);
+  } finally {
+    btn.disabled = false;
+  }
+}
+$('#lyr-melon').onclick = () => {
+  const q = $('#lyr-q').value.trim();
+  if (!q) { $('#lyr-q').focus(); return lyrStatus('제목(과 가수)을 입력해 주세요.'); }
+  findMelon({ q });
+};
+$('#lyr-q').onkeydown = (e) => { if (e.key === 'Enter' && !e.isComposing) { e.preventDefault(); $('#lyr-melon').click(); } };
+$('#lyr-pick').onchange = () => findMelon({ songId: $('#lyr-pick').value });
+
+function openLyrDialog() {
+  const dlg = $('#lyr-dialog');
+  $('#lyr-src').value = lsGet(lyrKey());
+  $('#lyr-q').value = lyrQuery();
+  $('#lyr-pick').hidden = true;
+  lyrStatus('');
+  $('#lyr-struct').textContent = lyrSections().map((s) => `${s.name} ${s.bars}마디`).join(' → ');
+  renderLyrOut();
+  // 오른쪽을 직접 고쳐 두었으면 그 글을 보여 준다
+  const edited = lsGet(lyrOutKey());
+  if (edited.trim()) $('#lyr-out').value = edited;
+  dlg.showModal();
+  // 넣어 둔 가사가 없으면 멜론에서 자동으로 찾는다
+  if (!$('#lyr-src').value.trim() && $('#lyr-q').value) $('#lyr-melon').click();
+}
+
+$('#lyr-src').oninput = () => {
+  lsSet(lyrKey(), $('#lyr-src').value);
+  renderLyrOut();
+  syncOrigLyrics();
+};
+$('#lyr-out').oninput = () => {
+  lsSet(lyrOutKey(), $('#lyr-out').value);
+  syncOrigLyrics();
+};
+$('#lyr-close').onclick = () => $('#lyr-dialog').close();
+$('#lyr-copy').onclick = async () => {
+  const text = $('#lyr-out').value;
+  if (!text.trim()) return;
+  if (await copyText(text)) {
+    flash('구조별 가사를 복사했습니다.', 'ok');
+    $('#lyr-copy').classList.add('done');
+    setTimeout(() => $('#lyr-copy').classList.remove('done'), 1200);
+  }
+};
 
 /* ---------------- 구간별 노래 흐름 ----------------
  * 곡 전체 음높이를 따라가(약 30~40초) 구간마다 어떻게 부르는지(담담하게·서서히 상승·고음 폭발·하강 멜로디 등)를 보여 준다.

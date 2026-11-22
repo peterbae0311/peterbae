@@ -42,6 +42,9 @@ DELIVERY: a section in the plan may carry a vocal-delivery note in [brackets] (e
 "soaring high notes and an emotional peak in the middle", "wistful falling melody at the end"). Shape that section's words
 to it: quiet, intimate, plain words where it is restrained; the strongest image and open, long vowels where it peaks;
 softer, reflective words where the melody falls.
+SYLLABLES: a template line may carry "syl" — the syllable count of the reference song's line in that slot, sung to the
+same melody. Write that "en" line so it is sung with about that many syllables (within ±2) and keep the section's line
+count; a long "syl" line may run past the usual 4-8 words (still 10 words at most). Never copy or translate the reference song.
 Before answering, run the SELF-CHECK silently, fix anything that fails, and output only the fixed result.
 
 RULES
@@ -103,6 +106,7 @@ SELF-CHECK (do not output)
 - Are any banned examples, clichés or fleeting slang left? Does every line sound like natural speech?
 - Does any banned recent image (e.g. coffee, neon) or hook appear anywhere?
 - Does every section have exactly the number of lines in the template?
+- Where a line has "syl", is the "en" line sung with about that many syllables (±2)?
 
 OUTPUT
 Fill in the JSON template given by the user and return ONLY that JSON, no Markdown or extra text.
@@ -116,13 +120,14 @@ const str = (v: unknown, max: number) => (typeof v === 'string' ? v.trim().slice
 const titleWords = () => { const r = Math.random(); return r < 0.7 ? 1 : r < 0.9 ? 2 : 3; };
 
 // 빈칸 템플릿: 줄마다 번호를 달아 줄 수를 형식으로 고정한다(운은 강제하지 않아 운 글자는 달지 않는다)
-function template(sections: { name: string; lines: number }[]) {
+type Sec = { name: string; lines: number; syl?: number[] };
+function template(sections: Sec[]) {
   return JSON.stringify({
     // 제목 단어 수: 1단어 70% · 2단어 20% · 3단어 10%(후보마다 따로 뽑음)
     titles: [titleWords(), titleWords(), titleWords()].map((words) => ({ words, title: '' })),
     sections: sections.map((s) => ({
       name: s.name,
-      lines: Array.from({ length: s.lines }, (_, i) => ({ n: i + 1, en: '', ko: '' })),
+      lines: Array.from({ length: s.lines }, (_, i) => (s.syl?.[i] ? { n: i + 1, syl: s.syl[i], en: '', ko: '' } : { n: i + 1, en: '', ko: '' })),
     })),
   });
 }
@@ -141,11 +146,15 @@ export async function POST(request: NextRequest) {
   // 화면의 금지 표현 목록(트렌디하지 않은 단어·클리셰 등). 사용자가 더하고 뺀다
   const banned = (Array.isArray(body?.banned) ? body.banned : [])
     .map((b: unknown) => str(b, 40)).filter(Boolean).slice(0, 80) as string[];
-  const sections: { name: string; lines: number }[] = Array.isArray(body?.sections)
+  // syl: 원곡 가사(참고곡)의 줄별 음절 수. 있으면 같은 멜로디에 맞게 음절 수를 맞춰 쓴다
+  const sections: Sec[] = Array.isArray(body?.sections)
     ? body.sections
       .filter((s: { name?: unknown; lines?: unknown }) => typeof s?.name === 'string' && Number.isInteger(s?.lines) && (s.lines as number) > 0 && (s.lines as number) <= 16)
       .slice(0, 12)
-      .map((s: { name: string; lines: number }) => ({ name: s.name.slice(0, 40), lines: s.lines }))
+      .map((s: { name: string; lines: number; syl?: unknown }) => {
+        const syl = Array.isArray(s.syl) ? s.syl.slice(0, s.lines).map((n) => (Number.isInteger(n) && (n as number) > 0 && (n as number) <= 40 ? n as number : 0)) : [];
+        return { name: s.name.slice(0, 40), lines: s.lines, ...(syl.some(Boolean) ? { syl } : {}) };
+      })
     : [];
   if (!style) return NextResponse.json({ error: '스타일이 없습니다. Suno Style Builder에서 먼저 [생성]을 눌러 주세요.' }, { status: 400 });
   if (!sections.length) return NextResponse.json({ error: '곡 구조가 없습니다.' }, { status: 400 });

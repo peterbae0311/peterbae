@@ -754,7 +754,7 @@ function renderGroup(g) {
 }
 
 /* ---------------- Theme (1번 위) ----------------
- * 곡의 주제·리듬·분위기. 직접 적거나, [곡 분석 불러오기]하면 곡으로 조합 만들기 ②의 원곡 정보로 채워진다.
+ * 곡의 주제·리듬·분위기. 직접 적거나, [곡 분석 불러오기]하면 곡 분석 ②의 원곡 정보로 채워진다.
  * '주제: …' 같은 한글 줄은 사람이 보는 메모라서 ':' 뒤의 영어 문장만 스타일 맨 앞에 들어간다
  * (':'로 시작하는 줄이 없으면 한글이 없는 줄만 쓴다). localStorage 키는 예전 Concept 것을 그대로 쓴다 */
 const CONCEPT_KEY = 'music.suno.concept';
@@ -1185,7 +1185,7 @@ function fromMixer() {
 }
 
 function fromSong() {
-  if (!last) return flash('먼저 "곡으로 조합 만들기" 탭에서 곡을 분석해 주세요.', 'warn');
+  if (!last) return flash('먼저 "곡 분석" 탭에서 곡을 분석해 주세요.', 'warn');
   const { res, mix } = last;
   const s = songSb(last);
   // 분석 장르가 4번에 없으면 새 세부 장르로 추가하고 고른다
@@ -1210,6 +1210,7 @@ function fromSong() {
   const structEn = secs.length ? `song structure: ${secs.map((x) => x.name.replace(/\s*\d+$/, '').toLowerCase()).join(', ')}` : '';
   sb.custom = { ...sb.custom, 8: structEn ? [...others, { en: structEn, ko: `곡 분석 가사 구조: ${secs.map((x) => x.name).join(' → ')}`, auto: 'structure', secs: secs.map((x) => ({ name: x.name, bars: x.bars, ...(x.en ? { ko: x.ko, en: x.en } : {}) })) }] : others };
   if (!sb.custom['8'].length) delete sb.custom['8'];
+  attachOrigLyrics(false);
   // 구간별 노래 흐름(분석해 두었을 때)을 10번 보컬에 한 줄로 넣는다: 벌스·프리코러스·후렴·브리지마다 첫 설명만(스타일 1,000자를 아끼려고)
   const ROLE = [['verse', /^Verse/], ['pre-chorus', /Pre-?Chorus/], ['chorus', /^Chorus$/], ['bridge', /^Bridge/]];
   const flows = ROLE.map(([role, re]) => [role, secs.find((x) => re.test(x.name) && x.en)]).filter(([, x]) => x);
@@ -1224,7 +1225,7 @@ function fromSong() {
   if (themed && typeof setLyricsTheme === 'function') {
     setLyricsTheme([w.themeKo && `주제: ${w.themeKo.slice(0, 190)}`, w.rhythmKo && `리듬: ${w.rhythmKo.slice(0, 190)}`, w.moodKo && `분위기: ${w.moodKo.slice(0, 190)}`].filter(Boolean).join('\n'));
   }
-  flash(`"${res.name}" 분석 결과를 불러왔습니다.${added ? ` 4번 장르에 없던 '${g.main.name}'을(를) ${g.main.cat} 탭에 새로 추가했습니다.` : ''}${freed.length ? ` 제외 항목에서 해제: ${freed.join(' · ')}.` : ''}${voice && !sb.vocal ? ' 보컬이 감지되었으니 10번에서 보컬 종류를 골라 주세요.' : ''}${structEn ? ' 가사 구조를 8번에 넣었습니다.' : ''}${flowEn ? ' 노래 흐름을 10번에 넣었습니다.' : structEn ? ' 노래 흐름도 넣으려면 곡으로 조합 만들기에서 [구간별 노래 흐름 분석] 후 다시 불러오세요.' : ''}${themed ? ' 원곡의 주제·리듬·분위기를 Theme과 제목·가사 탭의 주제·메모에 넣었습니다.' : ' 원곡 정보(②)를 찾지 않아 Theme은 그대로 두었습니다.'}`, 'ok');
+  flash(`"${res.name}" 분석 결과를 불러왔습니다.${added ? ` 4번 장르에 없던 '${g.main.name}'을(를) ${g.main.cat} 탭에 새로 추가했습니다.` : ''}${freed.length ? ` 제외 항목에서 해제: ${freed.join(' · ')}.` : ''}${voice && !sb.vocal ? ' 보컬이 감지되었으니 10번에서 보컬 종류를 골라 주세요.' : ''}${structEn ? ' 가사 구조를 8번에 넣었습니다.' : ''}${flowEn ? ' 노래 흐름을 10번에 넣었습니다.' : structEn ? ' 노래 흐름도 넣으려면 곡 분석에서 [구간별 노래 흐름 분석] 후 다시 불러오세요.' : ''}${themed ? ' 원곡의 주제·리듬·분위기를 Theme과 제목·가사 탭의 주제·메모에 넣었습니다.' : ' 원곡 정보(②)를 찾지 않아 Theme은 그대로 두었습니다.'}`, 'ok');
 }
 
 // 고른 주 악기 + 반주 악기를 믹서로 들어보기(장르를 골랐으면 그 장르의 코드 진행으로)
@@ -1234,6 +1235,22 @@ function previewSb() {
   const preset = GENRES.flatMap((g) => g.items).find((p) => p.name === sb.genre);
   markPreset(null);
   applyCombo(ids, sb.bpm, 0, preset?.prog ?? DEFAULT_PROG);
+}
+
+// 곡 분석 › 가사 팝업에 넣은 원곡 가사의 형태(구간별 줄 수·줄별 음절 수)를 8번 곡 분석 구조에 붙인다.
+// 구간 이름·개수가 지금 분석 결과와 같을 때만. 원곡 가사를 지우면 형태 정보도 뺀다
+function attachOrigLyrics(save = true) {
+  const it = (sb.custom?.['8'] ?? []).find((x) => x.auto === 'structure' && x.secs?.length);
+  if (!it || typeof origLyricSecs !== 'function' || !last?.res) return;
+  const cur = last.res.partial ? [] : (last.delivery ?? Analyzer.songStructure(last.res));
+  if (cur.length !== it.secs.length || cur.some((s, i) => s.name !== it.secs[i].name)) return;
+  const orig = origLyricSecs();
+  it.secs = it.secs.map(({ lines, syl, text, ...s }, i) => (orig?.[i] ? { ...s, ...orig[i] } : s));
+  it.ko = it.ko.replace(/ · 원곡 가사 형태$/, '') + (orig ? ' · 원곡 가사 형태' : '');
+  if (!save) return;
+  saveSb();
+  renderSb();
+  if (typeof renderPlan === 'function') renderPlan();
 }
 
 async function copyOut(id, label) {

@@ -282,7 +282,7 @@ body.has-solo .card.active:not(.soloed) .solo { color: var(--text); }
   .grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
 }
 
-/* ---------- 상단 탭 패널: 곡으로 조합 만들기 / 추천 조합 ---------- */
+/* ---------- 상단 탭 패널: 곡 분석 / 추천 조합 ---------- */
 .panel {
   background: var(--panel); border: 1px solid var(--line); border-radius: var(--radius);
   margin-bottom: 24px; /* overflow를 숨기면 세부 장르 말풍선이 패널 아래에서 잘림 */
@@ -671,6 +671,20 @@ body.no-board #board { display: none; } /* 제목·가사·Suno 작곡·인기�
 }
 .sd-copy:hover { color: var(--accent); border-color: var(--line); background: var(--panel-2); }
 .sd-copy.done { color: #16a34a; border-color: currentColor; }
+/* 곡 분석 › 가사 구조 옆 [가사] 버튼과 구조별 가사 팝업 */
+.r-grp-h .sd-mini { margin-left: 4px; color: var(--text); }
+.lyr-dialog { width: min(960px, calc(100vw - 32px)); }
+.lyr-wrap { display: flex; flex-direction: column; max-height: calc(100vh - 48px); }
+.lyr-struct { margin: 0; padding: 10px 20px 0; font-size: 12.5px; }
+.lyr-struct b { color: var(--text); margin-right: 6px; }
+.lyr-body { overflow-y: auto; }
+.lyr-find { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; padding: 10px 20px 0; }
+.lyr-find input { flex: 0 1 280px; min-width: 0; font: inherit; font-size: 13px; padding: 6px 10px; border: 1px solid var(--line); border-radius: 8px; background: var(--field-bg); color: var(--text); }
+.lyr-find select { max-width: 280px; font-size: 12.5px; }
+.lyr-find small { font-size: 12px; }
+.lyr-body textarea { font-size: 13px; line-height: 1.55; }
+.lyr-how { margin: 0; padding: 0 20px 16px; font-size: 12px; }
+@media (max-width: 640px) { .lyr-body { grid-template-columns: minmax(0, 1fr); } }
 /* 제목·가사 탭: 이름 바로 옆에 복사 아이콘 */
 .ly-lbl { display: inline-flex; align-items: center; gap: 4px; }
 .sd-file { display: flex; align-items: center; gap: 8px; font-weight: 400; color: var(--text); font-size: 12.5px; }
@@ -698,7 +712,7 @@ body.no-board #board { display: none; } /* 제목·가사·Suno 작곡·인기�
   .sd-head, .sd-foot { padding-left: 16px; padding-right: 16px; }
 }
 
-/* 추천 조합·곡으로 조합 만들기 상단 줄: 왼쪽 장르 탭, 오른쪽 [초기화] */
+/* 추천 조합·곡 분석 상단 줄: 왼쪽 장르 탭, 오른쪽 [초기화] */
 .prow { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; margin-bottom: 10px; }
 .prow .gtabs { flex: 0 1 auto; margin-bottom: 0; }
 .prow-end { justify-content: flex-end; margin-bottom: 8px; }
@@ -722,7 +736,7 @@ body.no-board #board { display: none; } /* 제목·가사·Suno 작곡·인기�
 .web-result .w-foot { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
 .web-result .w-foot button { padding: 6px 12px; font-size: 12.5px; }
 
-/* 곡으로 조합 만들기 단계 제목: ① 곡 분석 ② 원곡 정보 확인 ③ 반영 여부 선택 */
+/* 곡 분석 단계 제목: ① 곡 분석 ② 원곡 정보 확인 ③ 반영 여부 선택 */
 .step-h { display: flex; align-items: baseline; gap: 8px; flex-wrap: wrap; margin: 0 0 10px; font-size: 14px; }
 .step-h small { font-size: 12px; font-weight: 400; color: var(--muted); }
 .step-n { display: inline-grid; place-items: center; width: 20px; height: 20px; border-radius: 50%; background: var(--accent); color: #fff; font-size: 12px; font-weight: 700; flex: none; align-self: center; }

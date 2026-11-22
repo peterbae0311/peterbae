@@ -93,11 +93,22 @@ function planSong(sec, bpm) {
 function analyzedPlan() {
   const it = (typeof sb !== 'undefined' ? sb.custom?.['8'] ?? [] : []).find((x) => x.auto === 'structure' && !x.off && x.secs?.length);
   if (!it) return null;
+  // 원곡 가사(곡 분석 › 가사 팝업)가 붙어 있으면: 그 줄 수·음절 수를 쓰고, 반복 구간이라도 원곡 가사가 다르면 따로 쓴다
+  const seen = new Map(); // key → 원곡 가사 글
   return it.secs.map((s) => {
-    const key = /^(Intro|Interlude|Instrumental|Post-Chorus)/i.test(s.name) ? null
+    let key = /^(Intro|Interlude|Instrumental|Post-Chorus)/i.test(s.name) ? null
       : /Chorus$/i.test(s.name) && !/Pre/i.test(s.name) ? 'Chorus'
       : /Pre-?Chorus/i.test(s.name) ? 'Pre-Chorus' : s.name;
-    return { name: s.name, bars: key ? Math.max(2, s.bars) : Math.max(1, s.bars), key, ...(s.en ? { ko: s.ko, en: s.en } : {}) };
+    if (key && s.text != null) {
+      if (seen.has(key) && seen.get(key) !== s.text) {
+        let k = s.name, n = 2;
+        while (seen.has(k)) k = `${s.name} ${n++}`;
+        key = k;
+      }
+      if (!seen.has(key)) seen.set(key, s.text);
+    }
+    return { name: s.name, bars: key ? Math.max(2, s.bars) : Math.max(1, s.bars), key,
+      ...(s.en ? { ko: s.ko, en: s.en } : {}), ...(s.lines ? { lines: Math.min(16, s.lines), syl: s.syl } : {}) };
   });
 }
 // 가사 구성: 곡 분석 구조가 있으면 그것, 없으면 곡 길이·BPM으로 정한 기본 구성
@@ -109,10 +120,16 @@ const barsPerLine = (bpm) => (bpm < 90 ? 1 : 2);
 const LINE_CAP = (key) => (/^Verse/i.test(key) ? 8 : /Pre-?Chorus/i.test(key) ? 6 : /^Chorus/i.test(key) ? 8 : /^Bridge/i.test(key) ? 6 : /^Outro/i.test(key) ? 4 : 8);
 const sectionLines = (bars, bpm, key) => Math.min(LINE_CAP(key), Math.max(1, Math.round(bars / barsPerLine(bpm))));
 // 가사를 공유하는 섹션별 줄 수(가장 긴 자리 기준)
+// 원곡 가사 형태가 있으면 그 줄 수와 줄별 음절 수(syl)를 그대로 보낸다
 function uniqueSections(plan, bpm) {
   const map = new Map();
-  plan.forEach((s) => { if (s.key) map.set(s.key, Math.max(map.get(s.key) ?? 0, sectionLines(s.bars, bpm, s.key))); });
-  return [...map].map(([name, lines]) => ({ name, lines }));
+  plan.forEach((s) => {
+    if (!s.key) return;
+    const lines = s.lines ?? sectionLines(s.bars, bpm, s.key);
+    const prev = map.get(s.key);
+    if (!prev || lines > prev.lines) map.set(s.key, { lines, ...(s.syl ? { syl: s.syl.slice(0, lines) } : {}) });
+  });
+  return [...map].map(([name, v]) => ({ name, ...v }));
 }
 const fmtLen = (sec) => `${Math.floor(sec / 60)}:${String(Math.round(sec % 60)).padStart(2, '0')}`;
 
@@ -192,7 +209,8 @@ function renderPlan() {
   const bars = totalBars(plan);
   ly.plan.textContent = `${bars}마디 · 예상 ${fmtLen(bars * 240 / bpm)} (${fromSong ? '곡 분석 구조 기준 — 곡 길이는 쓰지 않아요 · '
     : ly.len.value ? '' : `곡 길이 기본 ${fmtLen(LEN_DEFAULT)} 기준 · `}Suno는 ±15초 정도 달라질 수 있어요)`;
-  renderStruct($('#ly-plan-struct'), plan.map((s) => ({ name: s.name, bars: s.bars, inst: !s.key, ko: s.ko })), fromSong ? '가사 구조 (곡 분석)' : '가사 구조');
+  renderStruct($('#ly-plan-struct'), plan.map((s) => ({ name: s.name, bars: s.bars, inst: !s.key, ko: s.ko })),
+    fromSong ? (plan.some((s) => s.lines) ? '가사 구조 (곡 분석 · 원곡 가사 형태)' : '가사 구조 (곡 분석)') : '가사 구조');
   ly.len.disabled = fromSong;
   ly.len.title = fromSong ? 'Suno Style Builder 8번의 곡 분석 가사 구조를 쓰는 중이라 곡 길이는 쓰지 않습니다(8번 구조 칩을 끄면 다시 씁니다)' : '';
 }
@@ -202,7 +220,8 @@ function renderPlan() {
 const NON_EN = /[\u1100-\u11FF\u3040-\u30FF\u3130-\u318F\u3400-\u9FFF\uAC00-\uD7AF\uF900-\uFAFF]/;
 // 모델에 넘기는 전체 구성: "Intro 4 bars (instrumental) > Verse 1 8 bars > … > Final Chorus 16 bars (same lyrics as Chorus)"
 // 구간별 노래 흐름(곡 분석)이 있으면 [대괄호] 안에 부르는 방식을 붙인다(예: Chorus 18 bars [low and yearning start, …])
-const planText = (plan) => plan.map((s) => `${s.name} ${s.bars} bars${!s.key ? ' (instrumental)' : s.key !== s.name ? ` (same lyrics as ${s.key})` : ''}${s.en ? ` [${s.en}]` : ''}`).join(' > ');
+const planText = (plan) => plan.map((s) => `${s.name} ${s.bars} bars${!s.key ? ' (instrumental)'
+  : s.key === s.name ? '' : s.key.startsWith(`${s.name} `) ? ` (its own lyrics: template section "${s.key}")` : ` (same lyrics as ${s.key})`}${s.lines ? `, ${s.lines} lines` : ''}${s.en ? ` [${s.en}]` : ''}`).join(' > ');
 // Style Builder에서 고른 끝맺음(영어 문장). '선택 안 함'이면 비워 둔다
 const plannedEnding = () => (typeof OUTRO_EN !== 'undefined' && sb.outro ? OUTRO_EN[sb.outro] ?? '' : '');
 
@@ -407,9 +426,9 @@ function lyricsText(v, lang) {
     else {
       // 그 자리의 마디 수만큼(짧은 자리는 앞쪽 줄만). 줄 수 상한으로 마디가 4마디 이상 남으면 그 뒤는 연주로 표시
       const bpl = barsPerLine(v.bpm || 120);
-      const lines = (v.lyrics[s.key] ?? []).slice(0, Math.min(LINE_CAP(s.key), Math.max(1, Math.round(s.bars / bpl))));
+      const lines = (v.lyrics[s.key] ?? []).slice(0, s.lines ?? Math.min(LINE_CAP(s.key), Math.max(1, Math.round(s.bars / bpl))));
       lines.forEach((l) => out.push(lang === 'ko' ? l.ko : l.en));
-      if (s.bars - lines.length * bpl >= 4) out.push('[Instrumental]');
+      if (!s.lines && s.bars - lines.length * bpl >= 4) out.push('[Instrumental]'); // 원곡 형태를 따를 때는 원곡대로
     }
     out.push('');
   });

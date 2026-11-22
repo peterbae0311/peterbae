@@ -3,7 +3,7 @@
  *  - 최근 곡: 같은 태그 순위에서 후보를 최대 250곡 받아, hub /api/music/trackyears(MusicBrainz, 초당 1회)로 첫 발매 연도를
  *    30곡씩 확인하며 최근 N년 곡만 순위대로 골라 20곡이 모이면 멈춘다. 확인한 연도는 바뀌지 않아 이 브라우저에 계속 기억한다
  * 장르·세부 장르는 추천 조합과 같은 목록(GENRES + 곡 분석으로 자동 추가한 장르 ✦)을 쓴다.
- * 곡마다 유튜브·스포티파이 검색 링크와 [원곡 정보 찾기](곡으로 조합 만들기 ②로 제목·가수를 넘겨 웹 정보 검색)를 둔다. */
+ * 곡마다 유튜브·스포티파이 검색 링크와 [원곡 정보 찾기](곡 분석 ②로 제목·가수를 넘겨 웹 정보 검색)를 둔다. */
 
 // 세부 장르 → Last.fm 태그. 앱의 영어 장르명이 Last.fm에서 잘 안 쓰이는 이름이면 실제로 많이 쓰는 태그로 바꾼다
 const REF_TAGS = {
@@ -254,7 +254,7 @@ function renderRefList(name, list, head, showYear = false) {
   if (reload) reload.onclick = () => loadRef(name, true);
 }
 
-// 곡으로 조합 만들기의 ② 원곡 정보 확인으로 제목·가수를 넘기고 웹 정보를 찾는다(소리 분석 없이도 확인할 수 있게 ②를 연다)
+// 곡 분석의 ② 원곡 정보 확인으로 제목·가수를 넘기고 웹 정보를 찾는다(소리 분석 없이도 확인할 수 있게 ②를 연다)
 function refFindInfo(t) {
   $('#tab-upload').click();
   const btn = $('#panel-upload .pdesc');

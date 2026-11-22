@@ -288,7 +288,7 @@ function progNames(prog, semis = 0) {
   return prog.map((sym) => buildChord(sym, semis, sharpKey).name);
 }
 
-/* ---------------- 상단 탭: 곡으로 조합 만들기 / 추천 조합 ---------------- */
+/* ---------------- 상단 탭: 곡 분석 / 추천 조합 ---------------- */
 function buildPanelTabs() {
   const tabs = [...document.querySelectorAll('.ptab')];
   const show = (id) => {
@@ -407,7 +407,7 @@ function clearAll() {
   });
 }
 
-// 믹서를 처음 상태로: 재생 정지, 악기·추천 조합 표시 해제, BPM·코드 진행 기본값('추천 조합'·'곡으로 조합 만들기' 초기화가 함께 씀)
+// 믹서를 처음 상태로: 재생 정지, 악기·추천 조합 표시 해제, BPM·코드 진행 기본값('추천 조합'·'곡 분석' 초기화가 함께 씀)
 function resetMixer() {
   if (typeof melIsOn === 'function' && melIsOn()) melodyOff();
   stopTransport();
